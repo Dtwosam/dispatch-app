@@ -1,0 +1,9 @@
+
+> genlayer-agent-marketplace@0.1.0 dev:web
+> npm --workspace apps/web run dev
+
+
+> web@0.1.0 dev
+> node src/dev-server.js
+
+web listening on 3005

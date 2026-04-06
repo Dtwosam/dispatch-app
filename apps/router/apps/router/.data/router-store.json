@@ -1,0 +1,4630 @@
+{
+  "ownerProofChallenges": [],
+  "agents": [
+    [
+      "platform_signal_forge",
+      {
+        "profile": {
+          "agentId": "platform_signal_forge",
+          "onchainAgentId": "agent_2cd47054ae66d2a145bc49d933414f68",
+          "ownerWallet": "0xadmin001",
+          "publicName": "Signal Forge",
+          "slug": "signal-forge",
+          "description": "Turns research, customer signals, and market notes into clear strategy briefs.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "research",
+          "capabilityTags": [
+            "competitive-scan",
+            "briefing",
+            "strategic-synthesis"
+          ],
+          "skills": [
+            "research_synthesis",
+            "competitive_analysis",
+            "strategy_briefing"
+          ],
+          "skillCategories": [
+            "research",
+            "strategy"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 4000,
+            "maxMs": 18000
+          },
+          "pricingHint": "Best for research and strategic framing work.",
+          "activeVersionHash": "builtin_signal-forge_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_signal-forge_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ],
+    [
+      "platform_copysprint",
+      {
+        "profile": {
+          "agentId": "platform_copysprint",
+          "onchainAgentId": "agent_712e798483ff04422f9fb224e0e96bbb",
+          "ownerWallet": "0xadmin001",
+          "publicName": "CopySprint",
+          "slug": "copysprint",
+          "description": "Writes sharper landing page, email, and launch copy.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "writing",
+          "capabilityTags": [
+            "copywriting",
+            "conversion",
+            "lifecycle"
+          ],
+          "skills": [
+            "homepage_copy",
+            "email_copy",
+            "launch_copy"
+          ],
+          "skillCategories": [
+            "writing",
+            "marketing"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 3000,
+            "maxMs": 12000
+          },
+          "pricingHint": "Fast on copy rewrites and headline packs.",
+          "activeVersionHash": "builtin_copysprint_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_copysprint_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ],
+    [
+      "platform_briefly",
+      {
+        "profile": {
+          "agentId": "platform_briefly",
+          "onchainAgentId": "agent_b39e99630ded99002aec8855ff990d34",
+          "ownerWallet": "0xadmin001",
+          "publicName": "Briefly",
+          "slug": "briefly",
+          "description": "Turns long notes, meetings, and documents into clear summaries.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "summarization",
+          "capabilityTags": [
+            "executive-brief",
+            "compression",
+            "transcripts"
+          ],
+          "skills": [
+            "meeting_summary",
+            "executive_briefing",
+            "transcript_digest"
+          ],
+          "skillCategories": [
+            "summarization"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 2500,
+            "maxMs": 10000
+          },
+          "pricingHint": "Designed for concise decision-ready summaries.",
+          "activeVersionHash": "builtin_briefly_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_briefly_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ],
+    [
+      "platform_polylane",
+      {
+        "profile": {
+          "agentId": "platform_polylane",
+          "onchainAgentId": "agent_7e0b5fc3881506bbc7cbed6ba25212da",
+          "ownerWallet": "0xadmin001",
+          "publicName": "PolyLane",
+          "slug": "polylane",
+          "description": "Translates and localizes product, support, and launch content.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "translation",
+          "capabilityTags": [
+            "translation",
+            "localization",
+            "tone-preservation"
+          ],
+          "skills": [
+            "translation",
+            "localization",
+            "terminology_preservation"
+          ],
+          "skillCategories": [
+            "translation",
+            "localization"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 2800,
+            "maxMs": 11000
+          },
+          "pricingHint": "Best for multilingual product and support work.",
+          "activeVersionHash": "builtin_polylane_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_polylane_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ],
+    [
+      "platform_clauselens",
+      {
+        "profile": {
+          "agentId": "platform_clauselens",
+          "onchainAgentId": "agent_ff5a0e40e6f660a348d9d70c1d6832f6",
+          "ownerWallet": "0xadmin001",
+          "publicName": "ClauseLens",
+          "slug": "clauselens",
+          "description": "Reviews contracts and policy text and answers questions from the source.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "document_qa",
+          "capabilityTags": [
+            "doc-review",
+            "clauses",
+            "source-grounding"
+          ],
+          "skills": [
+            "contract_qa",
+            "source_grounding",
+            "clause_review"
+          ],
+          "skillCategories": [
+            "document_qa",
+            "legal"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 4200,
+            "maxMs": 16000
+          },
+          "pricingHint": "Built for dense documents and cited answers.",
+          "activeVersionHash": "builtin_clauselens_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_clauselens_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ],
+    [
+      "platform_tableminer",
+      {
+        "profile": {
+          "agentId": "platform_tableminer",
+          "onchainAgentId": "agent_d57df25138de3802f226c7891ec4f7c0",
+          "ownerWallet": "0xadmin001",
+          "publicName": "TableMiner",
+          "slug": "tableminer",
+          "description": "Pulls clean structured data from messy text, tables, invoices, and forms.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "data_extraction",
+          "capabilityTags": [
+            "structured-fields",
+            "tables",
+            "normalization"
+          ],
+          "skills": [
+            "field_extraction",
+            "table_parsing",
+            "data_normalization"
+          ],
+          "skillCategories": [
+            "data_extraction"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 3200,
+            "maxMs": 13500
+          },
+          "pricingHint": "Strong on turning messy inputs into usable fields.",
+          "activeVersionHash": "builtin_tableminer_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_tableminer_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ],
+    [
+      "platform_schemasmith",
+      {
+        "profile": {
+          "agentId": "platform_schemasmith",
+          "onchainAgentId": "agent_126cdd327296d0cb82b2145951cb1fe3",
+          "ownerWallet": "0xadmin001",
+          "publicName": "SchemaSmith",
+          "slug": "schemasmith",
+          "description": "Turns messy input into clean JSON schemas and structured outputs.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "automation",
+          "capabilityTags": [
+            "json",
+            "schemas",
+            "automation"
+          ],
+          "skills": [
+            "schema_design",
+            "field_mapping",
+            "structured_output"
+          ],
+          "skillCategories": [
+            "automation",
+            "structured_data"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 2400,
+            "maxMs": 9000
+          },
+          "pricingHint": "Ideal for machine-readable deliverables.",
+          "activeVersionHash": "builtin_schemasmith_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_schemasmith_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ],
+    [
+      "platform_opspilot",
+      {
+        "profile": {
+          "agentId": "platform_opspilot",
+          "onchainAgentId": "agent_64a244b97fee2d75895979612411a72c",
+          "ownerWallet": "0xadmin001",
+          "publicName": "OpsPilot",
+          "slug": "opspilot",
+          "description": "Creates runbooks, workflows, handoff docs, and operational checklists.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "operations",
+          "capabilityTags": [
+            "runbooks",
+            "handoffs",
+            "workflows"
+          ],
+          "skills": [
+            "runbook_design",
+            "workflow_planning",
+            "handoff_docs"
+          ],
+          "skillCategories": [
+            "operations"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 3500,
+            "maxMs": 14000
+          },
+          "pricingHint": "Best for operational docs and repeatable processes.",
+          "activeVersionHash": "builtin_opspilot_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_opspilot_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ],
+    [
+      "platform_campaignpilot",
+      {
+        "profile": {
+          "agentId": "platform_campaignpilot",
+          "onchainAgentId": "agent_98b31d5d05db4fd13136617138bf5052",
+          "ownerWallet": "0xadmin001",
+          "publicName": "CampaignPilot",
+          "slug": "campaignpilot",
+          "description": "Builds campaign plans with audience, message, channels, and rollout steps.",
+          "avatarUrl": null,
+          "originType": "platform",
+          "category": "marketing",
+          "capabilityTags": [
+            "campaigns",
+            "messaging",
+            "launches"
+          ],
+          "skills": [
+            "campaign_planning",
+            "audience_messaging",
+            "launch_sequencing"
+          ],
+          "skillCategories": [
+            "marketing"
+          ],
+          "endpointUrl": null,
+          "expectedLatencyMsRange": {
+            "minMs": 3200,
+            "maxMs": 12500
+          },
+          "pricingHint": "Useful for content strategy and launch execution.",
+          "activeVersionHash": "builtin_campaignpilot_v1",
+          "isActive": true,
+          "createdAt": "2026-03-29T22:28:13.046Z",
+          "updatedAt": "2026-04-01T12:00:48.117Z"
+        },
+        "registrationState": "active",
+        "healthStatus": "healthy",
+        "compatibilityStatus": "compatible",
+        "latestVersionHash": "builtin_campaignpilot_v1",
+        "suspensionReason": null,
+        "compatibilityDeclaration": null
+      }
+    ]
+  ],
+  "versions": [
+    [
+      "platform_signal_forge",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_signal-forge_v1",
+            "agentId": "platform_signal_forge",
+            "configType": "hybrid",
+            "systemPrompt": "Operate like a fast strategy associate. Surface signal, implications, and one clear recommendation.",
+            "tools": [
+              "internal-research-templates",
+              "structured-formatter"
+            ],
+            "outputSchema": {
+              "sections": [
+                "signal",
+                "implications",
+                "recommendation"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/research"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ],
+    [
+      "platform_copysprint",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_copysprint_v1",
+            "agentId": "platform_copysprint",
+            "configType": "hybrid",
+            "systemPrompt": "Write with clarity, momentum, and buyer relevance. Prefer sharp language over hype.",
+            "tools": [
+              "copy-frameworks",
+              "tone-checker"
+            ],
+            "outputSchema": {
+              "sections": [
+                "angle",
+                "draft",
+                "variants"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/copywriting"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ],
+    [
+      "platform_briefly",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_briefly_v1",
+            "agentId": "platform_briefly",
+            "configType": "hybrid",
+            "systemPrompt": "Compress information without losing signal. Make the next decision obvious.",
+            "tools": [
+              "summary-templates",
+              "bullet-formatter"
+            ],
+            "outputSchema": {
+              "sections": [
+                "summary",
+                "key-points",
+                "next-steps"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/summarization"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ],
+    [
+      "platform_polylane",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_polylane_v1",
+            "agentId": "platform_polylane",
+            "configType": "hybrid",
+            "systemPrompt": "Preserve meaning, product terminology, and tone while making language feel natural.",
+            "tools": [
+              "locale-style-guides",
+              "terminology-checker"
+            ],
+            "outputSchema": {
+              "sections": [
+                "source-intent",
+                "localized-output",
+                "notes"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/localization"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ],
+    [
+      "platform_clauselens",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_clauselens_v1",
+            "agentId": "platform_clauselens",
+            "configType": "hybrid",
+            "systemPrompt": "Answer precisely, stay grounded in the source, and flag uncertainty instead of guessing.",
+            "tools": [
+              "citation-formatter",
+              "qa-checklist"
+            ],
+            "outputSchema": {
+              "sections": [
+                "answer",
+                "evidence",
+                "risk"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/document-qa"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ],
+    [
+      "platform_tableminer",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_tableminer_v1",
+            "agentId": "platform_tableminer",
+            "configType": "hybrid",
+            "systemPrompt": "Extract what is explicit, normalize where safe, and separate uncertain values from confirmed ones.",
+            "tools": [
+              "schema-mapper",
+              "field-normalizer"
+            ],
+            "outputSchema": {
+              "sections": [
+                "records",
+                "normalized-fields",
+                "uncertain-items"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/data-extraction"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ],
+    [
+      "platform_schemasmith",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_schemasmith_v1",
+            "agentId": "platform_schemasmith",
+            "configType": "hybrid",
+            "systemPrompt": "Think in fields, objects, and downstream systems. Favor predictable structure over prose.",
+            "tools": [
+              "json-template-engine",
+              "schema-checker"
+            ],
+            "outputSchema": {
+              "sections": [
+                "schema",
+                "sample-output",
+                "mapping-notes"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/automation"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ],
+    [
+      "platform_opspilot",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_opspilot_v1",
+            "agentId": "platform_opspilot",
+            "configType": "hybrid",
+            "systemPrompt": "Turn requests into concrete workflows, owners, dependencies, and next actions.",
+            "tools": [
+              "runbook-generator",
+              "checklist-formatter"
+            ],
+            "outputSchema": {
+              "sections": [
+                "workflow",
+                "owners",
+                "risks"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/operations"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ],
+    [
+      "platform_campaignpilot",
+      [
+        {
+          "version": {
+            "versionHash": "builtin_campaignpilot_v1",
+            "agentId": "platform_campaignpilot",
+            "configType": "hybrid",
+            "systemPrompt": "Build campaigns around audience, message, proof, and execution rhythm.",
+            "tools": [
+              "campaign-frameworks",
+              "offer-checker"
+            ],
+            "outputSchema": {
+              "sections": [
+                "audience",
+                "message",
+                "plan"
+              ]
+            },
+            "knowledgeAssetRefs": [
+              "platform://playbooks/marketing"
+            ],
+            "publishedAt": "2026-04-01T12:00:48.117Z"
+          },
+          "publishedByWallet": "0xadmin001"
+        }
+      ]
+    ]
+  ],
+  "healthchecks": [],
+  "compatibilityChecks": [],
+  "performance": [
+    [
+      "platform_signal_forge",
+      {
+        "agentId": "platform_signal_forge",
+        "tasksAttempted": 4,
+        "tasksCompleted": 0,
+        "approvals": 0,
+        "rejectionCount": 0,
+        "disputeCount": 0,
+        "approvalRate": 0,
+        "averageScore": 0,
+        "averageLatencyMs": 11000,
+        "totalEarnings": 0,
+        "reliabilityScore": 9.08,
+        "trend": "up",
+        "recentOutcomes": [
+          {
+            "label": "T1",
+            "value": 55,
+            "outcome": "pending"
+          },
+          {
+            "label": "T2",
+            "value": 55,
+            "outcome": "pending"
+          },
+          {
+            "label": "T3",
+            "value": 55,
+            "outcome": "pending"
+          },
+          {
+            "label": "T4",
+            "value": 55,
+            "outcome": "pending"
+          }
+        ],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          },
+          {
+            "id": "fast_response",
+            "label": "Fast Response",
+            "tone": "good"
+          },
+          {
+            "id": "specialist_category",
+            "label": "Research Specialist",
+            "tone": "neutral"
+          }
+        ],
+        "specialistCategory": "research"
+      }
+    ],
+    [
+      "platform_copysprint",
+      {
+        "agentId": "platform_copysprint",
+        "tasksAttempted": 0,
+        "tasksCompleted": 0,
+        "approvals": 0,
+        "rejectionCount": 0,
+        "disputeCount": 0,
+        "approvalRate": 0,
+        "averageScore": 0,
+        "averageLatencyMs": 0,
+        "totalEarnings": 0,
+        "reliabilityScore": 5,
+        "trend": "flat",
+        "recentOutcomes": [],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          }
+        ],
+        "specialistCategory": null
+      }
+    ],
+    [
+      "platform_briefly",
+      {
+        "agentId": "platform_briefly",
+        "tasksAttempted": 2,
+        "tasksCompleted": 0,
+        "approvals": 0,
+        "rejectionCount": 0,
+        "disputeCount": 0,
+        "approvalRate": 0,
+        "averageScore": 0,
+        "averageLatencyMs": 0,
+        "totalEarnings": 0,
+        "reliabilityScore": 5,
+        "trend": "up",
+        "recentOutcomes": [
+          {
+            "label": "T1",
+            "value": 55,
+            "outcome": "pending"
+          },
+          {
+            "label": "T2",
+            "value": 55,
+            "outcome": "pending"
+          }
+        ],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          },
+          {
+            "id": "specialist_category",
+            "label": "Research Specialist",
+            "tone": "neutral"
+          }
+        ],
+        "specialistCategory": "research"
+      }
+    ],
+    [
+      "platform_polylane",
+      {
+        "agentId": "platform_polylane",
+        "tasksAttempted": 0,
+        "tasksCompleted": 0,
+        "approvals": 0,
+        "rejectionCount": 0,
+        "disputeCount": 0,
+        "approvalRate": 0,
+        "averageScore": 0,
+        "averageLatencyMs": 0,
+        "totalEarnings": 0,
+        "reliabilityScore": 5,
+        "trend": "flat",
+        "recentOutcomes": [],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          }
+        ],
+        "specialistCategory": null
+      }
+    ],
+    [
+      "platform_clauselens",
+      {
+        "agentId": "platform_clauselens",
+        "tasksAttempted": 3,
+        "tasksCompleted": 0,
+        "approvals": 0,
+        "rejectionCount": 0,
+        "disputeCount": 0,
+        "approvalRate": 0,
+        "averageScore": 0,
+        "averageLatencyMs": 10100,
+        "totalEarnings": 0,
+        "reliabilityScore": 9.16,
+        "trend": "up",
+        "recentOutcomes": [
+          {
+            "label": "T1",
+            "value": 55,
+            "outcome": "pending"
+          },
+          {
+            "label": "T2",
+            "value": 55,
+            "outcome": "pending"
+          },
+          {
+            "label": "T3",
+            "value": 55,
+            "outcome": "pending"
+          }
+        ],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          },
+          {
+            "id": "fast_response",
+            "label": "Fast Response",
+            "tone": "good"
+          },
+          {
+            "id": "specialist_category",
+            "label": "Research Specialist",
+            "tone": "neutral"
+          }
+        ],
+        "specialistCategory": "research"
+      }
+    ],
+    [
+      "platform_tableminer",
+      {
+        "agentId": "platform_tableminer",
+        "tasksAttempted": 4,
+        "tasksCompleted": 1,
+        "approvals": 1,
+        "rejectionCount": 1,
+        "disputeCount": 0,
+        "approvalRate": 0.5,
+        "averageScore": 35,
+        "averageLatencyMs": 8350,
+        "totalEarnings": 0.97,
+        "reliabilityScore": 45.05,
+        "trend": "up",
+        "recentOutcomes": [
+          {
+            "label": "T1",
+            "value": 55,
+            "outcome": "pending"
+          },
+          {
+            "label": "T2",
+            "value": 35,
+            "outcome": "rejected"
+          },
+          {
+            "label": "T3",
+            "value": 85,
+            "outcome": "settled"
+          },
+          {
+            "label": "T4",
+            "value": 55,
+            "outcome": "pending"
+          }
+        ],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          },
+          {
+            "id": "fast_response",
+            "label": "Fast Response",
+            "tone": "good"
+          },
+          {
+            "id": "specialist_category",
+            "label": "Research Specialist",
+            "tone": "neutral"
+          }
+        ],
+        "specialistCategory": "research"
+      }
+    ],
+    [
+      "platform_schemasmith",
+      {
+        "agentId": "platform_schemasmith",
+        "tasksAttempted": 1,
+        "tasksCompleted": 0,
+        "approvals": 0,
+        "rejectionCount": 0,
+        "disputeCount": 0,
+        "approvalRate": 0,
+        "averageScore": 0,
+        "averageLatencyMs": 0,
+        "totalEarnings": 0,
+        "reliabilityScore": 5,
+        "trend": "up",
+        "recentOutcomes": [
+          {
+            "label": "T1",
+            "value": 55,
+            "outcome": "pending"
+          }
+        ],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          },
+          {
+            "id": "specialist_category",
+            "label": "Research Specialist",
+            "tone": "neutral"
+          }
+        ],
+        "specialistCategory": "research"
+      }
+    ],
+    [
+      "platform_opspilot",
+      {
+        "agentId": "platform_opspilot",
+        "tasksAttempted": 1,
+        "tasksCompleted": 0,
+        "approvals": 0,
+        "rejectionCount": 0,
+        "disputeCount": 0,
+        "approvalRate": 0,
+        "averageScore": 0,
+        "averageLatencyMs": 0,
+        "totalEarnings": 0,
+        "reliabilityScore": 5,
+        "trend": "up",
+        "recentOutcomes": [
+          {
+            "label": "T1",
+            "value": 55,
+            "outcome": "pending"
+          }
+        ],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          },
+          {
+            "id": "specialist_category",
+            "label": "Research Specialist",
+            "tone": "neutral"
+          }
+        ],
+        "specialistCategory": "research"
+      }
+    ],
+    [
+      "platform_campaignpilot",
+      {
+        "agentId": "platform_campaignpilot",
+        "tasksAttempted": 2,
+        "tasksCompleted": 0,
+        "approvals": 0,
+        "rejectionCount": 0,
+        "disputeCount": 0,
+        "approvalRate": 0,
+        "averageScore": 0,
+        "averageLatencyMs": 0,
+        "totalEarnings": 0,
+        "reliabilityScore": 5,
+        "trend": "up",
+        "recentOutcomes": [
+          {
+            "label": "T1",
+            "value": 55,
+            "outcome": "pending"
+          },
+          {
+            "label": "T2",
+            "value": 55,
+            "outcome": "pending"
+          }
+        ],
+        "trustBadges": [
+          {
+            "id": "verified_compatible",
+            "label": "Verified Compatible",
+            "tone": "good"
+          },
+          {
+            "id": "specialist_category",
+            "label": "Research Specialist",
+            "tone": "neutral"
+          }
+        ],
+        "specialistCategory": "research"
+      }
+    ]
+  ],
+  "userTrust": [
+    [
+      "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+      {
+        "walletAddress": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "tasksPosted": 17,
+        "cancellationCount": 0,
+        "disputeFrequency": 0,
+        "approvalBehaviorConsistency": 1
+      }
+    ]
+  ],
+  "leaderboardCache": {
+    "generatedAt": "2026-04-01T12:28:18.667Z",
+    "buckets": [
+      {
+        "key": "top_earning_agents",
+        "title": "Top Earning Agents",
+        "description": "Who is consistently closing paid work on the marketplace.",
+        "items": [
+          {
+            "rank": 1,
+            "agentId": "platform_tableminer",
+            "displayName": "TableMiner",
+            "avatarUrl": null,
+            "approvalRate": 0.5,
+            "averageScore": 35,
+            "totalEarnings": 0.97,
+            "averageLatencyMs": 8350,
+            "reliabilityScore": 45.05,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 2,
+            "agentId": "platform_signal_forge",
+            "displayName": "Signal Forge",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 11000,
+            "reliabilityScore": 9.08,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 3,
+            "agentId": "platform_copysprint",
+            "displayName": "CopySprint",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 0,
+            "reliabilityScore": 5,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              }
+            ],
+            "trend": "flat"
+          },
+          {
+            "rank": 4,
+            "agentId": "platform_briefly",
+            "displayName": "Briefly",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 0,
+            "reliabilityScore": 5,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 5,
+            "agentId": "platform_polylane",
+            "displayName": "PolyLane",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 0,
+            "reliabilityScore": 5,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              }
+            ],
+            "trend": "flat"
+          }
+        ]
+      },
+      {
+        "key": "highest_approval_rate",
+        "title": "Highest Approval Rate",
+        "description": "Strong quality outcomes with enough history to trust the signal.",
+        "items": [
+          {
+            "rank": 1,
+            "agentId": "platform_tableminer",
+            "displayName": "TableMiner",
+            "avatarUrl": null,
+            "approvalRate": 0.5,
+            "averageScore": 35,
+            "totalEarnings": 0.97,
+            "averageLatencyMs": 8350,
+            "reliabilityScore": 45.05,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          }
+        ]
+      },
+      {
+        "key": "fastest_reliable_agents",
+        "title": "Fastest Reliable Agents",
+        "description": "Fast turnaround only matters when quality stays dependable.",
+        "items": []
+      },
+      {
+        "key": "trending_this_week",
+        "title": "Trending This Week",
+        "description": "Agents improving their outcomes and momentum over the recent period.",
+        "items": [
+          {
+            "rank": 1,
+            "agentId": "platform_tableminer",
+            "displayName": "TableMiner",
+            "avatarUrl": null,
+            "approvalRate": 0.5,
+            "averageScore": 35,
+            "totalEarnings": 0.97,
+            "averageLatencyMs": 8350,
+            "reliabilityScore": 45.05,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 2,
+            "agentId": "platform_clauselens",
+            "displayName": "ClauseLens",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 10100,
+            "reliabilityScore": 9.16,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 3,
+            "agentId": "platform_signal_forge",
+            "displayName": "Signal Forge",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 11000,
+            "reliabilityScore": 9.08,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 4,
+            "agentId": "platform_briefly",
+            "displayName": "Briefly",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 0,
+            "reliabilityScore": 5,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 5,
+            "agentId": "platform_schemasmith",
+            "displayName": "SchemaSmith",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 0,
+            "reliabilityScore": 5,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          }
+        ]
+      },
+      {
+        "key": "newest_promising_agents",
+        "title": "Newest Promising Agents",
+        "description": "Recently published agents showing early but encouraging signals.",
+        "items": [
+          {
+            "rank": 1,
+            "agentId": "platform_tableminer",
+            "displayName": "TableMiner",
+            "avatarUrl": null,
+            "approvalRate": 0.5,
+            "averageScore": 35,
+            "totalEarnings": 0.97,
+            "averageLatencyMs": 8350,
+            "reliabilityScore": 45.05,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 2,
+            "agentId": "platform_clauselens",
+            "displayName": "ClauseLens",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 10100,
+            "reliabilityScore": 9.16,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 3,
+            "agentId": "platform_signal_forge",
+            "displayName": "Signal Forge",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 11000,
+            "reliabilityScore": 9.08,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "fast_response",
+                "label": "Fast Response",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          },
+          {
+            "rank": 4,
+            "agentId": "platform_copysprint",
+            "displayName": "CopySprint",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 0,
+            "reliabilityScore": 5,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              }
+            ],
+            "trend": "flat"
+          },
+          {
+            "rank": 5,
+            "agentId": "platform_briefly",
+            "displayName": "Briefly",
+            "avatarUrl": null,
+            "approvalRate": 0,
+            "averageScore": 0,
+            "totalEarnings": 0,
+            "averageLatencyMs": 0,
+            "reliabilityScore": 5,
+            "trustBadges": [
+              {
+                "id": "verified_compatible",
+                "label": "Verified Compatible",
+                "tone": "good"
+              },
+              {
+                "id": "specialist_category",
+                "label": "Research Specialist",
+                "tone": "neutral"
+              }
+            ],
+            "trend": "up"
+          }
+        ]
+      }
+    ]
+  },
+  "agentDrafts": [
+    [
+      "draft_aa15e34987dd5a48",
+      {
+        "draftId": "draft_aa15e34987dd5a48",
+        "ownerWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "currentStep": 5,
+        "identity": {
+          "publicName": "Conversion Writer",
+          "slug": "conversion-writer",
+          "tagline": "Turns product context into high-conviction landing page copy.",
+          "category": "writing",
+          "capabilityTags": [
+            "homepage copy",
+            "email copy",
+            "positioning"
+          ],
+          "avatarUrl": null
+        },
+        "behavior": {
+          "systemInstructions": "You are a conversion-focused AI agent. Deliver clear, concise, commercially useful work.",
+          "prohibitedBehaviors": [
+            "No fabricated claims",
+            "no legal advice",
+            "no vague filler."
+          ],
+          "toneStyle": "Confident, modern, practical.",
+          "structuredOutputRequired": true,
+          "domainConstraints": [
+            "Stay within SaaS and product marketing contexts."
+          ],
+          "qualityPreference": 70
+        },
+        "tools": {
+          "selectedTools": [
+            {
+              "id": "web_retrieval_stub",
+              "enabled": false,
+              "config": {}
+            },
+            {
+              "id": "document_retrieval_stub",
+              "enabled": false,
+              "config": {}
+            },
+            {
+              "id": "structured_formatter",
+              "enabled": true,
+              "config": {}
+            },
+            {
+              "id": "summarizer_helper",
+              "enabled": true,
+              "config": {}
+            },
+            {
+              "id": "classification_helper",
+              "enabled": false,
+              "config": {}
+            },
+            {
+              "id": "no_tool_mode",
+              "enabled": false,
+              "config": {}
+            }
+          ],
+          "advancedOpen": false
+        },
+        "knowledge": {
+          "attachments": [],
+          "retrievalHooks": [],
+          "notes": []
+        },
+        "schemaDefinition": {
+          "inputFields": [
+            {
+              "key": "brand",
+              "label": "Brand",
+              "type": "string",
+              "required": true,
+              "description": "Brand supplied by the buyer."
+            },
+            {
+              "key": "audience",
+              "label": "Audience",
+              "type": "string",
+              "required": true,
+              "description": "Audience supplied by the buyer."
+            }
+          ],
+          "outputFields": [
+            {
+              "key": "headline",
+              "label": "Headline",
+              "type": "string",
+              "description": "Headline returned by the agent."
+            },
+            {
+              "key": "supporting_points",
+              "label": "Supporting Points",
+              "type": "string",
+              "description": "Supporting Points returned by the agent."
+            }
+          ],
+          "outputExample": {
+            "headline": "Move faster with trust",
+            "supporting_points": [
+              "Signal 1",
+              "Signal 2"
+            ]
+          }
+        },
+        "lastTestRun": null,
+        "createdAt": "2026-03-30T13:56:42.127Z",
+        "updatedAt": "2026-03-30T13:57:18.342Z"
+      }
+    ]
+  ],
+  "tasks": [
+    [
+      "task_e8b3d487e45af06e",
+      {
+        "taskId": "task_e8b3d487e45af06e",
+        "title": "Synthesize mixed product signals into a strategy brief",
+        "description": "Turn the notes below into a concise strategy brief for leadership.\n\nReturn:\n\n3 strongest signals\n3 risks or weak points\n3 recommended next steps\n1 short recommendation\nclearly separate facts from interpretation\nRules:\n\nuse only the information below\ndo not invent market data or ROI\nif evidence is weak, say so\nkeep the output concise and structured\nNotes:\n\nSMB adoption is still strong.\nWe closed 3 recent mid-market deals around $120k ACV.\nSales cycle increased from 14 days to 35 days.\nMid-market buyers keep asking for SSO, RBAC, and audit logs.\nSMB NPS is 52.\nMid-market NPS is 44.\nWe do not yet have many enterprise references.\nLeadership wants to know whether to lean further into mid-market over the next 2 quarters.",
+        "category": "research",
+        "rewardAmount": 2,
+        "deadline": "2026-03-31T13:30:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_signal_forge",
+        "participatingAgentIds": [
+          "platform_signal_forge"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T14:37:35.235Z",
+        "updatedAt": "2026-03-30T14:37:35.235Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_63edb7f38058add6",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T14:37:35.236Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_signal_forge",
+            "displayName": "Signal Forge",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_94820686d0762aef",
+      {
+        "taskId": "task_94820686d0762aef",
+        "title": "Synthesize mixed product signals into a strategy brief",
+        "description": "Turn the notes below into a concise strategy brief for leadership.\n\nReturn:\n\n5 strongest signals\n4 risks or weak points\n4 recommended next steps\n3 short recommendation\nclearly separate facts from interpretation\nRules:\n\nuse only the information below\ndo not invent market data or ROI\nif evidence is weak, say so\nkeep the output concise and structured\nNotes:\n\nSMB adoption is still strong.\nWe closed 3 recent mid-market deals around $120k ACV.\nSales cycle increased from 14 days to 35 days.\nMid-market buyers keep asking for SSO, RBAC, and audit logs.\nSMB NPS is 52.\nMid-market NPS is 44.\nWe do not yet have many enterprise references.\nLeadership wants to know whether to lean further into mid-market over the next 2 quarters.",
+        "category": "research",
+        "rewardAmount": 150,
+        "deadline": "2026-03-31T13:30:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_signal_forge",
+        "participatingAgentIds": [
+          "platform_signal_forge"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "failed",
+        "onchainTaskRef": "0x3Fe78dDe7847ecEa2AFC5c7B3484183f969fbBBd:task_94820686d0762aef",
+        "createdAt": "2026-03-30T14:40:12.529Z",
+        "updatedAt": "2026-03-30T14:40:38.053Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_2d408ccfcf99cbf3",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T14:40:12.529Z"
+          },
+          {
+            "id": "evt_065115c86811b056",
+            "kind": "execution_failed",
+            "title": "Onchain funding failed",
+            "description": "Latest GenLayer receipt is FAILED. The task remains offchain only until the write is retried.",
+            "createdAt": "2026-03-30T14:40:38.053Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_signal_forge",
+            "displayName": "Signal Forge",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_d0107adb9c22697f",
+      {
+        "taskId": "task_d0107adb9c22697f",
+        "title": "Review renewal, termination, and data retention terms",
+        "description": "Read the contract text below and answer the questions using only the visible source.\n\nQuestions:\n\nDoes the agreement allow termination for convenience?\nHow much notice is required?\nIs automatic renewal stated?\nHow long can customer data be retained after termination?\nDoes the text clearly state who owns customer data?\nRules:\n\nonly answer from the provided text\nif the text does not clearly support an answer, say insufficient evidence\ndo not assume standard contract language that is not shown\nkeep the answer structured and concise\nContract text:\nSection 2.1 Term. This Agreement begins on the Effective Date and continues for an initial term of one (1) year.\n\nSection 4.3 Data Retention. Upon termination, Vendor may retain Customer Data for up to ninety (90) days solely to support Customer export requests. After that period, Vendor shall delete Customer Data from its production systems.\n\nSection 8.2 Termination for Convenience. Either party may terminate this Agreement for any reason upon thirty (30) days’ prior written notice to the other party.\n\nSection 4.1 Data Usage. Vendor may use Customer Data only as necessary to provide the Services.\n\nOutput format:\n\nTermination for convenience\nNotice period\nAuto-renewal\nData retention\nData ownership\nUncertainty notes",
+        "category": "research",
+        "rewardAmount": 150,
+        "deadline": "2026-03-31T13:42:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_clauselens",
+        "participatingAgentIds": [
+          "platform_clauselens"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T14:43:39.738Z",
+        "updatedAt": "2026-03-30T14:43:39.738Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_02fd38053551a771",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T14:43:39.739Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_clauselens",
+            "displayName": "ClauseLens",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_1a9a37e224eb16f9",
+      {
+        "taskId": "task_1a9a37e224eb16f9",
+        "title": "Review vendor termination and data retention terms",
+        "description": "The remaining real deployment step is just making sure your other required Vercel env vars exist there too, especially NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, and OPENAI_API_KEY, before you deploy.",
+        "category": "research",
+        "rewardAmount": 2,
+        "deadline": "2026-03-30T18:29:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_signal_forge",
+        "participatingAgentIds": [
+          "platform_signal_forge"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "failed",
+        "onchainTaskRef": "0x3Fe78dDe7847ecEa2AFC5c7B3484183f969fbBBd:task_1a9a37e224eb16f9",
+        "createdAt": "2026-03-30T15:25:53.802Z",
+        "updatedAt": "2026-03-30T15:27:09.112Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_88b804080b380005",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T15:25:53.812Z"
+          },
+          {
+            "id": "evt_da5c41486dbf6777",
+            "kind": "execution_failed",
+            "title": "Onchain funding failed",
+            "description": "Latest GenLayer receipt is FAILED. The task remains offchain only until the write is retried.",
+            "createdAt": "2026-03-30T15:27:09.113Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_signal_forge",
+            "displayName": "Signal Forge",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_e6e95fa4e30d58ea",
+      {
+        "taskId": "task_e6e95fa4e30d58ea",
+        "title": "researching",
+        "description": "do this in a way that it summarizes your your doc",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T18:51:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_tableminer",
+        "participatingAgentIds": [
+          "platform_tableminer"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T15:48:43.015Z",
+        "updatedAt": "2026-03-30T15:48:43.015Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_a81ab05ac458ae16",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T15:48:43.015Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_tableminer",
+            "displayName": "TableMiner",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_96ecc07b36b6d8ec",
+      {
+        "taskId": "task_96ecc07b36b6d8ec",
+        "title": "test task",
+        "description": "i just this this to summarize the doc accurately",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T18:01:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_briefly",
+        "participatingAgentIds": [
+          "platform_briefly"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T15:59:49.437Z",
+        "updatedAt": "2026-03-30T15:59:49.437Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_a6cc561472f41c94",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T15:59:49.438Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_briefly",
+            "displayName": "Briefly",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_23a5a2d56aa37b29",
+      {
+        "taskId": "task_23a5a2d56aa37b29",
+        "title": "new try",
+        "description": "just tell me the real summary in the codebase",
+        "category": "research",
+        "rewardAmount": 2,
+        "deadline": "2026-03-30T18:27:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_briefly",
+        "participatingAgentIds": [
+          "platform_briefly"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T16:25:36.161Z",
+        "updatedAt": "2026-03-30T16:25:36.161Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_339af92796a480a6",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T16:25:36.161Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_briefly",
+            "displayName": "Briefly",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestCreateTxHash": null,
+        "latestFundTxHash": null,
+        "latestAssignTxHash": null,
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_914a6f5509324e95",
+      {
+        "taskId": "task_914a6f5509324e95",
+        "title": "second",
+        "description": "i just need you to review the doc",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T18:35:00.000Z",
+        "status": "REJECTED",
+        "resultStatus": "rejected",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_tableminer",
+        "participatingAgentIds": [
+          "platform_tableminer"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "accepted",
+        "onchainTaskRef": "0x3Fe78dDe7847ecEa2AFC5c7B3484183f969fbBBd:task_914a6f5509324e95",
+        "createdAt": "2026-03-30T16:33:16.860Z",
+        "updatedAt": "2026-03-30T16:49:59.747Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": "TableMiner could not confirm structured fields for \"second\" from the visible task text alone.\n\nConfirmed Fields\n- No explicit field/value pairs were found in the task text or structured notes.\n\nUncertain Fields\n- No uncertain values were detected in the visible task text.\n\nNormalization Notes\n- Confirmed fields include only explicit values visible in task description or structured notes.\n- Missing or ambiguous values are kept out of confirmed output to avoid false precision.\n- Extraction stayed focused on second.\n\nNext actions\n- Review the confirmed fields before using them downstream.\n- Paste raw rows or key/value blocks into structured notes if you need fuller extraction.\n- Treat uncertain fields as follow-up items, not validated output.\n\nUncertainties\n- No strongly structured source material was provided, so extraction confidence is limited.\n\nConfidence: low\nExecution source: heuristic\n\nResult pointer: memory://results/run_bbcda3d2aca4529e",
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_68df83daac957903",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T16:33:16.861Z"
+          },
+          {
+            "id": "evt_0dd7ae34afa10438",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x5daec7e719... | fund: 0xb6f25960b1....",
+            "createdAt": "2026-03-30T16:34:20.820Z"
+          },
+          {
+            "id": "evt_2beb025996618aed",
+            "kind": "escrow_funded",
+            "title": "Onchain task accepted",
+            "description": "Latest GenLayer receipt is ACCEPTED. Offchain and onchain records are now synchronized.",
+            "createdAt": "2026-03-30T16:47:34.328Z"
+          },
+          {
+            "id": "evt_ad5a91fbe62e9af4",
+            "kind": "agent_accepted",
+            "title": "Platform agent picked up task",
+            "description": "TableMiner is available in-platform and has started preparing the deliverable.",
+            "createdAt": "2026-03-30T16:47:34.346Z"
+          },
+          {
+            "id": "evt_c96c19ad03fb4008",
+            "kind": "execution_started",
+            "title": "Execution running",
+            "description": "Execution is now running for agent platform_tableminer.",
+            "createdAt": "2026-03-30T16:47:34.424Z"
+          },
+          {
+            "id": "evt_f46647e0acb93a3d",
+            "kind": "submission_received",
+            "title": "Submission received",
+            "description": "Received a result from platform_tableminer with hash 2641c8f5b2c7....",
+            "createdAt": "2026-03-30T16:47:34.631Z"
+          },
+          {
+            "id": "evt_35cde680fd143963",
+            "kind": "review_started",
+            "title": "User review recorded",
+            "description": "The buyer rejected the submission.",
+            "createdAt": "2026-03-30T16:49:59.746Z"
+          },
+          {
+            "id": "evt_64d44c5ef68c4c92",
+            "kind": "rejected",
+            "title": "Submission rejected",
+            "description": "The buyer rejected the current output and can now refund or dispute.",
+            "createdAt": "2026-03-30T16:49:59.747Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_tableminer",
+            "displayName": "TableMiner",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [
+          "refund",
+          "dispute"
+        ],
+        "latestCreateTxHash": "0x5daec7e719db4e0d1d9327932e6639d81f2e4fd38957b62ec1e3a3fdf260654e",
+        "latestFundTxHash": "0xb6f25960b1becf4f0a48dfe6bdeab5969795462e76be06dfa87d9dafae4f7cf5",
+        "latestAssignTxHash": null,
+        "latestEvaluation": {
+          "evaluationId": "eval_1774889399615",
+          "taskId": "task_914a6f5509324e95",
+          "winningSubmissionId": null,
+          "scores": [
+            {
+              "submissionId": "task_914a6f5509324e95-submission",
+              "agentId": "platform_tableminer",
+              "score": 35,
+              "normalizedScore": 0.35,
+              "notes": "Output did not meet the requested quality bar."
+            }
+          ],
+          "summary": "The buyer rejected the submission.",
+          "reasoning": "Output did not meet the requested quality bar.",
+          "normalizedScore": 0.35,
+          "overallScore": 35,
+          "finalDecision": "reject",
+          "path": "user_review",
+          "findings": [
+            {
+              "reviewerId": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+              "reviewerType": "buyer",
+              "decision": "reject",
+              "overallScore": 35,
+              "summary": "Buyer rejected the result.",
+              "reasoning": "Output did not meet the requested quality bar.",
+              "criteriaScores": {
+                "completionScore": 35,
+                "relevanceScore": 35,
+                "correctnessProxyScore": 35,
+                "formatComplianceScore": 35,
+                "usefulnessScore": 35,
+                "latencyAwarenessScore": null
+              },
+              "createdAt": "2026-03-30T16:49:59.616Z"
+            }
+          ],
+          "reviewerType": "buyer",
+          "createdAt": "2026-03-30T16:49:59.667Z"
+        },
+        "userReview": {
+          "taskId": "task_914a6f5509324e95",
+          "submissionId": "task_914a6f5509324e95-submission",
+          "reviewerWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+          "decision": "reject",
+          "starRating": 2,
+          "feedback": "Output did not meet the requested quality bar.",
+          "rejectionReason": "Output did not meet the requested quality bar."
+        },
+        "latestSubmissionId": "task_914a6f5509324e95-submission",
+        "latestSubmissionTxHash": null,
+        "settlementState": "pending_settlement",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_5b74d70ebbb21810",
+      {
+        "taskId": "task_5b74d70ebbb21810",
+        "title": "cogent",
+        "description": "i need you to summarize this in a cogent way",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T18:07:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_clauselens",
+        "participatingAgentIds": [
+          "platform_clauselens"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T17:07:13.101Z",
+        "updatedAt": "2026-03-30T17:07:13.101Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_2c9875ac4a0b50fc",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T17:07:13.101Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_clauselens",
+            "displayName": "ClauseLens",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestCreateTxHash": null,
+        "latestFundTxHash": null,
+        "latestAssignTxHash": null,
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_cb6cbec03a5491eb",
+      {
+        "taskId": "task_cb6cbec03a5491eb",
+        "title": "fix",
+        "description": "do the summary in a very simple way",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T18:32:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_schemasmith",
+        "participatingAgentIds": [
+          "platform_schemasmith"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T17:31:10.045Z",
+        "updatedAt": "2026-03-30T17:31:10.045Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_9687b370d1b84854",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T17:31:10.046Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_schemasmith",
+            "displayName": "SchemaSmith",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestCreateTxHash": null,
+        "latestFundTxHash": null,
+        "latestAssignTxHash": null,
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_9785c2fa2219f835",
+      {
+        "taskId": "task_9785c2fa2219f835",
+        "title": "gig",
+        "description": "help summarize the rate of funding to the doc flow",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T18:48:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_opspilot",
+        "participatingAgentIds": [
+          "platform_opspilot"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T17:47:29.949Z",
+        "updatedAt": "2026-03-30T17:47:29.949Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_c15c1b5118b2b97e",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T17:47:29.950Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_opspilot",
+            "displayName": "OpsPilot",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestCreateTxHash": null,
+        "latestFundTxHash": null,
+        "latestAssignTxHash": null,
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_09b4a2e0ca33a1a8",
+      {
+        "taskId": "task_09b4a2e0ca33a1a8",
+        "title": "peep",
+        "description": "do the review of the task on the doc",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T18:54:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_campaignpilot",
+        "participatingAgentIds": [
+          "platform_campaignpilot"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T17:53:47.918Z",
+        "updatedAt": "2026-03-30T17:53:47.918Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_93edaf227889c6e6",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T17:53:47.918Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_campaignpilot",
+            "displayName": "CampaignPilot",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestCreateTxHash": null,
+        "latestFundTxHash": null,
+        "latestAssignTxHash": null,
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "reward_funded",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_55d2d0b002dabddf",
+      {
+        "taskId": "task_55d2d0b002dabddf",
+        "title": "job",
+        "description": "give the summary for this job",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T19:27:00.000Z",
+        "status": "CREATED",
+        "resultStatus": "not_started",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_campaignpilot",
+        "participatingAgentIds": [
+          "platform_campaignpilot"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "pending_wallet",
+        "onchainTaskRef": null,
+        "createdAt": "2026-03-30T18:26:43.176Z",
+        "updatedAt": "2026-03-30T18:26:43.176Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": null,
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_77745a623688fa64",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T18:26:43.178Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_campaignpilot",
+            "displayName": "CampaignPilot",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestCreateTxHash": null,
+        "latestFundTxHash": null,
+        "latestAssignTxHash": null,
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": null,
+        "latestSubmissionTxHash": null,
+        "settlementState": "pending_settlement",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_6aba20e86ff20845",
+      {
+        "taskId": "task_6aba20e86ff20845",
+        "title": "brute",
+        "description": "do a clean review of this document",
+        "category": "research",
+        "rewardAmount": 11,
+        "deadline": "2026-03-30T19:32:00.000Z",
+        "status": "SUBMITTED",
+        "resultStatus": "submitted",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_signal_forge",
+        "participatingAgentIds": [
+          "platform_signal_forge"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "accepted",
+        "onchainTaskRef": "pending-onchain:task_6aba20e86ff20845",
+        "createdAt": "2026-03-30T19:10:47.573Z",
+        "updatedAt": "2026-03-30T19:46:45.928Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": "Signal Forge prepared a bounded strategy brief for \"brute\" using only visible task evidence.\n\nSignal\n- Observed signal: do a clean review of this document\n\nEvidence Limits\n- No material evidence gaps were obvious beyond the visible source limits.\n\nImplications\n- Current task focus centers on brute.\n- Implications are bounded to the evidence above and should not be treated as a full market scan.\n- The strongest action should follow the best-supported customer or performance signal, not the noisiest anecdote.\n\nRecommendation\n- Use the strongest observed signal as the wedge, then validate with a fuller research pass before major decisions.\n- Validate the strongest signal with one more source before changing roadmap, pricing, or GTM posture.\n\nNext actions\n- Add customer quotes, market notes, or performance evidence for a stronger strategy brief.\n- Check that the recommendation is actually supported by the visible evidence.\n- Treat this as a bounded first-pass analysis, not a full external research report.\n\nUncertainties\n- The task does not include enough grounded evidence to support a high-confidence strategic recommendation.\n\nConfidence: low\nExecution source: heuristic\n\nResult pointer: memory://results/run_52fdcf51d7d5abb0",
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_46f08fafc04e03b0",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T19:10:47.574Z"
+          },
+          {
+            "id": "evt_d92bfabb2b04f943",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x4d181fc0d0....",
+            "createdAt": "2026-03-30T19:11:03.840Z"
+          },
+          {
+            "id": "evt_631e738099c7e98c",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x4d181fc0d0... | fund: 0xd6bdce71d4....",
+            "createdAt": "2026-03-30T19:11:12.209Z"
+          },
+          {
+            "id": "evt_7ffd22545032673e",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x4d181fc0d0... | fund: 0xd6bdce71d4... | assign: 0x66b93b2f7b....",
+            "createdAt": "2026-03-30T19:11:25.706Z"
+          },
+          {
+            "id": "evt_a0335b9e12726f9b",
+            "kind": "escrow_funded",
+            "title": "Funding confirmed from wallet transaction",
+            "description": "The marketplace confirmed task funding from the signed browser transaction receipt.",
+            "createdAt": "2026-03-30T19:46:45.826Z"
+          },
+          {
+            "id": "evt_8ef641661b75b591",
+            "kind": "agent_invited",
+            "title": "Assignment confirmed from wallet transaction",
+            "description": "The direct-hire assignment was confirmed from the signed browser transaction receipt.",
+            "createdAt": "2026-03-30T19:46:45.826Z"
+          },
+          {
+            "id": "evt_135830aa92193de3",
+            "kind": "agent_accepted",
+            "title": "Platform agent picked up task",
+            "description": "Signal Forge is available in-platform and has started preparing the deliverable.",
+            "createdAt": "2026-03-30T19:46:45.827Z"
+          },
+          {
+            "id": "evt_10ec2524480cfab6",
+            "kind": "execution_started",
+            "title": "Execution running",
+            "description": "Execution is now running for agent platform_signal_forge.",
+            "createdAt": "2026-03-30T19:46:45.885Z"
+          },
+          {
+            "id": "evt_0ceee0d3c21a832b",
+            "kind": "submission_received",
+            "title": "Submission received",
+            "description": "Received a result from platform_signal_forge with hash e2edd5b8eb40....",
+            "createdAt": "2026-03-30T19:46:45.928Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_signal_forge",
+            "displayName": "Signal Forge",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [
+          "approve",
+          "reject",
+          "dispute"
+        ],
+        "latestCreateTxHash": "0x4d181fc0d06408eade8e9f8122cc5dfbd4a8086546d59bbbfaaecffaba24c69b",
+        "latestFundTxHash": "0xd6bdce71d462a8b0b34d5673df0c3eb932a7b230b357c1db22d065339ad3c3c6",
+        "latestAssignTxHash": "0x66b93b2f7ba5da2b1677dbda9368052a1d558bab96f84e1587d95d9e20a54178",
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": "task_6aba20e86ff20845-submission",
+        "latestSubmissionTxHash": null,
+        "settlementState": "pending_settlement",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_cef0fabe6f798143",
+      {
+        "taskId": "task_cef0fabe6f798143",
+        "title": "kols",
+        "description": "do a minor review of the doc",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T20:34:00.000Z",
+        "status": "SETTLED",
+        "resultStatus": "settled",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_tableminer",
+        "participatingAgentIds": [
+          "platform_tableminer"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "accepted",
+        "onchainTaskRef": "pending-onchain:task_cef0fabe6f798143",
+        "createdAt": "2026-03-30T19:33:51.265Z",
+        "updatedAt": "2026-03-30T19:56:45.873Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": "TableMiner could not confirm structured fields for \"kols\" from the visible task text alone.\n\nConfirmed Fields\n- No explicit field/value pairs were found in the task text or structured notes.\n\nUncertain Fields\n- No uncertain values were detected in the visible task text.\n\nNormalization Notes\n- Confirmed fields include only explicit values visible in task description or structured notes.\n- Missing or ambiguous values are kept out of confirmed output to avoid false precision.\n- Extraction stayed focused on minor.\n\nNext actions\n- Review the confirmed fields before using them downstream.\n- Paste raw rows or key/value blocks into structured notes if you need fuller extraction.\n- Treat uncertain fields as follow-up items, not validated output.\n\nUncertainties\n- No strongly structured source material was provided, so extraction confidence is limited.\n\nConfidence: low\nExecution source: heuristic\n\nResult pointer: memory://results/run_cf4fffee93937a9f",
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_f13965236187a24e",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T19:33:51.265Z"
+          },
+          {
+            "id": "evt_1c5002004b4353c1",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x521710b324....",
+            "createdAt": "2026-03-30T19:34:00.085Z"
+          },
+          {
+            "id": "evt_dd6f01df58cf8f96",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x521710b324... | fund: 0x27a219bb7c....",
+            "createdAt": "2026-03-30T19:34:06.642Z"
+          },
+          {
+            "id": "evt_cedb7d90703d7d74",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x521710b324... | fund: 0x27a219bb7c... | assign: 0x5bb9ef05d7....",
+            "createdAt": "2026-03-30T19:34:17.809Z"
+          },
+          {
+            "id": "evt_b2275e980a053904",
+            "kind": "escrow_funded",
+            "title": "Funding confirmed from wallet transaction",
+            "description": "The marketplace confirmed task funding from the signed browser transaction receipt.",
+            "createdAt": "2026-03-30T19:49:05.184Z"
+          },
+          {
+            "id": "evt_a8b99a80a01653f8",
+            "kind": "agent_invited",
+            "title": "Assignment confirmed from wallet transaction",
+            "description": "The direct-hire assignment was confirmed from the signed browser transaction receipt.",
+            "createdAt": "2026-03-30T19:49:05.184Z"
+          },
+          {
+            "id": "evt_08ed63ab70d91136",
+            "kind": "agent_accepted",
+            "title": "Platform agent picked up task",
+            "description": "TableMiner is available in-platform and has started preparing the deliverable.",
+            "createdAt": "2026-03-30T19:49:05.184Z"
+          },
+          {
+            "id": "evt_f6408f82f655ef64",
+            "kind": "execution_started",
+            "title": "Execution running",
+            "description": "Execution is now running for agent platform_tableminer.",
+            "createdAt": "2026-03-30T19:49:05.195Z"
+          },
+          {
+            "id": "evt_77fa736770ffa9b9",
+            "kind": "submission_received",
+            "title": "Submission received",
+            "description": "Received a result from platform_tableminer with hash 458ac6ff32d3....",
+            "createdAt": "2026-03-30T19:49:05.217Z"
+          },
+          {
+            "id": "evt_3b1c0e2269d11cdd",
+            "kind": "approved",
+            "title": "Submission approved",
+            "description": "The submission passed review and is ready for settlement.",
+            "createdAt": "2026-03-30T19:56:31.925Z"
+          },
+          {
+            "id": "evt_3a194ecf73fe0799",
+            "kind": "settled",
+            "title": "Payout settled",
+            "description": "Agent payout settled with tx reference bradbury:tx_6937bb4ac6d4d5ca.",
+            "createdAt": "2026-03-30T19:56:45.874Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_tableminer",
+            "displayName": "TableMiner",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [],
+        "latestCreateTxHash": "0x521710b324cbf78641530cd0e44ca81100b371539c3a72369d49d5ed623895a7",
+        "latestFundTxHash": "0x27a219bb7c34aa57063933f8b51b1ef931f61cbf5272f386ad987f6662f0624b",
+        "latestAssignTxHash": "0x5bb9ef05d74e5d0516034724b7ad26a3c7eb673fb6183fbcd4c7d74d51953882",
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": "task_cef0fabe6f798143-submission",
+        "latestSubmissionTxHash": null,
+        "settlementState": "settled",
+        "latestSettlement": {
+          "settlementId": "settlement_74391d91020e7315",
+          "taskId": "task_cef0fabe6f798143",
+          "grossReward": 1,
+          "platformFee": 0.03,
+          "agentPayout": 0.97,
+          "refundAmount": 0,
+          "settlementTimestamp": "2026-03-30T19:56:45.871Z",
+          "txReference": "bradbury:tx_6937bb4ac6d4d5ca",
+          "settlementState": "settled",
+          "outcome": "paid",
+          "payoutWallet": "0xadmin001",
+          "platformFeeWallet": null
+        },
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_0f24c3757b309055",
+      {
+        "taskId": "task_0f24c3757b309055",
+        "title": "prune",
+        "description": "do what youd do in the line of action",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T21:28:00.000Z",
+        "status": "SUBMITTED",
+        "resultStatus": "submitted",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_tableminer",
+        "participatingAgentIds": [
+          "platform_tableminer"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "accepted",
+        "onchainTaskRef": "pending-onchain:task_0f24c3757b309055",
+        "createdAt": "2026-03-30T20:27:15.489Z",
+        "updatedAt": "2026-03-30T20:28:55.366Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": "TableMiner could not confirm structured fields for \"prune\" from the visible task text alone.\n\nConfirmed Fields\n- No explicit field/value pairs were found in the task text or structured notes.\n\nUncertain Fields\n- No uncertain values were detected in the visible task text.\n\nNormalization Notes\n- Confirmed fields include only explicit values visible in task description or structured notes.\n- Missing or ambiguous values are kept out of confirmed output to avoid false precision.\n- Extraction stayed focused on prune.\n\nNext actions\n- Review the confirmed fields before using them downstream.\n- Paste raw rows or key/value blocks into structured notes if you need fuller extraction.\n- Treat uncertain fields as follow-up items, not validated output.\n\nUncertainties\n- No strongly structured source material was provided, so extraction confidence is limited.\n\nConfidence: low\nExecution source: heuristic\n\nResult pointer: memory://results/run_dea5f78b22f86504",
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_5dabe5ea8f173d12",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T20:27:15.492Z"
+          },
+          {
+            "id": "evt_3847cf013070ce25",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x84ee3a3005....",
+            "createdAt": "2026-03-30T20:27:35.654Z"
+          },
+          {
+            "id": "evt_f769e36eb556d7ea",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x84ee3a3005... | fund: 0x3346759fbb....",
+            "createdAt": "2026-03-30T20:27:42.304Z"
+          },
+          {
+            "id": "evt_39efc408cf42cdcf",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0x84ee3a3005... | fund: 0x3346759fbb... | assign: 0x856e956b4f....",
+            "createdAt": "2026-03-30T20:27:54.893Z"
+          },
+          {
+            "id": "evt_d4287d873c1bd82e",
+            "kind": "escrow_funded",
+            "title": "Funding confirmed from wallet transaction",
+            "description": "The marketplace confirmed task funding from the signed browser transaction receipt.",
+            "createdAt": "2026-03-30T20:28:55.284Z"
+          },
+          {
+            "id": "evt_8f4013129bcbba6f",
+            "kind": "agent_invited",
+            "title": "Assignment confirmed from wallet transaction",
+            "description": "The direct-hire assignment was confirmed from the signed browser transaction receipt.",
+            "createdAt": "2026-03-30T20:28:55.284Z"
+          },
+          {
+            "id": "evt_3cb72d42deeb945f",
+            "kind": "agent_accepted",
+            "title": "Platform agent picked up task",
+            "description": "TableMiner is available in-platform and has started preparing the deliverable.",
+            "createdAt": "2026-03-30T20:28:55.284Z"
+          },
+          {
+            "id": "evt_d51783149c767dff",
+            "kind": "execution_started",
+            "title": "Execution running",
+            "description": "Execution is now running for agent platform_tableminer.",
+            "createdAt": "2026-03-30T20:28:55.332Z"
+          },
+          {
+            "id": "evt_4d26f91e08b3a903",
+            "kind": "submission_received",
+            "title": "Submission received",
+            "description": "Received a result from platform_tableminer with hash 79bcd6f82c74....",
+            "createdAt": "2026-03-30T20:28:55.366Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_tableminer",
+            "displayName": "TableMiner",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [
+          "approve",
+          "reject",
+          "dispute"
+        ],
+        "latestCreateTxHash": "0x84ee3a300588049197e94090ff6dd858b2044f84a420f9c8b0e6a5729f54b491",
+        "latestFundTxHash": "0x3346759fbb56c22457b2585b49946dfd4e2da2cb4db61709566d1541d24e8575",
+        "latestAssignTxHash": "0x856e956b4fe457361c1032dc11c95acae99a3b475231ddf6c37c899d7d0a8fbd",
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": "task_0f24c3757b309055-submission",
+        "latestSubmissionTxHash": null,
+        "settlementState": "pending_settlement",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ],
+    [
+      "task_c98d23ef870a7d15",
+      {
+        "taskId": "task_c98d23ef870a7d15",
+        "title": "kenn",
+        "description": "just do a quick summary and review of the doc",
+        "category": "research",
+        "rewardAmount": 1,
+        "deadline": "2026-03-30T21:39:00.000Z",
+        "status": "SUBMITTED",
+        "resultStatus": "submitted",
+        "creatorWallet": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+        "creatorDisplay": "0x85dc...9aaa",
+        "selectedAgentId": "platform_clauselens",
+        "participatingAgentIds": [
+          "platform_clauselens"
+        ],
+        "maxParticipants": 1,
+        "transactionState": "accepted",
+        "onchainTaskRef": "pending-onchain:task_c98d23ef870a7d15",
+        "createdAt": "2026-03-30T20:38:36.793Z",
+        "updatedAt": "2026-03-30T20:39:20.943Z",
+        "attachments": [],
+        "evaluationPreference": "hybrid_review",
+        "structuredNotes": "ClauseLens reviewed the provided task text for \"kenn\" and prepared a source-bounded answer.\n\nAnswer\n- Best grounded answer: just do a quick summary and review of the doc\n- This answer is limited to the text that was explicitly provided in the task.\n\nEvidence\n- Visible source: just do a quick summary and review of the doc\n\nRisk Review\n- Primary interpretation risk concerns quick.\n- Treat any implication beyond the cited text as interpretive rather than confirmed.\n\nNext actions\n- Paste the relevant source excerpt into structured notes for a higher-confidence review.\n- Use the evidence section to confirm the answer is grounded in visible text.\n- Escalate to human review when contractual or policy stakes are high.\n\nConfidence: high\nExecution source: heuristic\n\nResult pointer: memory://results/run_23c80218c24c1ac7",
+        "hiringMode": "direct_hire",
+        "timeline": [
+          {
+            "id": "evt_442997f506863416",
+            "kind": "task_created",
+            "title": "Task draft created",
+            "description": "Your task draft has been recorded offchain and is ready for funding.",
+            "createdAt": "2026-03-30T20:38:36.793Z"
+          },
+          {
+            "id": "evt_546abdf3a38375e4",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0xe6f7f3badf....",
+            "createdAt": "2026-03-30T20:38:48.165Z"
+          },
+          {
+            "id": "evt_ff6afb2a90189cb6",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0xe6f7f3badf... | fund: 0x0133eea0ac....",
+            "createdAt": "2026-03-30T20:38:55.693Z"
+          },
+          {
+            "id": "evt_823503a4106cf277",
+            "kind": "escrow_pending",
+            "title": "Browser transaction trace captured",
+            "description": "Captured wallet transaction hashes for this task: create: 0xe6f7f3badf... | fund: 0x0133eea0ac... | assign: 0x373df82abd....",
+            "createdAt": "2026-03-30T20:39:06.684Z"
+          },
+          {
+            "id": "evt_cbfaedcfb812a4ef",
+            "kind": "escrow_funded",
+            "title": "Funding confirmed from wallet transaction",
+            "description": "The marketplace confirmed task funding from the signed browser transaction receipt.",
+            "createdAt": "2026-03-30T20:39:20.743Z"
+          },
+          {
+            "id": "evt_51c5cb7776cbc0ca",
+            "kind": "agent_invited",
+            "title": "Assignment confirmed from wallet transaction",
+            "description": "The direct-hire assignment was confirmed from the signed browser transaction receipt.",
+            "createdAt": "2026-03-30T20:39:20.743Z"
+          },
+          {
+            "id": "evt_14d2e6f2668b4c7e",
+            "kind": "agent_accepted",
+            "title": "Platform agent picked up task",
+            "description": "ClauseLens is available in-platform and has started preparing the deliverable.",
+            "createdAt": "2026-03-30T20:39:20.743Z"
+          },
+          {
+            "id": "evt_b8933e5b77028460",
+            "kind": "execution_started",
+            "title": "Execution running",
+            "description": "Execution is now running for agent platform_clauselens.",
+            "createdAt": "2026-03-30T20:39:20.760Z"
+          },
+          {
+            "id": "evt_d092a0c746af767c",
+            "kind": "submission_received",
+            "title": "Submission received",
+            "description": "Received a result from platform_clauselens with hash 351b89e95248....",
+            "createdAt": "2026-03-30T20:39:20.943Z"
+          }
+        ],
+        "selectedAgents": [
+          {
+            "agentId": "platform_clauselens",
+            "displayName": "ClauseLens",
+            "originType": "platform"
+          }
+        ],
+        "reviewActions": [
+          "approve",
+          "reject",
+          "dispute"
+        ],
+        "latestCreateTxHash": "0xe6f7f3badfd42d7524d8b4a09c1891285356a841ad2d94d3a89d2f40d8e821ff",
+        "latestFundTxHash": "0x0133eea0acb447eb20addf8e0c81d83e8f970e48ba37639c360662d7131b2c7c",
+        "latestAssignTxHash": "0x373df82abdf5878c8e6cd95efb1300c382adc843e6569d39101c3cb49855b462",
+        "latestEvaluation": null,
+        "userReview": null,
+        "latestSubmissionId": "task_c98d23ef870a7d15-submission",
+        "latestSubmissionTxHash": null,
+        "settlementState": "pending_settlement",
+        "latestSettlement": null,
+        "disputeRecord": null
+      }
+    ]
+  ],
+  "taskEvaluations": [],
+  "settlements": [
+    [
+      "task_cef0fabe6f798143",
+      [
+        {
+          "settlementId": "settlement_74391d91020e7315",
+          "taskId": "task_cef0fabe6f798143",
+          "grossReward": 1,
+          "platformFee": 0.03,
+          "agentPayout": 0.97,
+          "refundAmount": 0,
+          "settlementTimestamp": "2026-03-30T19:56:45.871Z",
+          "txReference": "bradbury:tx_6937bb4ac6d4d5ca",
+          "settlementState": "settled",
+          "outcome": "paid",
+          "payoutWallet": "0xadmin001",
+          "platformFeeWallet": null
+        }
+      ]
+    ]
+  ],
+  "executionRuns": [
+    [
+      "run_bbcda3d2aca4529e",
+      {
+        "runId": "run_bbcda3d2aca4529e",
+        "requestId": "req_a3e4479c85440c29",
+        "taskId": "task_914a6f5509324e95",
+        "agentId": "platform_tableminer",
+        "ownerWallet": "0xadmin001",
+        "endpointUrl": "platform://platform_tableminer",
+        "callbackUrl": "http://localhost:4020/api/execution/callback",
+        "state": "completed",
+        "attempt": 1,
+        "maxRetries": 0,
+        "nextRetryAt": null,
+        "timeoutAt": "2026-03-30T16:48:04.377Z",
+        "executionMode": "sync",
+        "remoteRunId": null,
+        "resultPointer": "memory://results/run_bbcda3d2aca4529e",
+        "resultHash": "2641c8f5b2c74ccdd6b0067a327d3dce5793fa40166e74cb01fecad40f25a48b",
+        "rawPayload": {
+          "mode": "high_quality",
+          "promptVersions": {
+            "taskStructuring": "platform-structuring-v2",
+            "generation": "platform-generation-v2",
+            "evaluation": "platform-evaluation-v2",
+            "improvement": "platform-improvement-v2",
+            "polish": "platform-polish-v2"
+          },
+          "rawTaskInput": {
+            "taskId": "task_914a6f5509324e95",
+            "title": "second",
+            "description": "i just need you to review the doc",
+            "category": "research",
+            "rewardAmount": 1,
+            "deadline": "2026-03-30T18:35:00.000Z",
+            "evaluationPreference": "hybrid_review",
+            "structuredNotes": null,
+            "attachments": [],
+            "refinement": null
+          },
+          "structuredTask": {
+            "task": "second",
+            "goal": "i just need you to review the doc",
+            "outputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+            "constraints": [
+              "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+              "Do not invent facts that are not grounded in the task description, notes, or attachments."
+            ],
+            "qualityLevel": "high_quality"
+          },
+          "draftOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"second\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on second."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "evaluation": {
+            "relevance": 88.75,
+            "clarity": 87,
+            "completeness": 100,
+            "formatAdherence": 85,
+            "usefulness": 78,
+            "overall": 88.16,
+            "confidence": "low",
+            "strengths": [
+              "The draft stays close to the buyer's stated goal.",
+              "The writing is easy to scan and approve."
+            ],
+            "gaps": [],
+            "notes": [
+              "Strength: The draft stays close to the buyer's stated goal.",
+              "Gap: no major format or usefulness issue detected."
+            ]
+          },
+          "improvedOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"second\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on second."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "polishedOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"second\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on second."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "finalOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"second\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on second."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "runSummary": {
+            "taskIntent": "i just need you to review the doc",
+            "requestedOutputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+            "skillsUsed": [
+              "field_extraction",
+              "table_parsing",
+              "data_normalization"
+            ],
+            "skillCategories": [
+              "data_extraction"
+            ],
+            "evaluationFocus": [
+              "relevance",
+              "clarity",
+              "completeness",
+              "format_adherence",
+              "usefulness"
+            ],
+            "confidenceBand": "low",
+            "evidenceStrength": "low",
+            "benchmarkSuites": [
+              "tableminer_core_v1"
+            ]
+          },
+          "stageTimingsMs": {
+            "structuring": 30,
+            "generation": 23,
+            "evaluation": 9,
+            "improvement": 1,
+            "polish": 5,
+            "total": 68
+          },
+          "score": 88.16,
+          "confidence": "low",
+          "executionSource": "heuristic",
+          "refinement": null,
+          "reviewOutcome": "reject",
+          "settlementOutcome": null,
+          "finalResultPointer": "memory://results/run_bbcda3d2aca4529e",
+          "finalResultHash": "2641c8f5b2c74ccdd6b0067a327d3dce5793fa40166e74cb01fecad40f25a48b"
+        },
+        "normalizedPayload": {
+          "task": "second",
+          "goal": "i just need you to review the doc",
+          "outputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+          "constraints": [
+            "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+            "Do not invent facts that are not grounded in the task description, notes, or attachments."
+          ],
+          "qualityLevel": "high_quality"
+        },
+        "errorCode": null,
+        "failureCategory": null,
+        "lastErrorMessage": null,
+        "createdAt": "2026-03-30T16:47:34.377Z",
+        "updatedAt": "2026-03-30T16:49:59.748Z",
+        "startedAt": "2026-03-30T16:47:34.377Z",
+        "completedAt": "2026-03-30T16:47:42.727Z"
+      }
+    ],
+    [
+      "run_52fdcf51d7d5abb0",
+      {
+        "runId": "run_52fdcf51d7d5abb0",
+        "requestId": "req_6306b790d416847e",
+        "taskId": "task_6aba20e86ff20845",
+        "agentId": "platform_signal_forge",
+        "ownerWallet": "0xadmin001",
+        "endpointUrl": "platform://platform_signal_forge",
+        "callbackUrl": "http://localhost:4020/api/execution/callback",
+        "state": "completed",
+        "attempt": 1,
+        "maxRetries": 0,
+        "nextRetryAt": null,
+        "timeoutAt": "2026-03-30T19:47:15.828Z",
+        "executionMode": "sync",
+        "remoteRunId": null,
+        "resultPointer": "memory://results/run_52fdcf51d7d5abb0",
+        "resultHash": "e2edd5b8eb405579d9860fede89d304aa2d92cdda0a93c68e6b5e33b758c32a6",
+        "rawPayload": {
+          "mode": "high_quality",
+          "promptVersions": {
+            "taskStructuring": "platform-structuring-v2",
+            "generation": "platform-generation-v2",
+            "evaluation": "platform-evaluation-v2",
+            "improvement": "platform-improvement-v2",
+            "polish": "platform-polish-v2"
+          },
+          "rawTaskInput": {
+            "taskId": "task_6aba20e86ff20845",
+            "title": "brute",
+            "description": "do a clean review of this document",
+            "category": "research",
+            "rewardAmount": 11,
+            "deadline": "2026-03-30T19:32:00.000Z",
+            "evaluationPreference": "hybrid_review",
+            "structuredNotes": null,
+            "attachments": [],
+            "refinement": null
+          },
+          "structuredTask": {
+            "task": "brute",
+            "goal": "do a clean review of this document",
+            "outputFormat": "Deliver a buyer-reviewable research result using sections such as signal, implications, recommendation.",
+            "constraints": [
+              "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+              "Do not invent facts that are not grounded in the task description, notes, or attachments."
+            ],
+            "qualityLevel": "high_quality"
+          },
+          "draftOutput": {
+            "summary": "Signal Forge prepared a bounded strategy brief for \"brute\" using only visible task evidence.",
+            "sections": [
+              {
+                "heading": "Signal",
+                "bullets": [
+                  "Observed signal: do a clean review of this document"
+                ]
+              },
+              {
+                "heading": "Evidence Limits",
+                "bullets": [
+                  "No material evidence gaps were obvious beyond the visible source limits."
+                ]
+              },
+              {
+                "heading": "Implications",
+                "bullets": [
+                  "Current task focus centers on brute.",
+                  "Implications are bounded to the evidence above and should not be treated as a full market scan.",
+                  "The strongest action should follow the best-supported customer or performance signal, not the noisiest anecdote."
+                ]
+              },
+              {
+                "heading": "Recommendation",
+                "bullets": [
+                  "Use the strongest observed signal as the wedge, then validate with a fuller research pass before major decisions.",
+                  "Validate the strongest signal with one more source before changing roadmap, pricing, or GTM posture."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Add customer quotes, market notes, or performance evidence for a stronger strategy brief.",
+              "Check that the recommendation is actually supported by the visible evidence.",
+              "Treat this as a bounded first-pass analysis, not a full external research report."
+            ],
+            "uncertainties": [
+              "The task does not include enough grounded evidence to support a high-confidence strategic recommendation."
+            ],
+            "confidence": "low"
+          },
+          "evaluation": {
+            "relevance": 100,
+            "clarity": 87,
+            "completeness": 100,
+            "formatAdherence": 85,
+            "usefulness": 78,
+            "overall": 90.86,
+            "confidence": "low",
+            "strengths": [
+              "The draft stays close to the buyer's stated goal.",
+              "The writing is easy to scan and approve."
+            ],
+            "gaps": [],
+            "notes": [
+              "Strength: The draft stays close to the buyer's stated goal.",
+              "Gap: no major format or usefulness issue detected."
+            ]
+          },
+          "improvedOutput": {
+            "summary": "Signal Forge prepared a bounded strategy brief for \"brute\" using only visible task evidence.",
+            "sections": [
+              {
+                "heading": "Signal",
+                "bullets": [
+                  "Observed signal: do a clean review of this document"
+                ]
+              },
+              {
+                "heading": "Evidence Limits",
+                "bullets": [
+                  "No material evidence gaps were obvious beyond the visible source limits."
+                ]
+              },
+              {
+                "heading": "Implications",
+                "bullets": [
+                  "Current task focus centers on brute.",
+                  "Implications are bounded to the evidence above and should not be treated as a full market scan.",
+                  "The strongest action should follow the best-supported customer or performance signal, not the noisiest anecdote."
+                ]
+              },
+              {
+                "heading": "Recommendation",
+                "bullets": [
+                  "Use the strongest observed signal as the wedge, then validate with a fuller research pass before major decisions.",
+                  "Validate the strongest signal with one more source before changing roadmap, pricing, or GTM posture."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Add customer quotes, market notes, or performance evidence for a stronger strategy brief.",
+              "Check that the recommendation is actually supported by the visible evidence.",
+              "Treat this as a bounded first-pass analysis, not a full external research report."
+            ],
+            "uncertainties": [
+              "The task does not include enough grounded evidence to support a high-confidence strategic recommendation."
+            ],
+            "confidence": "low"
+          },
+          "polishedOutput": {
+            "summary": "Signal Forge prepared a bounded strategy brief for \"brute\" using only visible task evidence.",
+            "sections": [
+              {
+                "heading": "Signal",
+                "bullets": [
+                  "Observed signal: do a clean review of this document"
+                ]
+              },
+              {
+                "heading": "Evidence Limits",
+                "bullets": [
+                  "No material evidence gaps were obvious beyond the visible source limits."
+                ]
+              },
+              {
+                "heading": "Implications",
+                "bullets": [
+                  "Current task focus centers on brute.",
+                  "Implications are bounded to the evidence above and should not be treated as a full market scan.",
+                  "The strongest action should follow the best-supported customer or performance signal, not the noisiest anecdote."
+                ]
+              },
+              {
+                "heading": "Recommendation",
+                "bullets": [
+                  "Use the strongest observed signal as the wedge, then validate with a fuller research pass before major decisions.",
+                  "Validate the strongest signal with one more source before changing roadmap, pricing, or GTM posture."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Add customer quotes, market notes, or performance evidence for a stronger strategy brief.",
+              "Check that the recommendation is actually supported by the visible evidence.",
+              "Treat this as a bounded first-pass analysis, not a full external research report."
+            ],
+            "uncertainties": [
+              "The task does not include enough grounded evidence to support a high-confidence strategic recommendation."
+            ],
+            "confidence": "low"
+          },
+          "finalOutput": {
+            "summary": "Signal Forge prepared a bounded strategy brief for \"brute\" using only visible task evidence.",
+            "sections": [
+              {
+                "heading": "Signal",
+                "bullets": [
+                  "Observed signal: do a clean review of this document"
+                ]
+              },
+              {
+                "heading": "Evidence Limits",
+                "bullets": [
+                  "No material evidence gaps were obvious beyond the visible source limits."
+                ]
+              },
+              {
+                "heading": "Implications",
+                "bullets": [
+                  "Current task focus centers on brute.",
+                  "Implications are bounded to the evidence above and should not be treated as a full market scan.",
+                  "The strongest action should follow the best-supported customer or performance signal, not the noisiest anecdote."
+                ]
+              },
+              {
+                "heading": "Recommendation",
+                "bullets": [
+                  "Use the strongest observed signal as the wedge, then validate with a fuller research pass before major decisions.",
+                  "Validate the strongest signal with one more source before changing roadmap, pricing, or GTM posture."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Add customer quotes, market notes, or performance evidence for a stronger strategy brief.",
+              "Check that the recommendation is actually supported by the visible evidence.",
+              "Treat this as a bounded first-pass analysis, not a full external research report."
+            ],
+            "uncertainties": [
+              "The task does not include enough grounded evidence to support a high-confidence strategic recommendation."
+            ],
+            "confidence": "low"
+          },
+          "runSummary": {
+            "taskIntent": "do a clean review of this document",
+            "requestedOutputFormat": "Deliver a buyer-reviewable research result using sections such as signal, implications, recommendation.",
+            "skillsUsed": [
+              "research_synthesis",
+              "competitive_analysis",
+              "strategy_briefing"
+            ],
+            "skillCategories": [
+              "research",
+              "strategy"
+            ],
+            "evaluationFocus": [
+              "relevance",
+              "clarity",
+              "completeness",
+              "format_adherence",
+              "usefulness"
+            ],
+            "confidenceBand": "low",
+            "evidenceStrength": "low",
+            "benchmarkSuites": [
+              "signal_forge_core_v1"
+            ]
+          },
+          "stageTimingsMs": {
+            "structuring": 1,
+            "generation": 9,
+            "evaluation": 5,
+            "improvement": 5,
+            "polish": 0,
+            "total": 20
+          },
+          "score": 90.86,
+          "confidence": "low",
+          "executionSource": "heuristic",
+          "refinement": null,
+          "reviewOutcome": null,
+          "settlementOutcome": null,
+          "finalResultPointer": "memory://results/run_52fdcf51d7d5abb0",
+          "finalResultHash": "e2edd5b8eb405579d9860fede89d304aa2d92cdda0a93c68e6b5e33b758c32a6"
+        },
+        "normalizedPayload": {
+          "task": "brute",
+          "goal": "do a clean review of this document",
+          "outputFormat": "Deliver a buyer-reviewable research result using sections such as signal, implications, recommendation.",
+          "constraints": [
+            "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+            "Do not invent facts that are not grounded in the task description, notes, or attachments."
+          ],
+          "qualityLevel": "high_quality"
+        },
+        "errorCode": null,
+        "failureCategory": null,
+        "lastErrorMessage": null,
+        "createdAt": "2026-03-30T19:46:45.828Z",
+        "updatedAt": "2026-03-30T19:46:56.828Z",
+        "startedAt": "2026-03-30T19:46:45.828Z",
+        "completedAt": "2026-03-30T19:46:56.828Z"
+      }
+    ],
+    [
+      "run_cf4fffee93937a9f",
+      {
+        "runId": "run_cf4fffee93937a9f",
+        "requestId": "req_25bbaa4650b815de",
+        "taskId": "task_cef0fabe6f798143",
+        "agentId": "platform_tableminer",
+        "ownerWallet": "0xadmin001",
+        "endpointUrl": "platform://platform_tableminer",
+        "callbackUrl": "http://localhost:4020/api/execution/callback",
+        "state": "completed",
+        "attempt": 1,
+        "maxRetries": 0,
+        "nextRetryAt": null,
+        "timeoutAt": "2026-03-30T19:49:35.184Z",
+        "executionMode": "sync",
+        "remoteRunId": null,
+        "resultPointer": "memory://results/run_cf4fffee93937a9f",
+        "resultHash": "458ac6ff32d3c62a7d6e6f1a8daf65eb2544daf500a9803d518c31d026cc72a3",
+        "rawPayload": {
+          "mode": "high_quality",
+          "promptVersions": {
+            "taskStructuring": "platform-structuring-v2",
+            "generation": "platform-generation-v2",
+            "evaluation": "platform-evaluation-v2",
+            "improvement": "platform-improvement-v2",
+            "polish": "platform-polish-v2"
+          },
+          "rawTaskInput": {
+            "taskId": "task_cef0fabe6f798143",
+            "title": "kols",
+            "description": "do a minor review of the doc",
+            "category": "research",
+            "rewardAmount": 1,
+            "deadline": "2026-03-30T20:34:00.000Z",
+            "evaluationPreference": "hybrid_review",
+            "structuredNotes": null,
+            "attachments": [],
+            "refinement": null
+          },
+          "structuredTask": {
+            "task": "kols",
+            "goal": "do a minor review of the doc",
+            "outputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+            "constraints": [
+              "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+              "Do not invent facts that are not grounded in the task description, notes, or attachments."
+            ],
+            "qualityLevel": "high_quality"
+          },
+          "draftOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"kols\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on minor."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "evaluation": {
+            "relevance": 100,
+            "clarity": 87,
+            "completeness": 100,
+            "formatAdherence": 85,
+            "usefulness": 78,
+            "overall": 90.86,
+            "confidence": "low",
+            "strengths": [
+              "The draft stays close to the buyer's stated goal.",
+              "The writing is easy to scan and approve."
+            ],
+            "gaps": [],
+            "notes": [
+              "Strength: The draft stays close to the buyer's stated goal.",
+              "Gap: no major format or usefulness issue detected."
+            ]
+          },
+          "improvedOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"kols\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on minor."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "polishedOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"kols\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on minor."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "finalOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"kols\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on minor."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "runSummary": {
+            "taskIntent": "do a minor review of the doc",
+            "requestedOutputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+            "skillsUsed": [
+              "field_extraction",
+              "table_parsing",
+              "data_normalization"
+            ],
+            "skillCategories": [
+              "data_extraction"
+            ],
+            "evaluationFocus": [
+              "relevance",
+              "clarity",
+              "completeness",
+              "format_adherence",
+              "usefulness"
+            ],
+            "confidenceBand": "low",
+            "evidenceStrength": "low",
+            "benchmarkSuites": [
+              "tableminer_core_v1"
+            ]
+          },
+          "stageTimingsMs": {
+            "structuring": 1,
+            "generation": 11,
+            "evaluation": 2,
+            "improvement": 0,
+            "polish": 1,
+            "total": 15
+          },
+          "score": 90.86,
+          "confidence": "low",
+          "executionSource": "heuristic",
+          "refinement": null,
+          "reviewOutcome": "approve",
+          "settlementOutcome": "settled",
+          "finalResultPointer": "memory://results/run_cf4fffee93937a9f",
+          "finalResultHash": "458ac6ff32d3c62a7d6e6f1a8daf65eb2544daf500a9803d518c31d026cc72a3"
+        },
+        "normalizedPayload": {
+          "task": "kols",
+          "goal": "do a minor review of the doc",
+          "outputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+          "constraints": [
+            "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+            "Do not invent facts that are not grounded in the task description, notes, or attachments."
+          ],
+          "qualityLevel": "high_quality"
+        },
+        "errorCode": null,
+        "failureCategory": null,
+        "lastErrorMessage": null,
+        "createdAt": "2026-03-30T19:49:05.184Z",
+        "updatedAt": "2026-03-30T19:56:45.874Z",
+        "startedAt": "2026-03-30T19:49:05.184Z",
+        "completedAt": "2026-03-30T19:49:13.534Z"
+      }
+    ],
+    [
+      "run_dea5f78b22f86504",
+      {
+        "runId": "run_dea5f78b22f86504",
+        "requestId": "req_bc504f7444843e09",
+        "taskId": "task_0f24c3757b309055",
+        "agentId": "platform_tableminer",
+        "ownerWallet": "0xadmin001",
+        "endpointUrl": "platform://platform_tableminer",
+        "callbackUrl": "http://localhost:4020/api/execution/callback",
+        "state": "completed",
+        "attempt": 1,
+        "maxRetries": 0,
+        "nextRetryAt": null,
+        "timeoutAt": "2026-03-30T20:29:25.286Z",
+        "executionMode": "sync",
+        "remoteRunId": null,
+        "resultPointer": "memory://results/run_dea5f78b22f86504",
+        "resultHash": "79bcd6f82c74622b79844133d6b41f35f38f3c619ff4cca92bde92972b8c24ff",
+        "rawPayload": {
+          "mode": "high_quality",
+          "promptVersions": {
+            "taskStructuring": "platform-structuring-v2",
+            "generation": "platform-generation-v2",
+            "evaluation": "platform-evaluation-v2",
+            "improvement": "platform-improvement-v2",
+            "polish": "platform-polish-v2"
+          },
+          "rawTaskInput": {
+            "taskId": "task_0f24c3757b309055",
+            "title": "prune",
+            "description": "do what youd do in the line of action",
+            "category": "research",
+            "rewardAmount": 1,
+            "deadline": "2026-03-30T21:28:00.000Z",
+            "evaluationPreference": "hybrid_review",
+            "structuredNotes": null,
+            "attachments": [],
+            "refinement": null
+          },
+          "structuredTask": {
+            "task": "prune",
+            "goal": "do what youd do in the line of action",
+            "outputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+            "constraints": [
+              "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+              "Do not invent facts that are not grounded in the task description, notes, or attachments."
+            ],
+            "qualityLevel": "high_quality"
+          },
+          "draftOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"prune\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on prune."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "evaluation": {
+            "relevance": 64,
+            "clarity": 87,
+            "completeness": 100,
+            "formatAdherence": 85,
+            "usefulness": 78,
+            "overall": 82.22,
+            "confidence": "low",
+            "strengths": [
+              "The writing is easy to scan and approve."
+            ],
+            "gaps": [],
+            "notes": [
+              "Strength: The writing is easy to scan and approve.",
+              "Gap: no major format or usefulness issue detected."
+            ]
+          },
+          "improvedOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"prune\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on prune."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "polishedOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"prune\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on prune."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "finalOutput": {
+            "summary": "TableMiner could not confirm structured fields for \"prune\" from the visible task text alone.",
+            "sections": [
+              {
+                "heading": "Confirmed Fields",
+                "bullets": [
+                  "No explicit field/value pairs were found in the task text or structured notes."
+                ]
+              },
+              {
+                "heading": "Uncertain Fields",
+                "bullets": [
+                  "No uncertain values were detected in the visible task text."
+                ]
+              },
+              {
+                "heading": "Normalization Notes",
+                "bullets": [
+                  "Confirmed fields include only explicit values visible in task description or structured notes.",
+                  "Missing or ambiguous values are kept out of confirmed output to avoid false precision.",
+                  "Extraction stayed focused on prune."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Review the confirmed fields before using them downstream.",
+              "Paste raw rows or key/value blocks into structured notes if you need fuller extraction.",
+              "Treat uncertain fields as follow-up items, not validated output."
+            ],
+            "uncertainties": [
+              "No strongly structured source material was provided, so extraction confidence is limited."
+            ],
+            "confidence": "low"
+          },
+          "runSummary": {
+            "taskIntent": "do what youd do in the line of action",
+            "requestedOutputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+            "skillsUsed": [
+              "field_extraction",
+              "table_parsing",
+              "data_normalization"
+            ],
+            "skillCategories": [
+              "data_extraction"
+            ],
+            "evaluationFocus": [
+              "relevance",
+              "clarity",
+              "completeness",
+              "format_adherence",
+              "usefulness"
+            ],
+            "confidenceBand": "low",
+            "evidenceStrength": "low",
+            "benchmarkSuites": [
+              "tableminer_core_v1"
+            ]
+          },
+          "stageTimingsMs": {
+            "structuring": 8,
+            "generation": 6,
+            "evaluation": 1,
+            "improvement": 1,
+            "polish": 1,
+            "total": 17
+          },
+          "score": 82.22,
+          "confidence": "low",
+          "executionSource": "heuristic",
+          "refinement": null,
+          "reviewOutcome": null,
+          "settlementOutcome": null,
+          "finalResultPointer": "memory://results/run_dea5f78b22f86504",
+          "finalResultHash": "79bcd6f82c74622b79844133d6b41f35f38f3c619ff4cca92bde92972b8c24ff"
+        },
+        "normalizedPayload": {
+          "task": "prune",
+          "goal": "do what youd do in the line of action",
+          "outputFormat": "Deliver a buyer-reviewable data extraction result using sections such as records, normalized-fields, uncertain-items.",
+          "constraints": [
+            "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+            "Do not invent facts that are not grounded in the task description, notes, or attachments."
+          ],
+          "qualityLevel": "high_quality"
+        },
+        "errorCode": null,
+        "failureCategory": null,
+        "lastErrorMessage": null,
+        "createdAt": "2026-03-30T20:28:55.286Z",
+        "updatedAt": "2026-03-30T20:29:03.636Z",
+        "startedAt": "2026-03-30T20:28:55.286Z",
+        "completedAt": "2026-03-30T20:29:03.636Z"
+      }
+    ],
+    [
+      "run_23c80218c24c1ac7",
+      {
+        "runId": "run_23c80218c24c1ac7",
+        "requestId": "req_184b2e1a40601c6c",
+        "taskId": "task_c98d23ef870a7d15",
+        "agentId": "platform_clauselens",
+        "ownerWallet": "0xadmin001",
+        "endpointUrl": "platform://platform_clauselens",
+        "callbackUrl": "http://localhost:4020/api/execution/callback",
+        "state": "completed",
+        "attempt": 1,
+        "maxRetries": 0,
+        "nextRetryAt": null,
+        "timeoutAt": "2026-03-30T20:39:50.744Z",
+        "executionMode": "sync",
+        "remoteRunId": null,
+        "resultPointer": "memory://results/run_23c80218c24c1ac7",
+        "resultHash": "351b89e952486bdea9301dbdb869bf16a4028bba62d6d0cc96751913ebe2f62d",
+        "rawPayload": {
+          "mode": "high_quality",
+          "promptVersions": {
+            "taskStructuring": "platform-structuring-v2",
+            "generation": "platform-generation-v2",
+            "evaluation": "platform-evaluation-v2",
+            "improvement": "platform-improvement-v2",
+            "polish": "platform-polish-v2"
+          },
+          "rawTaskInput": {
+            "taskId": "task_c98d23ef870a7d15",
+            "title": "kenn",
+            "description": "just do a quick summary and review of the doc",
+            "category": "research",
+            "rewardAmount": 1,
+            "deadline": "2026-03-30T21:39:00.000Z",
+            "evaluationPreference": "hybrid_review",
+            "structuredNotes": null,
+            "attachments": [],
+            "refinement": null
+          },
+          "structuredTask": {
+            "task": "kenn",
+            "goal": "just do a quick summary and review of the doc",
+            "outputFormat": "Deliver a buyer-reviewable document qa result using sections such as answer, evidence, risk.",
+            "constraints": [
+              "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+              "Do not invent facts that are not grounded in the task description, notes, or attachments."
+            ],
+            "qualityLevel": "high_quality"
+          },
+          "draftOutput": {
+            "summary": "ClauseLens reviewed the provided task text for \"kenn\" and prepared a source-bounded answer.",
+            "sections": [
+              {
+                "heading": "Answer",
+                "bullets": [
+                  "Best grounded answer: just do a quick summary and review of the doc",
+                  "This answer is limited to the text that was explicitly provided in the task."
+                ]
+              },
+              {
+                "heading": "Evidence",
+                "bullets": [
+                  "Visible source: just do a quick summary and review of the doc"
+                ]
+              },
+              {
+                "heading": "Risk Review",
+                "bullets": [
+                  "Primary interpretation risk concerns quick.",
+                  "Treat any implication beyond the cited text as interpretive rather than confirmed."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Paste the relevant source excerpt into structured notes for a higher-confidence review.",
+              "Use the evidence section to confirm the answer is grounded in visible text.",
+              "Escalate to human review when contractual or policy stakes are high."
+            ],
+            "uncertainties": [],
+            "confidence": "high"
+          },
+          "evaluation": {
+            "relevance": 100,
+            "clarity": 87,
+            "completeness": 100,
+            "formatAdherence": 85,
+            "usefulness": 90,
+            "overall": 93.26,
+            "confidence": "high",
+            "strengths": [
+              "The draft stays close to the buyer's stated goal.",
+              "The writing is easy to scan and approve.",
+              "The output includes practical next actions."
+            ],
+            "gaps": [],
+            "notes": [
+              "Strength: The draft stays close to the buyer's stated goal.",
+              "Gap: no major format or usefulness issue detected."
+            ]
+          },
+          "improvedOutput": {
+            "summary": "ClauseLens reviewed the provided task text for \"kenn\" and prepared a source-bounded answer.",
+            "sections": [
+              {
+                "heading": "Answer",
+                "bullets": [
+                  "Best grounded answer: just do a quick summary and review of the doc",
+                  "This answer is limited to the text that was explicitly provided in the task."
+                ]
+              },
+              {
+                "heading": "Evidence",
+                "bullets": [
+                  "Visible source: just do a quick summary and review of the doc"
+                ]
+              },
+              {
+                "heading": "Risk Review",
+                "bullets": [
+                  "Primary interpretation risk concerns quick.",
+                  "Treat any implication beyond the cited text as interpretive rather than confirmed."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Paste the relevant source excerpt into structured notes for a higher-confidence review.",
+              "Use the evidence section to confirm the answer is grounded in visible text.",
+              "Escalate to human review when contractual or policy stakes are high."
+            ],
+            "uncertainties": [],
+            "confidence": "high"
+          },
+          "polishedOutput": {
+            "summary": "ClauseLens reviewed the provided task text for \"kenn\" and prepared a source-bounded answer.",
+            "sections": [
+              {
+                "heading": "Answer",
+                "bullets": [
+                  "Best grounded answer: just do a quick summary and review of the doc",
+                  "This answer is limited to the text that was explicitly provided in the task."
+                ]
+              },
+              {
+                "heading": "Evidence",
+                "bullets": [
+                  "Visible source: just do a quick summary and review of the doc"
+                ]
+              },
+              {
+                "heading": "Risk Review",
+                "bullets": [
+                  "Primary interpretation risk concerns quick.",
+                  "Treat any implication beyond the cited text as interpretive rather than confirmed."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Paste the relevant source excerpt into structured notes for a higher-confidence review.",
+              "Use the evidence section to confirm the answer is grounded in visible text.",
+              "Escalate to human review when contractual or policy stakes are high."
+            ],
+            "uncertainties": [],
+            "confidence": "high"
+          },
+          "finalOutput": {
+            "summary": "ClauseLens reviewed the provided task text for \"kenn\" and prepared a source-bounded answer.",
+            "sections": [
+              {
+                "heading": "Answer",
+                "bullets": [
+                  "Best grounded answer: just do a quick summary and review of the doc",
+                  "This answer is limited to the text that was explicitly provided in the task."
+                ]
+              },
+              {
+                "heading": "Evidence",
+                "bullets": [
+                  "Visible source: just do a quick summary and review of the doc"
+                ]
+              },
+              {
+                "heading": "Risk Review",
+                "bullets": [
+                  "Primary interpretation risk concerns quick.",
+                  "Treat any implication beyond the cited text as interpretive rather than confirmed."
+                ]
+              }
+            ],
+            "nextActions": [
+              "Paste the relevant source excerpt into structured notes for a higher-confidence review.",
+              "Use the evidence section to confirm the answer is grounded in visible text.",
+              "Escalate to human review when contractual or policy stakes are high."
+            ],
+            "uncertainties": [],
+            "confidence": "high"
+          },
+          "runSummary": {
+            "taskIntent": "just do a quick summary and review of the doc",
+            "requestedOutputFormat": "Deliver a buyer-reviewable document qa result using sections such as answer, evidence, risk.",
+            "skillsUsed": [
+              "contract_qa",
+              "source_grounding",
+              "clause_review"
+            ],
+            "skillCategories": [
+              "document_qa",
+              "legal"
+            ],
+            "evaluationFocus": [
+              "relevance",
+              "clarity",
+              "completeness",
+              "format_adherence",
+              "usefulness"
+            ],
+            "confidenceBand": "high",
+            "evidenceStrength": "low",
+            "benchmarkSuites": [
+              "clauselens_core_v1"
+            ]
+          },
+          "stageTimingsMs": {
+            "structuring": 24,
+            "generation": 110,
+            "evaluation": 8,
+            "improvement": 1,
+            "polish": 0,
+            "total": 143
+          },
+          "score": 93.26,
+          "confidence": "high",
+          "executionSource": "heuristic",
+          "refinement": null,
+          "reviewOutcome": null,
+          "settlementOutcome": null,
+          "finalResultPointer": "memory://results/run_23c80218c24c1ac7",
+          "finalResultHash": "351b89e952486bdea9301dbdb869bf16a4028bba62d6d0cc96751913ebe2f62d"
+        },
+        "normalizedPayload": {
+          "task": "kenn",
+          "goal": "just do a quick summary and review of the doc",
+          "outputFormat": "Deliver a buyer-reviewable document qa result using sections such as answer, evidence, risk.",
+          "constraints": [
+            "Keep the deliverable concise enough for a marketplace buyer to review quickly.",
+            "Do not invent facts that are not grounded in the task description, notes, or attachments."
+          ],
+          "qualityLevel": "high_quality"
+        },
+        "errorCode": null,
+        "failureCategory": null,
+        "lastErrorMessage": null,
+        "createdAt": "2026-03-30T20:39:20.744Z",
+        "updatedAt": "2026-03-30T20:39:30.844Z",
+        "startedAt": "2026-03-30T20:39:20.744Z",
+        "completedAt": "2026-03-30T20:39:30.844Z"
+      }
+    ]
+  ],
+  "executionLogs": [
+    [
+      "run_bbcda3d2aca4529e",
+      [
+        {
+          "id": "log_b2915789bfd674f1",
+          "runId": "run_bbcda3d2aca4529e",
+          "taskId": "task_914a6f5509324e95",
+          "agentId": "platform_tableminer",
+          "level": "info",
+          "event": "execution.platform_started",
+          "message": "Built-in platform agent execution started",
+          "metadata": {},
+          "createdAt": "2026-03-30T16:47:34.403Z"
+        },
+        {
+          "id": "log_1bc8ada1ffb5c01b",
+          "runId": "run_bbcda3d2aca4529e",
+          "taskId": "task_914a6f5509324e95",
+          "agentId": "platform_tableminer",
+          "level": "info",
+          "event": "execution.platform_completed",
+          "message": "Built-in platform agent finished execution",
+          "metadata": {
+            "latencyMs": 8350
+          },
+          "createdAt": "2026-03-30T16:47:34.620Z"
+        }
+      ]
+    ],
+    [
+      "run_52fdcf51d7d5abb0",
+      [
+        {
+          "id": "log_66e9e00e51664314",
+          "runId": "run_52fdcf51d7d5abb0",
+          "taskId": "task_6aba20e86ff20845",
+          "agentId": "platform_signal_forge",
+          "level": "info",
+          "event": "execution.platform_started",
+          "message": "Built-in platform agent execution started",
+          "metadata": {},
+          "createdAt": "2026-03-30T19:46:45.829Z"
+        },
+        {
+          "id": "log_7c10087147e55baf",
+          "runId": "run_52fdcf51d7d5abb0",
+          "taskId": "task_6aba20e86ff20845",
+          "agentId": "platform_signal_forge",
+          "level": "info",
+          "event": "execution.platform_completed",
+          "message": "Built-in platform agent finished execution",
+          "metadata": {
+            "latencyMs": 11000
+          },
+          "createdAt": "2026-03-30T19:46:45.911Z"
+        }
+      ]
+    ],
+    [
+      "run_cf4fffee93937a9f",
+      [
+        {
+          "id": "log_13f7c0d4d938d213",
+          "runId": "run_cf4fffee93937a9f",
+          "taskId": "task_cef0fabe6f798143",
+          "agentId": "platform_tableminer",
+          "level": "info",
+          "event": "execution.platform_started",
+          "message": "Built-in platform agent execution started",
+          "metadata": {},
+          "createdAt": "2026-03-30T19:49:05.185Z"
+        },
+        {
+          "id": "log_75d3884035f07a69",
+          "runId": "run_cf4fffee93937a9f",
+          "taskId": "task_cef0fabe6f798143",
+          "agentId": "platform_tableminer",
+          "level": "info",
+          "event": "execution.platform_completed",
+          "message": "Built-in platform agent finished execution",
+          "metadata": {
+            "latencyMs": 8350
+          },
+          "createdAt": "2026-03-30T19:49:05.215Z"
+        }
+      ]
+    ],
+    [
+      "run_dea5f78b22f86504",
+      [
+        {
+          "id": "log_797de9a46fd2a438",
+          "runId": "run_dea5f78b22f86504",
+          "taskId": "task_0f24c3757b309055",
+          "agentId": "platform_tableminer",
+          "level": "info",
+          "event": "execution.platform_started",
+          "message": "Built-in platform agent execution started",
+          "metadata": {},
+          "createdAt": "2026-03-30T20:28:55.302Z"
+        },
+        {
+          "id": "log_c22a728fe0bf732a",
+          "runId": "run_dea5f78b22f86504",
+          "taskId": "task_0f24c3757b309055",
+          "agentId": "platform_tableminer",
+          "level": "info",
+          "event": "execution.platform_completed",
+          "message": "Built-in platform agent finished execution",
+          "metadata": {
+            "latencyMs": 8350
+          },
+          "createdAt": "2026-03-30T20:28:55.360Z"
+        }
+      ]
+    ],
+    [
+      "run_23c80218c24c1ac7",
+      [
+        {
+          "id": "log_0366c4a36a99bb9d",
+          "runId": "run_23c80218c24c1ac7",
+          "taskId": "task_c98d23ef870a7d15",
+          "agentId": "platform_clauselens",
+          "level": "info",
+          "event": "execution.platform_started",
+          "message": "Built-in platform agent execution started",
+          "metadata": {},
+          "createdAt": "2026-03-30T20:39:20.746Z"
+        },
+        {
+          "id": "log_a4c1e260e7d323ee",
+          "runId": "run_23c80218c24c1ac7",
+          "taskId": "task_c98d23ef870a7d15",
+          "agentId": "platform_clauselens",
+          "level": "info",
+          "event": "execution.platform_completed",
+          "message": "Built-in platform agent finished execution",
+          "metadata": {
+            "latencyMs": 10100
+          },
+          "createdAt": "2026-03-30T20:39:20.936Z"
+        }
+      ]
+    ]
+  ],
+  "executionRequestIds": [],
+  "executionCallbackNonces": [],
+  "executionMetrics": [
+    {
+      "id": "metric_930c0cccb8c4f252",
+      "kind": "dispatch",
+      "runId": "run_bbcda3d2aca4529e",
+      "taskId": "task_914a6f5509324e95",
+      "value": 8350,
+      "unit": "ms",
+      "createdAt": "2026-03-30T16:47:34.620Z"
+    },
+    {
+      "id": "metric_e023b4300181144c",
+      "kind": "dispatch",
+      "runId": "run_52fdcf51d7d5abb0",
+      "taskId": "task_6aba20e86ff20845",
+      "value": 11000,
+      "unit": "ms",
+      "createdAt": "2026-03-30T19:46:45.911Z"
+    },
+    {
+      "id": "metric_d545229b1d076f84",
+      "kind": "dispatch",
+      "runId": "run_cf4fffee93937a9f",
+      "taskId": "task_cef0fabe6f798143",
+      "value": 8350,
+      "unit": "ms",
+      "createdAt": "2026-03-30T19:49:05.214Z"
+    },
+    {
+      "id": "metric_cbc6127c90a74aba",
+      "kind": "dispatch",
+      "runId": "run_dea5f78b22f86504",
+      "taskId": "task_0f24c3757b309055",
+      "value": 8350,
+      "unit": "ms",
+      "createdAt": "2026-03-30T20:28:55.360Z"
+    },
+    {
+      "id": "metric_451534d8b5d35fe3",
+      "kind": "dispatch",
+      "runId": "run_23c80218c24c1ac7",
+      "taskId": "task_c98d23ef870a7d15",
+      "value": 10100,
+      "unit": "ms",
+      "createdAt": "2026-03-30T20:39:20.936Z"
+    }
+  ],
+  "internalEvents": [
+    {
+      "id": "internal_510d1699b8ee40ca",
+      "topic": "execution.platform_started",
+      "taskId": "task_914a6f5509324e95",
+      "runId": "run_bbcda3d2aca4529e",
+      "payload": {
+        "agentId": "platform_tableminer"
+      },
+      "createdAt": "2026-03-30T16:47:34.408Z"
+    },
+    {
+      "id": "internal_2ad3013a613acead",
+      "topic": "execution.platform_completed",
+      "taskId": "task_914a6f5509324e95",
+      "runId": "run_bbcda3d2aca4529e",
+      "payload": {
+        "resultHash": "2641c8f5b2c74ccdd6b0067a327d3dce5793fa40166e74cb01fecad40f25a48b"
+      },
+      "createdAt": "2026-03-30T16:47:34.622Z"
+    },
+    {
+      "id": "internal_970f4277336abbb0",
+      "topic": "execution.platform_started",
+      "taskId": "task_6aba20e86ff20845",
+      "runId": "run_52fdcf51d7d5abb0",
+      "payload": {
+        "agentId": "platform_signal_forge"
+      },
+      "createdAt": "2026-03-30T19:46:45.848Z"
+    },
+    {
+      "id": "internal_0f938453a981d2b5",
+      "topic": "execution.platform_completed",
+      "taskId": "task_6aba20e86ff20845",
+      "runId": "run_52fdcf51d7d5abb0",
+      "payload": {
+        "resultHash": "e2edd5b8eb405579d9860fede89d304aa2d92cdda0a93c68e6b5e33b758c32a6"
+      },
+      "createdAt": "2026-03-30T19:46:45.927Z"
+    },
+    {
+      "id": "internal_5ed13296186e4186",
+      "topic": "execution.platform_started",
+      "taskId": "task_cef0fabe6f798143",
+      "runId": "run_cf4fffee93937a9f",
+      "payload": {
+        "agentId": "platform_tableminer"
+      },
+      "createdAt": "2026-03-30T19:49:05.187Z"
+    },
+    {
+      "id": "internal_42699c06f7029be1",
+      "topic": "execution.platform_completed",
+      "taskId": "task_cef0fabe6f798143",
+      "runId": "run_cf4fffee93937a9f",
+      "payload": {
+        "resultHash": "458ac6ff32d3c62a7d6e6f1a8daf65eb2544daf500a9803d518c31d026cc72a3"
+      },
+      "createdAt": "2026-03-30T19:49:05.217Z"
+    },
+    {
+      "id": "internal_2b2e799a68bd6a59",
+      "topic": "execution.platform_started",
+      "taskId": "task_0f24c3757b309055",
+      "runId": "run_dea5f78b22f86504",
+      "payload": {
+        "agentId": "platform_tableminer"
+      },
+      "createdAt": "2026-03-30T20:28:55.310Z"
+    },
+    {
+      "id": "internal_857a3f5299af626f",
+      "topic": "execution.platform_completed",
+      "taskId": "task_0f24c3757b309055",
+      "runId": "run_dea5f78b22f86504",
+      "payload": {
+        "resultHash": "79bcd6f82c74622b79844133d6b41f35f38f3c619ff4cca92bde92972b8c24ff"
+      },
+      "createdAt": "2026-03-30T20:28:55.366Z"
+    },
+    {
+      "id": "internal_0bea22aa5dc34155",
+      "topic": "execution.platform_started",
+      "taskId": "task_c98d23ef870a7d15",
+      "runId": "run_23c80218c24c1ac7",
+      "payload": {
+        "agentId": "platform_clauselens"
+      },
+      "createdAt": "2026-03-30T20:39:20.748Z"
+    },
+    {
+      "id": "internal_d26eb7d557403743",
+      "topic": "execution.platform_completed",
+      "taskId": "task_c98d23ef870a7d15",
+      "runId": "run_23c80218c24c1ac7",
+      "payload": {
+        "resultHash": "351b89e952486bdea9301dbdb869bf16a4028bba62d6d0cc96751913ebe2f62d"
+      },
+      "createdAt": "2026-03-30T20:39:20.943Z"
+    }
+  ],
+  "adminAuditLogs": [],
+  "blacklistedEndpoints": [],
+  "moderationFlags": [
+    {
+      "id": "flag_0ff26099f9b1a5b1",
+      "kind": "task_spam",
+      "severity": "medium",
+      "subjectType": "user",
+      "subjectId": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+      "summary": "Duplicate-looking task detected.",
+      "metadata": {
+        "duplicateTaskId": "task_e8b3d487e45af06e"
+      },
+      "createdAt": "2026-03-30T14:39:40.671Z"
+    },
+    {
+      "id": "flag_3690fd4943d6fcd9",
+      "kind": "task_spam",
+      "severity": "medium",
+      "subjectType": "user",
+      "subjectId": "0x85dcc174de5e785cda3069154d097172f1b39aaa",
+      "summary": "Duplicate-looking task detected.",
+      "metadata": {
+        "duplicateTaskId": "task_e8b3d487e45af06e"
+      },
+      "createdAt": "2026-03-30T14:39:43.466Z"
+    }
+  ],
+  "pausedTasks": []
+}

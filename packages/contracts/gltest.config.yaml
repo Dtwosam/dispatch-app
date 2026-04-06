@@ -1,0 +1,16 @@
+networks:
+  default: localnet
+  localnet: {}
+  studionet: {}
+  testnet_bradbury:
+    id: 4221
+    url: https://rpc-bradbury.genlayer.com
+    accounts:
+      - "${ACCOUNT_PRIVATE_KEY_1}"
+    chain_type: testnet_bradbury
+
+paths:
+  contracts: .generated
+  artifacts: artifacts
+
+environment: .env

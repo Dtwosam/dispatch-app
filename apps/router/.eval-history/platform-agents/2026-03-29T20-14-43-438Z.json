@@ -1,0 +1,833 @@
+{
+  "metadata": {
+    "generatedAt": "2026-03-29T20:14:43.438Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 25,
+    "averageScore": 99,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 16,
+        "averageScore": 99
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T20-14-43-438Z.json"
+  },
+  "suite": {
+    "benchmarkVersion": "2026-03-29.4",
+    "generatedAt": "2026-03-29T20:14:43.438Z",
+    "total": 26,
+    "passed": 25,
+    "averageScore": 99,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 16,
+        "averageScore": 99
+      }
+    },
+    "results": [
+      {
+        "id": "briefly_exec_summary",
+        "agentId": "platform_briefly",
+        "title": "Briefly summarizes visible source material",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "section:Top Line",
+            "passed": true,
+            "detail": "Found section Top Line."
+          },
+          {
+            "label": "section:Decision Signals",
+            "passed": true,
+            "detail": "Found section Decision Signals."
+          },
+          {
+            "label": "bullet:Revenue grew 14 percent",
+            "passed": true,
+            "detail": "Bullet content references \"Revenue grew 14 percent\"."
+          },
+          {
+            "label": "bullet:Churn fell",
+            "passed": true,
+            "detail": "Bullet content references \"Churn fell\"."
+          },
+          {
+            "label": "executionSource",
+            "passed": true,
+            "detail": "Execution source matched heuristic."
+          }
+        ],
+        "confidence": "high",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "clauselens_fail_safe",
+        "agentId": "platform_clauselens",
+        "title": "ClauseLens fails safe without evidence",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "section:Answer",
+            "passed": true,
+            "detail": "Found section Answer."
+          },
+          {
+            "label": "section:Evidence",
+            "passed": true,
+            "detail": "Found section Evidence."
+          },
+          {
+            "label": "summary:cannot safely answer",
+            "passed": true,
+            "detail": "Summary references \"cannot safely answer\"."
+          },
+          {
+            "label": "uncertainty:cannot verify",
+            "passed": true,
+            "detail": "Uncertainty references \"cannot verify\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "tableminer_structured_fields",
+        "agentId": "platform_tableminer",
+        "title": "TableMiner separates confirmed and uncertain fields",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "section:Confirmed Fields",
+            "passed": true,
+            "detail": "Found section Confirmed Fields."
+          },
+          {
+            "label": "section:Uncertain Fields",
+            "passed": true,
+            "detail": "Found section Uncertain Fields."
+          },
+          {
+            "label": "bullet:Invoice Number: INV-42",
+            "passed": true,
+            "detail": "Bullet content references \"Invoice Number: INV-42\"."
+          },
+          {
+            "label": "bullet:Due Date: TBD",
+            "passed": true,
+            "detail": "Bullet content references \"Due Date: TBD\"."
+          }
+        ],
+        "confidence": "medium",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "schemasmith_explicit_keys",
+        "agentId": "platform_schemasmith",
+        "title": "SchemaSmith turns explicit fields into stable schema keys",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "section:Schema",
+            "passed": true,
+            "detail": "Found section Schema."
+          },
+          {
+            "label": "section:Sample Output",
+            "passed": true,
+            "detail": "Found section Sample Output."
+          },
+          {
+            "label": "bullet:\"lead_name\": string | null",
+            "passed": true,
+            "detail": "Bullet content references \"\"lead_name\": string | null\"."
+          },
+          {
+            "label": "bullet:\"lead_email\": string | null",
+            "passed": true,
+            "detail": "Bullet content references \"\"lead_email\": string | null\"."
+          }
+        ],
+        "confidence": "high",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "polylane_requires_source",
+        "agentId": "platform_polylane",
+        "title": "PolyLane refuses translation without source text",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "summary:cannot localize",
+            "passed": true,
+            "detail": "Summary references \"cannot localize\"."
+          },
+          {
+            "label": "uncertainty:source text",
+            "passed": true,
+            "detail": "Uncertainty references \"source text\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "opspilot_runbook",
+        "agentId": "platform_opspilot",
+        "title": "OpsPilot converts visible steps into a runbook",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "section:Workflow",
+            "passed": true,
+            "detail": "Found section Workflow."
+          },
+          {
+            "label": "section:Owners",
+            "passed": true,
+            "detail": "Found section Owners."
+          },
+          {
+            "label": "section:Risks",
+            "passed": true,
+            "detail": "Found section Risks."
+          },
+          {
+            "label": "bullet:Draft checklist",
+            "passed": true,
+            "detail": "Bullet content references \"Draft checklist\"."
+          }
+        ],
+        "confidence": "high",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "signalforge_bounded",
+        "agentId": "platform_signal_forge",
+        "title": "Signal Forge keeps thin-evidence strategy work low-confidence",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "section:Signal",
+            "passed": true,
+            "detail": "Found section Signal."
+          },
+          {
+            "label": "section:Recommendation",
+            "passed": true,
+            "detail": "Found section Recommendation."
+          },
+          {
+            "label": "uncertainty:evidence",
+            "passed": true,
+            "detail": "Uncertainty references \"evidence\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "copysprint_bounded_copy",
+        "agentId": "platform_copysprint",
+        "title": "CopySprint avoids unsupported proof claims",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "section:Angle",
+            "passed": true,
+            "detail": "Found section Angle."
+          },
+          {
+            "label": "section:Draft",
+            "passed": true,
+            "detail": "Found section Draft."
+          },
+          {
+            "label": "section:Variants",
+            "passed": true,
+            "detail": "Found section Variants."
+          },
+          {
+            "label": "bullet:Headline: Move faster with clearer execution.",
+            "passed": true,
+            "detail": "Bullet content references \"Headline: Move faster with clearer execution.\"."
+          },
+          {
+            "label": "uncertainty:proof",
+            "passed": true,
+            "detail": "Uncertainty references \"proof\"."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "campaignpilot_conservative_plan",
+        "agentId": "platform_campaignpilot",
+        "title": "CampaignPilot creates conservative campaign planning when context is thin",
+        "profile": "baseline",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "section:Audience",
+            "passed": true,
+            "detail": "Found section Audience."
+          },
+          {
+            "label": "section:Message",
+            "passed": true,
+            "detail": "Found section Message."
+          },
+          {
+            "label": "section:Plan",
+            "passed": true,
+            "detail": "Found section Plan."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "clauselens_grounded_clause",
+        "agentId": "platform_clauselens",
+        "title": "ClauseLens stays grounded when explicit clause text is present",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:Best grounded answer: Section 8. Termination",
+            "passed": true,
+            "detail": "Bullet content references \"Best grounded answer: Section 8. Termination\"."
+          },
+          {
+            "label": "bullet:Visible source: Section 9. Survival",
+            "passed": true,
+            "detail": "Bullet content references \"Visible source: Section 9. Survival\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched high."
+          }
+        ],
+        "confidence": "high",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "tableminer_attachment_grounding",
+        "agentId": "platform_tableminer",
+        "title": "TableMiner extracts grounded fields from attachment text and keeps uncertain values separate",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:Vendor Name: Northwind Freight",
+            "passed": true,
+            "detail": "Bullet content references \"Vendor Name: Northwind Freight\"."
+          },
+          {
+            "label": "bullet:Account ID: NF-1002",
+            "passed": true,
+            "detail": "Bullet content references \"Account ID: NF-1002\"."
+          },
+          {
+            "label": "bullet:Renewal Date: TBD",
+            "passed": true,
+            "detail": "Bullet content references \"Renewal Date: TBD\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched high."
+          }
+        ],
+        "confidence": "high",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "schemasmith_sparse_input_stays_conservative",
+        "agentId": "platform_schemasmith",
+        "title": "SchemaSmith stays conservative when explicit source fields are missing",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:\"notes\": string | null",
+            "passed": true,
+            "detail": "Bullet content references \"\"notes\": string | null\"."
+          },
+          {
+            "label": "bullet:\"notes\": \"Add concrete fields from source material before production use.\"",
+            "passed": true,
+            "detail": "Bullet content references \"\"notes\": \"Add concrete fields from source material before production use.\"\"."
+          },
+          {
+            "label": "uncertainty:partly inferred",
+            "passed": true,
+            "detail": "Uncertainty references \"partly inferred\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "polylane_grounded_translation",
+        "agentId": "platform_polylane",
+        "title": "PolyLane localizes only when source text and target language are explicit",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:Target language: Spanish",
+            "passed": true,
+            "detail": "Bullet content references \"Target language: Spanish\"."
+          },
+          {
+            "label": "bullet:Visible source copy: Launch faster with fewer handoffs.",
+            "passed": true,
+            "detail": "Bullet content references \"Visible source copy: Launch faster with fewer handoffs.\"."
+          },
+          {
+            "label": "bullet:[Spanish] Launch faster with fewer handoffs.",
+            "passed": true,
+            "detail": "Bullet content references \"[Spanish] Launch faster with fewer handoffs.\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched medium."
+          }
+        ],
+        "confidence": "medium",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "opspilot_owner_aware_runbook",
+        "agentId": "platform_opspilot",
+        "title": "OpsPilot uses explicit step and owner signals instead of generic workflow prose",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:1. Review the incident timeline",
+            "passed": true,
+            "detail": "Bullet content references \"1. Review the incident timeline\"."
+          },
+          {
+            "label": "bullet:Use the owners already referenced in the task context.",
+            "passed": true,
+            "detail": "Bullet content references \"Use the owners already referenced in the task context.\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched high."
+          }
+        ],
+        "confidence": "high",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "signalforge_instruction_filter",
+        "agentId": "platform_signal_forge",
+        "title": "Signal Forge does not mistake the task ask itself for market evidence",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:No concrete market or customer evidence was provided in the visible task context.",
+            "passed": true,
+            "detail": "Bullet content references \"No concrete market or customer evidence was provided in the visible task context.\"."
+          },
+          {
+            "label": "uncertainty:evidence",
+            "passed": true,
+            "detail": "Uncertainty references \"evidence\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "copysprint_rejects_hype_claims",
+        "agentId": "platform_copysprint",
+        "title": "CopySprint stays conservative when asked to make unsupported market-dominance claims",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:No concrete product proof was visible, so the angle should stay conservative.",
+            "passed": true,
+            "detail": "Bullet content references \"No concrete product proof was visible, so the angle should stay conservative.\"."
+          },
+          {
+            "label": "uncertainty:proof",
+            "passed": true,
+            "detail": "Uncertainty references \"proof\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "campaignpilot_audience_and_proof",
+        "agentId": "platform_campaignpilot",
+        "title": "CampaignPilot can move to medium confidence when audience and proof are explicit",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:Primary working audience: finance ops leaders",
+            "passed": true,
+            "detail": "Bullet content references \"Primary working audience: finance ops leaders\"."
+          },
+          {
+            "label": "bullet:Visible support point: Audience: finance ops leaders",
+            "passed": true,
+            "detail": "Bullet content references \"Visible support point: Audience: finance ops leaders\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched medium."
+          }
+        ],
+        "confidence": "medium",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "briefly_conflicting_metrics_from_pack",
+        "agentId": "platform_briefly",
+        "title": "Briefly preserves conflicts instead of flattening them away",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:MRR $2.1M (+4% MoM)",
+            "passed": true,
+            "detail": "Bullet content references \"MRR $2.1M (+4% MoM)\"."
+          },
+          {
+            "label": "bullet:MRR $2.3M (+6% MoM)",
+            "passed": true,
+            "detail": "Bullet content references \"MRR $2.3M (+6% MoM)\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched medium."
+          }
+        ],
+        "confidence": "medium",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "clauselens_ownership_gap_from_pack",
+        "agentId": "platform_clauselens",
+        "title": "ClauseLens refuses to infer ownership from a usage clause",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "summary:cannot safely answer",
+            "passed": true,
+            "detail": "Summary references \"cannot safely answer\"."
+          },
+          {
+            "label": "bullet:Provide the relevant clause text",
+            "passed": true,
+            "detail": "Bullet content references \"Provide the relevant clause text\"."
+          },
+          {
+            "label": "bullet:Insufficient evidence to provide a grounded clause answer",
+            "passed": true,
+            "detail": "Bullet content references \"Insufficient evidence to provide a grounded clause answer\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "tableminer_conflicting_totals_from_pack",
+        "agentId": "platform_tableminer",
+        "title": "TableMiner preserves conflicting totals instead of resolving them silently",
+        "profile": "adversarial",
+        "passed": false,
+        "score": 75,
+        "checks": [
+          {
+            "label": "bullet:Subtotal: 1,000",
+            "passed": true,
+            "detail": "Bullet content references \"Subtotal: 1,000\"."
+          },
+          {
+            "label": "bullet:Total: 1,200",
+            "passed": true,
+            "detail": "Bullet content references \"Total: 1,200\"."
+          },
+          {
+            "label": "bullet:Amount Due: 1,100",
+            "passed": false,
+            "detail": "Expected bullet content \"Amount Due: 1,100\" was not found."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched high."
+          }
+        ],
+        "confidence": "high",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "schemasmith_over_inference_from_pack",
+        "agentId": "platform_schemasmith",
+        "title": "SchemaSmith does not invent telemetry fields from a tiny event brief",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:\"user\": string | null",
+            "passed": true,
+            "detail": "Bullet content references \"\"user\": string | null\"."
+          },
+          {
+            "label": "bullet:\"action\": string | null",
+            "passed": true,
+            "detail": "Bullet content references \"\"action\": string | null\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched high."
+          }
+        ],
+        "confidence": "high",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "polylane_conflicting_glossary_from_pack",
+        "agentId": "platform_polylane",
+        "title": "PolyLane honors glossary constraints when the prompt conflicts with itself",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:Target language:",
+            "passed": true,
+            "detail": "Bullet content references \"Target language:\"."
+          },
+          {
+            "label": "bullet:Store your API Key in your Workspace.",
+            "passed": true,
+            "detail": "Bullet content references \"Store your API Key in your Workspace.\"."
+          },
+          {
+            "label": "bullet:[de-DE] Store your API Key in your Workspace.",
+            "passed": true,
+            "detail": "Bullet content references \"[de-DE] Store your API Key in your Workspace.\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched medium."
+          }
+        ],
+        "confidence": "medium",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "opspilot_missing_owners_from_pack",
+        "agentId": "platform_opspilot",
+        "title": "OpsPilot leaves ownership as missing when the brief provides none",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:1. QA",
+            "passed": true,
+            "detail": "Bullet content references \"1. QA\"."
+          },
+          {
+            "label": "bullet:Assign one primary owner and one reviewer before execution starts.",
+            "passed": true,
+            "detail": "Bullet content references \"Assign one primary owner and one reviewer before execution starts.\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched medium."
+          }
+        ],
+        "confidence": "medium",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "copysprint_small_sample_from_pack",
+        "agentId": "platform_copysprint",
+        "title": "CopySprint stays careful when proof is tiny and mixed",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:5% faster response (n=3)",
+            "passed": true,
+            "detail": "Bullet content references \"5% faster response (n=3)\"."
+          },
+          {
+            "label": "uncertainty:small sample",
+            "passed": true,
+            "detail": "Uncertainty references \"small sample\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "campaignpilot_thin_brief_from_pack",
+        "agentId": "platform_campaignpilot",
+        "title": "CampaignPilot stays scaffold-level when the brief is missing core inputs",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:Primary working audience: the task owner",
+            "passed": true,
+            "detail": "Bullet content references \"Primary working audience: the task owner\"."
+          },
+          {
+            "label": "bullet:No concrete proof point was provided, so keep messaging conservative.",
+            "passed": true,
+            "detail": "Bullet content references \"No concrete proof point was provided, so keep messaging conservative.\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      },
+      {
+        "id": "signalforge_missing_context_from_pack",
+        "agentId": "platform_signal_forge",
+        "title": "Signal Forge does not make strategic decisions from an empty brief",
+        "profile": "adversarial",
+        "passed": true,
+        "score": 100,
+        "checks": [
+          {
+            "label": "bullet:No concrete market or customer evidence was provided in the visible task context.",
+            "passed": true,
+            "detail": "Bullet content references \"No concrete market or customer evidence was provided in the visible task context.\"."
+          },
+          {
+            "label": "uncertainty:evidence",
+            "passed": true,
+            "detail": "Uncertainty references \"evidence\"."
+          },
+          {
+            "label": "confidence",
+            "passed": true,
+            "detail": "Confidence matched low."
+          }
+        ],
+        "confidence": "low",
+        "executionSource": "heuristic"
+      }
+    ]
+  }
+}

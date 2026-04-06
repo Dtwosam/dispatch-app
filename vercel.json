@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm --workspace apps/web run build:static",
+  "outputDirectory": "apps/web/.vercel-static",
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

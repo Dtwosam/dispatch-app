@@ -1,0 +1,17 @@
+[
+  { "file": "./tests/agentRegistryService.test.ts" },
+  { "file": "./tests/arcChainService.test.ts" },
+  { "file": "./tests/compatibilityValidator.test.ts" },
+  { "file": "./tests/executionEngine.test.ts" },
+  { "file": "./tests/platformAgentBenchmarks.test.ts" },
+  { "file": "./tests/platformAgentTaskPacks.test.ts" },
+  { "file": "./tests/settlementService.test.ts" },
+  { "file": "./tests/storePersistence.test.ts" },
+  { "file": "./tests/taskMarketService.test.ts" },
+  { "file": "./tests/trustRankingService.test.ts" },
+  { "file": "./tests/platformAgentRuntime.signalForge.test.ts" },
+  { "file": "./tests/platformAgentRuntime.test.ts", "pattern": "ClauseLens|TableMiner|Briefly|SchemaSmith" },
+  { "file": "./tests/platformAgentRuntime.test.ts", "pattern": "PolyLane" },
+  { "file": "./tests/platformAgentRuntime.test.ts", "pattern": "OpsPilot" },
+  { "file": "./tests/platformAgentRuntime.test.ts", "pattern": "CopySprint|CampaignPilot|quality modes|Improve Again|platform runs|platform agent bootstrap" }
+]

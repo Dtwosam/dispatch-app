@@ -1,0 +1,70 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.2.4
+2 info using node@v20.11.0
+3 timing npm:load:whichnode Completed in 3ms
+4 timing config:load:defaults Completed in 3ms
+5 timing config:load:file:C:\Program Files\nodejs\node_modules\npm\npmrc Completed in 8ms
+6 timing config:load:builtin Completed in 9ms
+7 timing config:load:cli Completed in 2ms
+8 timing config:load:env Completed in 0ms
+9 timing config:load:file:C:\Users\dtwof\Desktop\genlayer\New folder\.npmrc Completed in 1ms
+10 timing config:load:project Completed in 53ms
+11 timing config:load:file:C:\Users\dtwof\.npmrc Completed in 0ms
+12 timing config:load:user Completed in 1ms
+13 timing config:load:file:C:\Users\dtwof\AppData\Roaming\npm\etc\npmrc Completed in 0ms
+14 timing config:load:global Completed in 0ms
+15 timing config:load:setEnvs Completed in 1ms
+16 timing config:load Completed in 70ms
+17 timing npm:load:configload Completed in 70ms
+18 timing config:load:flatten Completed in 2ms
+19 timing npm:load:mkdirpcache Completed in 1ms
+20 timing npm:load:mkdirplogs Completed in 1ms
+21 verbose title npm exec vercel project list
+22 verbose argv "exec" "--" "vercel" "project" "list"
+23 timing npm:load:setTitle Completed in 3ms
+24 timing npm:load:display Completed in 2ms
+25 verbose logfile logs-max:10 dir:C:\Users\dtwof\Desktop\genlayer\New folder\.npm-cache\_logs\2026-04-01T18_30_48_531Z-
+26 verbose logfile C:\Users\dtwof\Desktop\genlayer\New folder\.npm-cache\_logs\2026-04-01T18_30_48_531Z-debug-0.log
+27 timing npm:load:logFile Completed in 9ms
+28 timing npm:load:timers Completed in 0ms
+29 timing npm:load:configScope Completed in 0ms
+30 timing npm:load Completed in 136ms
+31 silly logfile done cleaning log files
+32 timing arborist:ctor Completed in 2ms
+33 verbose shrinkwrap failed to load node_modules/.package-lock.json out of date, updated: apps/web
+34 http fetch GET 200 https://registry.npmjs.org/npm 2260ms (cache miss)
+35 http fetch GET 200 https://registry.npmjs.org/vercel 2104ms (cache miss)
+36 timing arborist:ctor Completed in 0ms
+37 timing command:exec Completed in 2733ms
+38 notice
+38 notice New major version of npm available! 10.2.4 -> 11.12.1
+38 notice Changelog: <https://github.com/npm/cli/releases/tag/v11.12.1>
+38 notice Run `npm install -g npm@11.12.1` to update!
+38 notice
+39 verbose stack Error: EPERM: operation not permitted, lstat 'C:\Users\dtwof'
+40 verbose cwd C:\Users\dtwof\Desktop\genlayer\New folder
+41 verbose Windows_NT 10.0.26200
+42 verbose node v20.11.0
+43 verbose npm  v10.2.4
+44 error code EPERM
+45 error syscall lstat
+46 error path C:\Users\dtwof
+47 error errno -4048
+48 error [Error: EPERM: operation not permitted, lstat 'C:\Users\dtwof'] {
+48 error   errno: -4048,
+48 error   code: 'EPERM',
+48 error   syscall: 'lstat',
+48 error   path: 'C:\\Users\\dtwof'
+48 error }
+49 error
+49 error The operation was rejected by your operating system.
+49 error It's possible that the file was already in use (by a text editor or antivirus),
+49 error or that you lack permissions to access it.
+49 error
+49 error If you believe this might be a permissions issue, please double-check the
+49 error permissions of the file and its containing directories, or try running
+49 error the command again as root/Administrator.
+50 verbose exit -4048
+51 timing npm Completed in 3467ms
+52 verbose code -4048
+53 error A complete log of this run can be found in: C:\Users\dtwof\Desktop\genlayer\New folder\.npm-cache\_logs\2026-04-01T18_30_48_531Z-debug-0.log

@@ -1,0 +1,24 @@
+{
+  "name": "evaluator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --import tsx src/server.ts",
+    "test": "node --import tsx --test ./tests/run-all.js",
+    "test:manual": "tsx ../../scripts/run-node-tests.ts ./tests/evaluationService.test.ts"
+  },
+  "dependencies": {
+    "@marketplace/shared": "0.1.0",
+    "express": "^4.21.1",
+    "tsx": "^4.19.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.1",
+    "typescript": "^5.6.3"
+  }
+}

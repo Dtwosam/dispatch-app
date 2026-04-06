@@ -1,0 +1,10 @@
+[
+  {
+    "nonce": "demo-task-001",
+    "reward": 1000,
+    "deadline": 1735689600,
+    "task_mode": "SINGLE_SUBMISSION",
+    "metadata_uri": "ipfs://demo-task-001",
+    "metadata_hash": "0xmeta001"
+  }
+]

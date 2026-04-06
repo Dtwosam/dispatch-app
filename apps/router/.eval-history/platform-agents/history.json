@@ -1,0 +1,255 @@
+[
+  {
+    "generatedAt": "2026-03-29T20:22:44.549Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 26,
+    "averageScore": 100,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 17,
+        "averageScore": 100
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T20-22-44-549Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T20:18:09.226Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 25,
+    "averageScore": 99,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 16,
+        "averageScore": 99
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T20-18-09-226Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T20:16:44.522Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 25,
+    "averageScore": 99,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 16,
+        "averageScore": 99
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T20-16-44-522Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T20:14:43.438Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 25,
+    "averageScore": 99,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 16,
+        "averageScore": 99
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T20-14-43-438Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T19:29:36.857Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 26,
+    "averageScore": 100,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 17,
+        "averageScore": 100
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T19-29-36-857Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T19:27:46.286Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 22,
+    "averageScore": 91,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 13,
+        "averageScore": 87
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T19-27-46-286Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T19:22:34.117Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 20,
+    "averageScore": 87,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 11,
+        "averageScore": 79
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T19-22-34-117Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T19:19:30.993Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 19,
+    "averageScore": 80,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 10,
+        "averageScore": 70
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T19-19-30-993Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T19:17:38.904Z",
+    "benchmarkVersion": "2026-03-29.4",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 26,
+    "passed": 18,
+    "averageScore": 77,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 17,
+        "passed": 9,
+        "averageScore": 64
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T19-17-38-904Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T18:45:12.672Z",
+    "benchmarkVersion": "2026-03-29.3",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 17,
+    "passed": 17,
+    "averageScore": 100,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 8,
+        "passed": 8,
+        "averageScore": 100
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T18-45-12-672Z.json"
+  },
+  {
+    "generatedAt": "2026-03-29T18:43:33.861Z",
+    "benchmarkVersion": "2026-03-29.3",
+    "model": null,
+    "baseUrl": null,
+    "llmEnabled": false,
+    "total": 17,
+    "passed": 13,
+    "averageScore": 93,
+    "profiles": {
+      "baseline": {
+        "total": 9,
+        "passed": 9,
+        "averageScore": 100
+      },
+      "adversarial": {
+        "total": 8,
+        "passed": 4,
+        "averageScore": 85
+      }
+    },
+    "snapshotPath": "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\apps\\router\\.eval-history\\platform-agents\\2026-03-29T18-43-33-861Z.json"
+  }
+]

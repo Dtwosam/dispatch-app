@@ -1,0 +1,97 @@
+services:
+  - type: web
+    name: dispatch-evaluator
+    runtime: node
+    rootDir: .
+    plan: starter
+    buildCommand: npm install && npm --workspace packages/shared run build && npm --workspace apps/evaluator run build
+    startCommand: npm --workspace apps/evaluator run start
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "4030"
+
+  - type: web
+    name: dispatch-router
+    runtime: node
+    rootDir: .
+    plan: starter
+    buildCommand: npm install && npm --workspace packages/shared run build && npm --workspace packages/agent-sdk run build && npm --workspace apps/router run build
+    startCommand: npm --workspace apps/router run start
+    healthCheckPath: /health
+    disk:
+      name: dispatch-router-data
+      mountPath: /var/data/dispatch-router
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: "4020"
+      - key: ROUTER_STORE_PATH
+        value: /var/data/dispatch-router/router-store.json
+      - key: EVALUATOR_BASE_URL
+        fromService:
+          type: web
+          name: dispatch-evaluator
+          property: hostport
+      - key: ROUTER_PUBLIC_BASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ADMIN_WALLETS
+        sync: false
+      - key: ROUTER_AGENT_SHARED_SECRET
+        sync: false
+      - key: ROUTER_CALLBACK_SECRET
+        sync: false
+      - key: OWNER_PROOF_VERIFIER_URL
+        sync: false
+      - key: ALLOW_INSECURE_DEV_OWNER_PROOFS
+        sync: false
+      - key: PLATFORM_FEE_BPS
+        value: "250"
+      - key: EXECUTION_MAX_RETRIES
+        value: "3"
+      - key: EXECUTION_BASE_BACKOFF_MS
+        value: "1500"
+      - key: EXECUTION_TIMEOUT_MS
+        value: "120000"
+      - key: EXECUTION_ENDPOINT_ALLOWLIST
+        sync: false
+      - key: TRUST_CACHE_TTL_MS
+        value: "30000"
+      - key: TRUST_RECOMPUTE_INTERVAL_MS
+        value: "60000"
+      - key: ENABLE_MARKETPLACE_SEEDING
+        value: "false"
+      - key: ARC_RPC_URL
+        sync: false
+      - key: ARC_BROWSER_RPC_URL
+        sync: false
+      - key: ARC_CHAIN_ID
+        sync: false
+      - key: ARC_CHAIN_KEY
+        sync: false
+      - key: ARC_CHAIN_MODE
+        sync: false
+      - key: ARC_NETWORK_NAME
+        sync: false
+      - key: ARC_TASK_MARKETPLACE_ADDRESS
+        sync: false
+      - key: ARC_AGENT_REGISTRY_ADDRESS
+        sync: false
+      - key: ARC_PAYMENT_TOKEN_ADDRESS
+        sync: false
+      - key: ARC_PAYMENT_TOKEN_SYMBOL
+        value: "USDC"
+      - key: ARC_PAYMENT_TOKEN_DECIMALS
+        value: "6"
+      - key: ARC_GAS_TOKEN_SYMBOL
+        value: "USDC"
+      - key: ARC_GAS_TOKEN_DECIMALS
+        value: "18"
+      - key: ARC_EXPLORER_BASE_URL
+        sync: false
+      - key: ARC_SERVER_PRIVATE_KEY
+        sync: false
+      - key: ARC_SERVER_WALLET_ADDRESS
+        sync: false

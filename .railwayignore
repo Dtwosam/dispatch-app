@@ -1,0 +1,11 @@
+.git
+.gitignore
+.vercel
+.local
+.pytest_cache
+artifacts
+node_modules
+apps/*/dist
+apps/web/.vercel-static
+packages/*/dist
+*.log

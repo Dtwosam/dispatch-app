@@ -1,0 +1,13 @@
+{
+  "name": "@marketplace/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile:arc": "node ./scripts/compile-arc.mjs",
+    "deploy:arc": "node ./scripts/deploy-arc.mjs",
+    "test": "pytest tests/direct -v",
+    "test:direct": "pytest tests/direct -v"
+  },
+  "dependencies": {}
+}

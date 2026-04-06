@@ -1,0 +1,10 @@
+import "./agentRegistryService.test.ts";
+import "./compatibilityValidator.test.ts";
+import "./executionEngine.test.ts";
+import "./platformAgentRuntime.test.ts";
+import "./platformAgentBenchmarks.test.ts";
+import "./platformAgentTaskPacks.test.ts";
+import "./settlementService.test.ts";
+import "./storePersistence.test.ts";
+import "./taskMarketService.test.ts";
+import "./trustRankingService.test.ts";

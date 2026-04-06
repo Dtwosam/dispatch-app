@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dispatch</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "viem": "/@modules/viem/_esm/index.js",
+          "viem/": "/@modules/viem/_esm/",
+          "viem/accounts": "/@modules/viem/_esm/accounts/index.js",
+          "abitype": "/@modules/abitype/dist/esm/exports/index.js",
+          "abitype/": "/@modules/abitype/dist/esm/exports/",
+          "ox": "/@modules/ox/_esm/index.js",
+          "ox/": "/@modules/ox/_esm/",
+          "eventemitter3": "/@modules/eventemitter3/index.mjs",
+          "@adraffy/ens-normalize": "/@modules/@adraffy/ens-normalize/dist/index.mjs",
+          "@noble/ciphers": "/@modules/@noble/ciphers/esm/index.js",
+          "@noble/ciphers/": "/@modules/@noble/ciphers/esm/",
+          "@scure/bip32": "/@modules/@scure/bip32/lib/esm/index.js",
+          "@scure/bip32/": "/@modules/@scure/bip32/lib/esm/",
+          "@scure/bip39": "/@modules/@scure/bip39/esm/index.js",
+          "@scure/bip39/": "/@modules/@scure/bip39/esm/",
+          "@scure/base": "/@modules/@scure/base/lib/esm/index.js",
+          "@scure/base/": "/@modules/@scure/base/lib/esm/",
+          "@noble/curves": "/@modules/@noble/curves/esm/index.js",
+          "@noble/curves/": "/@modules/@noble/curves/esm/",
+          "@noble/hashes": "/@modules/@noble/hashes/esm/index.js",
+          "@noble/hashes/": "/@modules/@noble/hashes/esm/"
+        }
+      }
+    </script>
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main id="appFrame">
+      <header id="appHeader">
+        <section id="brandSlot"></section>
+        <nav id="routeList"></nav>
+        <section id="topbarActions"></section>
+      </header>
+      <section id="statusToast"></section>
+      <section id="appRoot"></section>
+    </main>
+    <section class="app-utility-hidden" aria-hidden="true">
+      <input id="ownerWallet" placeholder="0x..." />
+    </section>
+    <div class="wallet-sheet" id="walletSheet"></div>
+    <div class="burst-layer" id="burstLayer"></div>
+  </body>
+</html>

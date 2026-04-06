@@ -1,0 +1,45 @@
+{
+  "contractName": "IDispatchAgentRegistry",
+  "sourceName": "DispatchMarketplace.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "agentId",
+          "type": "string"
+        }
+      ],
+      "name": "isAgentActive",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "agentId",
+          "type": "string"
+        }
+      ],
+      "name": "ownerOfAgent",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x"
+}

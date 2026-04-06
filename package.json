@@ -1,0 +1,29 @@
+{
+  "name": "dispatch",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev:evaluator": "npm --workspace apps/evaluator run dev",
+    "dev:indexer": "npm --workspace apps/indexer run dev",
+    "dev:arc": "powershell -ExecutionPolicy Bypass -File ./scripts/bootstrap/start-browser-sdk.ps1",
+    "dev:browser-sdk": "powershell -ExecutionPolicy Bypass -File ./scripts/bootstrap/start-browser-sdk.ps1",
+    "dev:local": "powershell -ExecutionPolicy Bypass -File ./scripts/bootstrap/start-local.ps1",
+    "dev:tunnel:router": "powershell -ExecutionPolicy Bypass -File ./scripts/bootstrap/start-router-tunnel.ps1",
+    "dev:router": "npm --workspace apps/router run dev",
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:adapter": "npm --workspace apps/adapter-service run dev",
+    "dev:stop": "powershell -ExecutionPolicy Bypass -File ./scripts/bootstrap/stop-local.ps1",
+    "typecheck": "npm --workspace packages/shared run build && npm --workspace packages/agent-sdk run build && npm --workspace apps/evaluator run build && npm --workspace apps/router run build && npm --workspace apps/adapter-service run build && npm --workspace apps/web run build",
+    "test:router": "npm --workspace apps/router run test",
+    "test:evaluator": "npm --workspace apps/evaluator run test",
+    "test:web": "npm --workspace apps/web run test"
+  },
+  "devDependencies": {
+    "solc": "^0.8.34"
+  }
+}

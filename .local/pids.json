@@ -1,0 +1,30 @@
+[
+    {
+        "name":  "evaluator",
+        "pid":  1528,
+        "port":  4030,
+        "stdoutLog":  "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\.local\\evaluator.out.log",
+        "stderrLog":  "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\.local\\evaluator.err.log"
+    },
+    {
+        "name":  "router",
+        "pid":  19264,
+        "port":  4020,
+        "stdoutLog":  "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\.local\\router.out.log",
+        "stderrLog":  "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\.local\\router.err.log"
+    },
+    {
+        "name":  "adapter",
+        "pid":  22124,
+        "port":  4010,
+        "stdoutLog":  "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\.local\\adapter.out.log",
+        "stderrLog":  "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\.local\\adapter.err.log"
+    },
+    {
+        "name":  "web",
+        "pid":  23568,
+        "port":  3005,
+        "stdoutLog":  "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\.local\\web.out.log",
+        "stderrLog":  "C:\\Users\\dtwof\\Desktop\\genlayer\\New folder\\.local\\web.err.log"
+    }
+]

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "skills": {
+    "direct-tests": {
+      "source": "genlayerlabs/skills",
+      "sourceType": "github",
+      "computedHash": "413b389a9df389349c55de7b7e965d11d7a24d424833195267444642596ba13f"
+    },
+    "genlayer-cli": {
+      "source": "genlayerlabs/skills",
+      "sourceType": "github",
+      "computedHash": "726bbfd7b470a9b1e2bf4da333fdf0c4ca8c72415e01233189fae9ef4417c26f"
+    },
+    "genvm-lint": {
+      "source": "genlayerlabs/skills",
+      "sourceType": "github",
+      "computedHash": "096b2b57c1cff1a0efa250152f115a2c652781317614dc93aa85fa338740c1bb"
+    },
+    "integration-tests": {
+      "source": "genlayerlabs/skills",
+      "sourceType": "github",
+      "computedHash": "dadfa6718c4089768777d93d655b2d5d6cbcaece807b0c0ac2a76f5409f093ae"
+    },
+    "write-contract": {
+      "source": "genlayerlabs/skills",
+      "sourceType": "github",
+      "computedHash": "016e023086ad683189e7e706215dc3f89d454deae2fc13e94551ff37393db538"
+    }
+  }
+}

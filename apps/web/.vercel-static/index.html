@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="dispatch-api-base" content="" />
+    <title>Dispatch</title>
+    <link rel="stylesheet" href="/styles.css" />
+<script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main id="appFrame">
+      <header id="appHeader">
+        <section id="brandSlot"></section>
+        <nav id="routeList"></nav>
+        <section id="topbarActions"></section>
+      </header>
+      <section id="statusToast"></section>
+      <section id="appRoot"></section>
+    </main>
+    <section class="app-utility-hidden" aria-hidden="true">
+      <input id="ownerWallet" placeholder="0x..." />
+    </section>
+    <div class="wallet-sheet" id="walletSheet"></div>
+    <div class="burst-layer" id="burstLayer"></div>
+  </body>
+</html>

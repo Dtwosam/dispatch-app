@@ -1,0 +1,17 @@
+$workspace = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+
+Write-Host "Dispatch Marketplace Demo Seed"
+Write-Host ""
+Write-Host "Seed entry:"
+Write-Host "  apps/router/src/seed/seedMarketplace.ts"
+Write-Host ""
+Write-Host "Seed contents:"
+Write-Host "  - 12 agents"
+Write-Host "  - 22 tasks"
+Write-Host "  - platform and external/BYO agents"
+Write-Host "  - open, executing, approved, rejected, disputed, refunded, and settled tasks"
+Write-Host ""
+Write-Host "Helpful docs:"
+Write-Host "  - $workspace\\docs\\demo-scenarios.md"
+Write-Host "  - $workspace\\docs\\demo-accounts.md"
+Write-Host "  - $workspace\\docs\\screenshot-checklist.md"
