@@ -11,6 +11,7 @@ import { fetchJson } from "../lib/http";
 import { makeId } from "../lib/ids";
 import { ExecutionLogStore } from "./executionLogStore";
 import { ExecutionSecurity } from "./executionSecurity";
+import { Erc8183AdapterService } from "./erc8183AdapterService";
 import { SafetyService } from "./safetyService";
 import { resolveRouterPublicBaseUrl } from "../lib/publicBaseUrl";
 
@@ -23,6 +24,7 @@ export interface DispatchConfig {
 
 export class ExecutionDispatcher {
   private readonly callbackBaseUrl = resolveRouterPublicBaseUrl();
+  private readonly erc8183: Erc8183AdapterService;
 
   constructor(
     private readonly store: InMemoryRegistryStore,
@@ -30,7 +32,9 @@ export class ExecutionDispatcher {
     private readonly security: ExecutionSecurity,
     private readonly config: DispatchConfig,
     private readonly safetyService: SafetyService,
-  ) {}
+  ) {
+    this.erc8183 = new Erc8183AdapterService(store);
+  }
 
   createRun(task: TaskDetailView, agent: { agentId: string; ownerWallet: string; endpointUrl: string }) {
     if (this.config.endpointAllowlist.length > 0 && !this.config.endpointAllowlist.includes(agent.endpointUrl)) {
@@ -84,6 +88,11 @@ export class ExecutionDispatcher {
   }
 
   normalizeTaskPayload(task: TaskDetailView, run: ExecutionRunRow): AgentAdapterTaskRequest {
+    const erc8183Job = this.erc8183.ensureForTask(task, {
+      providerAgentId: run.agentId,
+      evaluator: task.creatorWallet,
+      hook: run.callbackUrl,
+    });
     const normalized = agentAdapterTaskRequestSchema.parse({
       requestId: run.requestId,
       taskId: task.taskId,
@@ -117,6 +126,9 @@ export class ExecutionDispatcher {
         }),
         timestamp: Math.floor(Date.now() / 1000),
       },
+      interop: {
+        erc8183Job,
+      },
     });
     run.normalizedPayload = normalized;
     run.updatedAt = new Date().toISOString();
@@ -148,6 +160,10 @@ export class ExecutionDispatcher {
       run.updatedAt = new Date().toISOString();
       run.state = parsed.executionMode === "sync" ? "running" : "awaiting_callback";
       this.store.executionRuns.set(run.runId, run);
+      this.erc8183.markDispatched(task, {
+        providerAgentId: run.agentId,
+        hook: run.callbackUrl,
+      });
 
       this.logs.metric("dispatch", run.runId, run.taskId, Date.now() - startedAt, "ms");
       this.logs.info(run.runId, run.taskId, run.agentId, "execution.dispatched", "Execution request accepted by endpoint", {

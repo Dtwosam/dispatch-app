@@ -247,13 +247,19 @@ export const agentReputationSchema = z.object({
   tasksAttempted: z.number().int().nonnegative(),
   tasksCompleted: z.number().int().nonnegative(),
   approvals: z.number().int().nonnegative(),
+  totalReviews: z.number().int().nonnegative(),
   rejectionCount: z.number().int().nonnegative(),
   disputeCount: z.number().int().nonnegative(),
+  successRate: z.number().min(0).max(1),
   approvalRate: z.number().min(0).max(1),
   averageScore: z.number().min(0).max(100),
+  averageResponseTimeMs: z.number().int().nonnegative(),
   averageLatencyMs: z.number().int().nonnegative(),
   totalEarnings: z.number().nonnegative(),
   reliabilityScore: z.number().min(0).max(100),
+  rankScore: z.number().min(0).max(100),
+  rankPosition: z.number().int().positive().nullable(),
+  status: z.enum(["active", "new", "unavailable"]),
   trend: leaderboardTrendSchema,
 });
 
@@ -289,11 +295,15 @@ export const leaderboardEntrySchema = z.object({
   agentId: z.string().min(1),
   displayName: z.string().min(1),
   avatarUrl: urlSchema.nullable(),
+  successRate: z.number().min(0).max(1),
   approvalRate: z.number().min(0).max(1),
   averageScore: z.number().min(0).max(100),
+  averageResponseTimeMs: z.number().int().nonnegative(),
   totalEarnings: z.number().nonnegative(),
   averageLatencyMs: z.number().int().nonnegative(),
   reliabilityScore: z.number().min(0).max(100),
+  rankScore: z.number().min(0).max(100),
+  status: z.enum(["active", "new", "unavailable"]),
   trustBadges: z.array(trustBadgeSchema).default([]),
   trend: leaderboardTrendSchema,
 });
@@ -321,6 +331,66 @@ export const agentAdapterAuthSchema = z.object({
   timestamp: z.number().int().positive(),
 });
 
+export const erc8183JobStateSchema = z.enum([
+  "mapped",
+  "dispatched",
+  "submitted",
+  "completed",
+  "rejected",
+  "disputed",
+  "refunded",
+  "settled",
+  "failed",
+]);
+
+export const erc8183JobSchema = z.object({
+  standard: z.literal("erc-8183"),
+  mode: z.enum(["adapter", "native"]),
+  dispatchTaskId: z.string().min(1),
+  jobId: z.string().min(1),
+  payloadHash: z.string().min(1),
+  state: erc8183JobStateSchema,
+  requester: walletAddressSchema,
+  providerAgentId: z.string().min(1).nullable(),
+  evaluator: z.string().min(1).nullable(),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  category: capabilityCategorySchema,
+  constraints: z.array(z.string().min(1)).default([]),
+  reward: z.object({
+    amount: z.string().min(1),
+    tokenAddress: walletAddressSchema.nullable(),
+    tokenSymbol: z.string().min(1),
+    tokenDecimals: z.number().int().min(0),
+  }),
+  deadlineTimestamp: z.number().int().positive(),
+  routing: z.object({
+    hiringMode: z.enum(["direct_hire", "open_market"]),
+    selectedAgentId: z.string().min(1).nullable(),
+    maxParticipants: z.number().int().positive(),
+  }),
+  attachments: z.array(
+    z.object({
+      name: z.string().min(1),
+      pointer: z.string().min(1),
+      contentType: z.string().min(1),
+      sizeBytes: z.number().int().nonnegative(),
+    }),
+  ).default([]),
+  outputRequirements: z.union([z.string().min(1), z.record(z.string(), z.unknown())]),
+  dispatchMetadata: z.record(z.string(), z.unknown()).default({}),
+  inputPointer: z.string().min(1).nullable(),
+  hook: z.string().min(1).nullable(),
+  contractAddress: walletAddressSchema.nullable(),
+  onchainJobId: z.string().min(1).nullable(),
+  notes: z.array(z.string()).default([]),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+  lastDispatchedAt: isoDateTimeSchema.nullable().optional(),
+  lastSubmissionAt: isoDateTimeSchema.nullable().optional(),
+  lastSettledAt: isoDateTimeSchema.nullable().optional(),
+});
+
 export const agentAdapterTaskRequestSchema = z.object({
   requestId: z.string().min(1),
   taskId: z.string().min(1),
@@ -340,6 +410,9 @@ export const agentAdapterTaskRequestSchema = z.object({
   deadlineTimestamp: z.number().int().positive(),
   callbackUrl: urlSchema.nullable(),
   auth: agentAdapterAuthSchema,
+  interop: z.object({
+    erc8183Job: erc8183JobSchema,
+  }).optional(),
 });
 
 export const agentAdapterTaskResponseSchema = z.object({
@@ -406,6 +479,7 @@ export type TrustBadge = z.infer<typeof trustBadgeSchema>;
 export type RecentOutcomePoint = z.infer<typeof recentOutcomePointSchema>;
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
 export type HealthcheckResponse = z.infer<typeof healthcheckResponseSchema>;
+export type Erc8183Job = z.infer<typeof erc8183JobSchema>;
 export type AgentAdapterTaskRequest = z.infer<typeof agentAdapterTaskRequestSchema>;
 export type AgentAdapterTaskResponse = z.infer<typeof agentAdapterTaskResponseSchema>;
 export type AgentAdapterRegistration = z.infer<typeof agentAdapterRegistrationSchema>;

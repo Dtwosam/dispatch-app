@@ -53,6 +53,9 @@ test("compatibility validator marks a healthy endpoint compatible", async () => 
     if (input.endsWith("/execute")) {
       const body = JSON.parse(String(init?.body));
       assert.equal(body.taskType, "writing");
+      assert.equal(body.interop?.erc8183Job?.standard, "erc-8183");
+      assert.equal(body.interop?.erc8183Job?.dispatchTaskId, body.taskId);
+      assert.equal(body.interop?.erc8183Job?.providerAgentId, "agent_external");
       return new Response(JSON.stringify({
         accepted: true,
         executionMode: "sync",

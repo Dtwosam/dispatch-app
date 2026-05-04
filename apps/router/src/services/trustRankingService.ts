@@ -77,6 +77,7 @@ export class TrustRankingService {
 
   recomputeAll() {
     const performanceRows = [...this.store.agents.values()].map((row) => this.recomputeAgent(row));
+    this.applyRankings(performanceRows);
     performanceRows.forEach((row) => this.store.performance.set(row.agentId, row));
     this.recomputeUserTrust();
     const cache: LeaderboardResponse = {
@@ -130,6 +131,10 @@ export class TrustRankingService {
       approvedTasks.length + rejectedTasks.length === 0
         ? 0
         : approvedTasks.length / (approvedTasks.length + rejectedTasks.length);
+    const successRate =
+      linkedTasks.length === 0
+        ? 0
+        : approvedTasks.length / linkedTasks.length;
     const averageScore =
       scoredTasks.length === 0 ? 0 : scoredTasks.reduce((sum, value) => sum + value, 0) / scoredTasks.length;
     const averageLatencyMs =
@@ -145,6 +150,8 @@ export class TrustRankingService {
     );
     const trend = this.computeTrend(linkedTasks);
     const specialistCategory = this.computeSpecialistCategory(linkedTasks);
+    const totalReviews = approvedTasks.length + rejectedTasks.length;
+    const status = this.computeAgentStatus(agentRow, linkedTasks.length);
     const trustBadges = this.computeTrustBadges(agentRow, {
       approvalRate,
       averageLatencyMs,
@@ -156,15 +163,21 @@ export class TrustRankingService {
     return {
       agentId,
       tasksAttempted: linkedTasks.length,
-      tasksCompleted: terminalTasks.length,
+      tasksCompleted: approvedTasks.length,
       approvals: approvedTasks.length,
+      totalReviews,
       rejectionCount: rejectedTasks.length,
       disputeCount: disputedTasks.length,
+      successRate: round(successRate, 4),
       approvalRate: round(approvalRate, 4),
       averageScore: round(averageScore, 2),
+      averageResponseTimeMs: averageLatencyMs,
       averageLatencyMs,
       totalEarnings: round(totalEarnings, 2),
       reliabilityScore: round(reliabilityScore, 2),
+      rankScore: 0,
+      rankPosition: null,
+      status,
       trend,
       recentOutcomes: this.buildRecentOutcomes(linkedTasks),
       trustBadges,
@@ -259,11 +272,15 @@ export class TrustRankingService {
         agentId: row.agentId,
         displayName: agent?.profile.publicName ?? row.agentId,
         avatarUrl: agent?.profile.avatarUrl ?? null,
+        successRate: row.successRate,
         approvalRate: row.approvalRate,
         averageScore: row.averageScore,
+        averageResponseTimeMs: row.averageResponseTimeMs,
         totalEarnings: row.totalEarnings,
         averageLatencyMs: row.averageLatencyMs,
         reliabilityScore: row.reliabilityScore,
+        rankScore: row.rankScore,
+        status: row.status,
         trustBadges: row.trustBadges,
         trend: row.trend,
       };
@@ -363,6 +380,52 @@ export class TrustRankingService {
     const createdAt = this.store.agents.get(agentId)?.profile.createdAt;
     if (!createdAt) return false;
     return Date.now() - new Date(createdAt).getTime() <= 1000 * 60 * 60 * 24 * 14;
+  }
+
+  private applyRankings(rows: AgentPerformanceRow[]) {
+    const maxCompleted = Math.max(1, ...rows.map((row) => row.tasksCompleted));
+    const maxEarnings = Math.max(1, ...rows.map((row) => row.totalEarnings));
+
+    rows.forEach((row) => {
+      const completionScore = row.tasksCompleted / maxCompleted;
+      const earningsScore = row.totalEarnings / maxEarnings;
+      const speedScore = row.averageResponseTimeMs === 0
+        ? 0.55
+        : clamp(1 - row.averageResponseTimeMs / 90000, 0.2, 1);
+      const historyFactor = row.tasksAttempted === 0
+        ? 0.35
+        : clamp(0.45 + row.tasksAttempted / 10, 0.45, 1);
+      const rawScore = (
+        row.successRate * 0.34 +
+        row.approvalRate * 0.28 +
+        completionScore * 0.16 +
+        speedScore * 0.12 +
+        earningsScore * 0.10
+      ) * 100;
+      row.rankScore = round(rawScore * historyFactor, 2);
+    });
+
+    [...rows]
+      .sort((left, right) =>
+        right.rankScore - left.rankScore
+        || right.successRate - left.successRate
+        || right.approvalRate - left.approvalRate
+        || right.tasksCompleted - left.tasksCompleted
+        || left.averageResponseTimeMs - right.averageResponseTimeMs,
+      )
+      .forEach((row, index) => {
+        row.rankPosition = index + 1;
+      });
+  }
+
+  private computeAgentStatus(agent: AgentRegistryRow, tasksAttempted: number): AgentPerformanceRow["status"] {
+    if (!agent.profile.isActive || agent.registrationState === "suspended" || agent.healthStatus === "suspended") {
+      return "unavailable";
+    }
+    if (tasksAttempted === 0 || this.isNewAgent(agent.profile.agentId)) {
+      return "new";
+    }
+    return "active";
   }
 }
 

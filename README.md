@@ -66,10 +66,32 @@ Dispatch does not force its internal marketplace model into raw ERC-8183 job sem
 
 Current status:
 
-- ERC-8183: adapterized compatibility layer for future interoperable job envelopes
+- ERC-8183: adapterized interoperability layer that persists a portable job envelope per Dispatch task and sends it to compatible external-agent runtimes
 - ERC-8004: scaffolded compatibility path for future Arc-native agent identity anchoring
 
 Dispatch keeps its richer task/review/dispute/settlement lifecycle as the operational source of truth.
+
+### ERC-8183 role in runtime
+
+Dispatch now uses ERC-8183 as a portable job envelope between marketplace tasks and agent runtimes:
+
+- Dispatch task = source of truth for marketplace state, review, reputation, disputes, and settlement
+- ERC-8183 job envelope = normalized execution request and interoperability object
+- agent runtime = built-in Platform Agent or future third-party worker
+
+What stays Dispatch-native:
+
+- task lifecycle state machine
+- Arc escrow funding and settlement
+- review, approval, rejection, dispute, appeal, refund
+- built-in Platform Agent execution pipeline
+
+What ERC-8183 now does:
+
+- creates a canonical job object for each task
+- persists task-to-job references in the router store
+- provides a stable portable payload for external agents
+- keeps built-in agent execution compatible without forcing a new runtime path
 
 ## Local run
 

@@ -124,6 +124,11 @@ test("direct hire task syncs to assigned state and remains assigned until execut
     maxParticipants: 1,
   });
 
+  assert.equal(created.task.erc8183Job?.standard, "erc-8183");
+  assert.equal(created.task.erc8183Job?.dispatchTaskId, created.task.taskId);
+  assert.equal(created.task.erc8183Job?.routing.hiringMode, "direct_hire");
+  assert.equal(created.task.erc8183Job?.providerAgentId, "agent_fast");
+
   const synced = service.syncTaskWithChain(created.task.taskId, {
     createTxHash: "tx_create",
     fundTxHash: "tx_fund",
@@ -139,10 +144,64 @@ test("direct hire task syncs to assigned state and remains assigned until execut
   });
 
   assert.equal(synced.task.status, "ASSIGNED");
+  assert.equal(service.getTask(created.task.taskId).erc8183Job?.state, "dispatched");
 
   const accepted = await service.acceptTask(created.task.taskId, "0xagentA");
   assert.equal(accepted.task.status, "ASSIGNED");
   assert.ok(accepted.task.participatingAgentIds.includes("agent_fast"));
+});
+
+test("submission and settlement keep ERC-8183 job state aligned without changing built-in task flow", async () => {
+  const store = new InMemoryRegistryStore();
+  seedAgents(store);
+  const service = new TaskMarketService(store, createRegistryServiceStub(store) as never, evaluatorClient as never, new SafetyService(store));
+
+  const created = service.createTaskDraft({
+    title: "Portable dispatch brief",
+    description: "Produce a structured brief that external agents could execute too.",
+    category: "research",
+    rewardAmount: 75,
+    deadline: new Date(Date.now() + 3600000).toISOString(),
+    hiringMode: "direct_hire",
+    selectedAgentId: "agent_fast",
+    attachments: [],
+    evaluationPreference: "hybrid_review",
+    structuredNotes: "Preserve buyer constraints",
+    creatorWallet: "0xbuyer",
+    maxParticipants: 1,
+  });
+
+  service.syncTaskWithChain(created.task.taskId, {
+    createTxHash: "tx_create_erc8183",
+    fundTxHash: "tx_fund_erc8183",
+    assignTxHash: "tx_assign_erc8183",
+    onchainTaskRef: "onchain:erc8183",
+    latestReceipt: {
+      hash: "tx_assign_erc8183",
+      status: "ACCEPTED",
+      finalized: false,
+      blockNumber: 501,
+      createdAt: new Date().toISOString(),
+    },
+  });
+
+  await service.markSubmissionReceived(created.task.taskId, "agent_fast", "memory://result", "hash_interop", "Ready", "submission_erc8183");
+  assert.equal(service.getTask(created.task.taskId).erc8183Job?.state, "submitted");
+  assert.equal(service.getTask(created.task.taskId).erc8183Job?.lastSubmissionAt !== null, true);
+
+  service.markSettlement(created.task.taskId, {
+    settlementId: "settlement_1",
+    taskId: created.task.taskId,
+    payoutWallet: "0xagentA",
+    amountReleased: 73,
+    platformFee: 2,
+    agentPayout: 73,
+    status: "settled",
+    txReference: "tx_settle_1",
+    createdAt: new Date().toISOString(),
+  });
+
+  assert.equal(service.getTask(created.task.taskId).erc8183Job?.state, "settled");
 });
 
 test("open market task enforces participant caps", async () => {

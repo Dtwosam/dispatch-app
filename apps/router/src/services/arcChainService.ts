@@ -22,7 +22,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import {
   derivePlatformAgentOnchainId,
-  getBuiltInPlatformAgents,
+  getUserFacingBuiltInPlatformAgents,
   resolvePlatformAgentOwnerWallet,
   type BuiltInPlatformAgentDefinition,
 } from "./platformAgentCatalog";
@@ -257,7 +257,7 @@ export class ArcChainService {
     return result;
   }
 
-  async bootstrapPlatformAgentsOnchain(definitions = getBuiltInPlatformAgents()) {
+  async bootstrapPlatformAgentsOnchain(definitions = getUserFacingBuiltInPlatformAgents()) {
     if (!this.canServerWrite) {
       return [];
     }

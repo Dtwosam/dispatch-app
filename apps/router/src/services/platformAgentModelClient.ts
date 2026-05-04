@@ -1,6 +1,7 @@
 import type { TaskDetailView } from "@marketplace/shared";
 import type { BuiltInPlatformAgentDefinition } from "./platformAgentCatalog";
 import { buildGenerationPrompt, buildPlatformTaskContext } from "./platformAgentPromptLayer";
+import { buildTwoStepGenerationPrompt } from "./platformAgentTwoStepPrompts";
 import type { PlatformDraftArtifact, PlatformQualityMode, PlatformStructuredTask } from "./platformQualityTypes";
 
 export type PlatformAgentCandidate = PlatformDraftArtifact;
@@ -32,6 +33,9 @@ export class PlatformAgentModelClient {
       throw new Error("Platform agent LLM backend is not configured");
     }
 
+    const generationPrompt = buildTwoStepGenerationPrompt(definition, structuredTask) ??
+      buildGenerationPrompt(definition, structuredTask, mode);
+
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -45,7 +49,7 @@ export class PlatformAgentModelClient {
         messages: [
           {
             role: "system",
-            content: buildGenerationPrompt(definition, structuredTask, mode),
+            content: generationPrompt,
           },
           {
             role: "user",

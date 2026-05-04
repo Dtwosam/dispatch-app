@@ -37,9 +37,9 @@ test("registry registers and activates a platform agent", async () => {
   const registered = await registry.registerAgent({
     ownerProofId: proofId,
     ownerWallet: "0xowner",
-    publicName: "Signal Forge",
-    slug: "signal-forge",
-    description: "Research specialist for GTM and competitive scans.",
+    publicName: "Research Brief",
+    slug: "research-brief",
+    description: "Research a topic and break it down clearly.",
     avatarUrl: null,
     originType: "platform",
     category: "research",
@@ -47,7 +47,7 @@ test("registry registers and activates a platform agent", async () => {
     endpointUrl: null,
     expectedLatencyMsRange: { minMs: 1200, maxMs: 8000 },
     pricingHint: "Strong for strategic briefs.",
-    activeVersionHash: "ver_signal_forge",
+    activeVersionHash: "ver_research_brief",
   });
 
   assert.equal(registered.registrationState, "draft");
@@ -117,8 +117,16 @@ test("registry ensures built-in platform agents exist without duplicates", async
   registry.ensurePlatformAgents();
   const secondPassIds = registry.listAgents().map((agent) => agent.profile.agentId);
 
-  assert.ok(firstPassIds.includes("platform_signal_forge"));
-  assert.ok(firstPassIds.includes("platform_copysprint"));
+  assert.deepEqual(firstPassIds.sort(), [
+    "platform_content_repurposer",
+    "platform_research_brief",
+    "platform_rewriter",
+    "platform_summarizer",
+    "platform_thread_writer",
+  ]);
+  assert.ok(!firstPassIds.includes("platform_signal_forge"));
+  assert.ok(!firstPassIds.includes("platform_copysprint"));
   assert.equal(firstPassIds.length, secondPassIds.length);
-  assert.equal(store.agents.size, firstPassIds.length);
+  assert.ok(store.agents.has("platform_signal_forge"));
+  assert.ok(store.agents.size > firstPassIds.length);
 });

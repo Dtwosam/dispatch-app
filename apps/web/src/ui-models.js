@@ -43,8 +43,9 @@ export function buildPostTaskChecklist(form, selectedAgent) {
 
 export function buildAgentProfileHighlights(agent) {
   return [
+    `${Math.round((agent.performanceSummary?.successRate || 0) * 100)}% success rate`,
     `${Math.round((agent.performanceSummary?.approvalRate || 0) * 100)}% approval`,
-    `${Math.round(agent.performanceSummary?.averageScore || 0)} average score`,
+    `${formatResponseMetric(agent)} avg response`,
     `${agent.performanceSummary?.tasksCompleted || 0} completed jobs`,
     `${agent.performanceSummary?.totalEarnings || 0} total earned`,
   ];
@@ -55,10 +56,61 @@ export function buildAgentIdentityBadges(agent) {
   if (agent?.profile?.originType === "platform") {
     badges.push("Platform Agent");
   }
+  if ((agent?.performanceSummary?.rankPosition || 0) === 1 && (agent?.performanceSummary?.tasksAttempted || 0) > 0) {
+    badges.push("Top Agent");
+  }
+  if (agent?.performanceSummary?.status === "new") {
+    badges.push("New");
+  }
   if (agent?.profile?.skillCategories?.length) {
     badges.push(labelize(agent.profile.skillCategories[0]));
   }
   return badges;
+}
+
+export function buildRecentAgentWork(agent, taskCollections = {}) {
+  const allTasks = [
+    ...(taskCollections.completedTasks || []),
+    ...(taskCollections.rejectedTasks || []),
+    ...(taskCollections.disputedTasks || []),
+  ];
+
+  return allTasks
+    .filter((task) => task.participatingAgentIds?.includes(agent.profile.agentId))
+    .filter((task, index, items) => items.findIndex((candidate) => candidate.taskId === task.taskId) === index)
+    .sort((left, right) => new Date(right.updatedAt || right.createdAt || 0).getTime() - new Date(left.updatedAt || left.createdAt || 0).getTime())
+    .slice(0, 5)
+    .map((task) => ({
+      taskId: task.taskId,
+      title: buildSafeTaskSummary(task),
+      category: labelize(task.category),
+      status: labelize(task.status),
+      completedAt: task.updatedAt || task.createdAt,
+      approvalIndicator: buildApprovalIndicator(task),
+    }));
+}
+
+function buildSafeTaskSummary(task) {
+  const raw = String(task?.title || "").trim();
+  if (!raw) return `${labelize(task?.category || "task")} task`;
+  return raw.length > 72 ? `${raw.slice(0, 69)}...` : raw;
+}
+
+function buildApprovalIndicator(task) {
+  const status = String(task?.status || "").toUpperCase();
+  if (["SETTLED", "APPROVED"].includes(status)) return "Approved";
+  if (status === "REFUNDED") return "Refunded";
+  if (status === "REJECTED") return "Rejected";
+  if (status === "DISPUTED") return "Disputed";
+  return labelize(task?.resultStatus || "completed");
+}
+
+function formatResponseMetric(agent) {
+  const latency = agent.performanceSummary?.averageResponseTimeMs || agent.performanceSummary?.averageLatencyMs || 0;
+  if (!latency) return "No response data yet";
+  if (latency < 1000) return `${latency} ms`;
+  if (latency < 60000) return `${Math.round(latency / 1000)} sec`;
+  return `${Math.round(latency / 60000)} min`;
 }
 
 export function buildReviewPanelModel(task) {

@@ -274,14 +274,14 @@ export function setButtonLoading(button, loading, text = "") {
 }
 
 export function speedLabel(agent) {
-  const latency = agent.performanceSummary?.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
+  const latency = agent.performanceSummary?.averageResponseTimeMs || agent.performanceSummary?.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
   if (latency <= 12000) return "Fast";
   if (latency <= 28000) return "Balanced";
   return "Deep";
 }
 
 export function trustScore(agent) {
-  return Math.round(agent.performanceSummary?.reliabilityScore || 0);
+  return Math.round(agent.performanceSummary?.rankScore || agent.performanceSummary?.reliabilityScore || 0);
 }
 
 export function trendWeight(agent) {
@@ -290,18 +290,37 @@ export function trendWeight(agent) {
 
 export function sortAgents(items, state) {
   return [...items].sort((left, right) => {
-    if (state.filters.sort === "highest_earning") {
+    if (state.filters.sort === "top_earning") {
       return (right.performanceSummary.totalEarnings || 0) - (left.performanceSummary.totalEarnings || 0);
     }
-    if (state.filters.sort === "best_rated") {
-      return (right.performanceSummary.averageScore || 0) - (left.performanceSummary.averageScore || 0);
+    if (state.filters.sort === "highest_success") {
+      return (right.performanceSummary.successRate || 0) - (left.performanceSummary.successRate || 0)
+        || (right.performanceSummary.approvalRate || 0) - (left.performanceSummary.approvalRate || 0)
+        || (right.performanceSummary.tasksCompleted || 0) - (left.performanceSummary.tasksCompleted || 0);
     }
     if (state.filters.sort === "fastest") {
-      return (left.performanceSummary.averageLatencyMs || left.profile.expectedLatencyMsRange.maxMs)
-        - (right.performanceSummary.averageLatencyMs || right.profile.expectedLatencyMsRange.maxMs);
+      return (left.performanceSummary.averageResponseTimeMs || left.performanceSummary.averageLatencyMs || left.profile.expectedLatencyMsRange.maxMs)
+        - (right.performanceSummary.averageResponseTimeMs || right.performanceSummary.averageLatencyMs || right.profile.expectedLatencyMsRange.maxMs);
     }
-    return trendWeight(right) - trendWeight(left) || trustScore(right) - trustScore(left);
+    return (right.performanceSummary.rankScore || 0) - (left.performanceSummary.rankScore || 0)
+      || (right.performanceSummary.successRate || 0) - (left.performanceSummary.successRate || 0)
+      || (right.performanceSummary.approvalRate || 0) - (left.performanceSummary.approvalRate || 0)
+      || (right.performanceSummary.tasksCompleted || 0) - (left.performanceSummary.tasksCompleted || 0);
   });
+}
+
+export function agentStatusLabel(agent) {
+  const status = agent.performanceSummary?.status || "new";
+  if (status === "active") return "Active";
+  if (status === "unavailable") return "Unavailable";
+  return "New";
+}
+
+export function agentStatusTone(agent) {
+  const status = agent.performanceSummary?.status || "new";
+  if (status === "active") return "good";
+  if (status === "unavailable") return "warn";
+  return "pending";
 }
 
 export function activityItems(state) {

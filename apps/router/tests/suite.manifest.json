@@ -3,6 +3,7 @@
   { "file": "./tests/arcChainService.test.ts" },
   { "file": "./tests/compatibilityValidator.test.ts" },
   { "file": "./tests/executionEngine.test.ts" },
+  { "file": "./tests/platformAgentLineup.test.ts" },
   { "file": "./tests/platformAgentBenchmarks.test.ts" },
   { "file": "./tests/platformAgentTaskPacks.test.ts" },
   { "file": "./tests/settlementService.test.ts" },

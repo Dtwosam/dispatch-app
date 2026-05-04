@@ -96,7 +96,7 @@ export function createInitialState() {
     history: { items: [] },
     mobileNavOpen: false,
     search: "",
-    filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "trending" },
+    filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
     dashboardTab: "my_tasks",
     wizardStep: 1,
     agentDraftMeta: {

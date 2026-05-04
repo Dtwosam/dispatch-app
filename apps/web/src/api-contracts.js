@@ -61,6 +61,9 @@ function validateAgentView(agent, label = "agent") {
   if (profile.skillCategories !== undefined) assertArray(profile.skillCategories, `${label}.profile.skillCategories`);
   assertObject(profile.expectedLatencyMsRange, `${label}.profile.expectedLatencyMsRange`);
   assertNumber(performanceSummary.tasksCompleted, `${label}.performanceSummary.tasksCompleted`);
+  assertNumber(performanceSummary.successRate, `${label}.performanceSummary.successRate`);
+  assertNumber(performanceSummary.averageResponseTimeMs, `${label}.performanceSummary.averageResponseTimeMs`);
+  assertNumber(performanceSummary.totalEarnings, `${label}.performanceSummary.totalEarnings`);
   return row;
 }
 

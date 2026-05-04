@@ -9,6 +9,14 @@ import {
   buildPolishPrompt,
   buildTaskStructuringPrompt,
 } from "./platformAgentPromptLayer";
+import {
+  addTwoStepCriteriaToEvaluation,
+  buildTwoStepEvaluationImprovementPrompt,
+  buildTwoStepGenerationPrompt,
+  enforceTwoStepOutputShape,
+  getTwoStepAgentSpec,
+  type TwoStepAgentSpec,
+} from "./platformAgentTwoStepPrompts";
 import type {
   PlatformAgentStageTrace,
   PlatformDraftArtifact,
@@ -50,11 +58,16 @@ type EngineOutput = {
 export class PlatformQualityEngine {
   async execute(input: EngineInput): Promise<EngineOutput> {
     const refinementContext = input.refinementContext ?? null;
-    const mode = resolveQualityMode(input.task, refinementContext);
+    const twoStepSpec = getTwoStepAgentSpec(input.definition);
+    const mode: PlatformQualityMode = twoStepSpec ? "balanced" : resolveQualityMode(input.task, refinementContext);
     const structuredTaskStart = Date.now();
     const structuredTask = structureTask(input.definition, input.task, mode, refinementContext);
     void buildTaskStructuringPrompt(input.definition, mode, refinementContext);
     const structuringMs = Date.now() - structuredTaskStart;
+
+    if (twoStepSpec) {
+      return executeTwoStepPipeline(input, twoStepSpec, structuredTask, structuringMs, refinementContext, mode);
+    }
 
     const generationStart = Date.now();
     const heuristicDraft = input.generateHeuristicDraft();
@@ -143,6 +156,93 @@ export class PlatformQualityEngine {
       latencyMs: Math.max(heuristicDraft.latencyMs, stageTimingsMs.total || heuristicDraft.latencyMs),
     };
   }
+}
+
+async function executeTwoStepPipeline(
+  input: EngineInput,
+  spec: TwoStepAgentSpec,
+  structuredTask: PlatformStructuredTask,
+  structuringMs: number,
+  refinementContext: PlatformRefinementContext | null,
+  mode: PlatformQualityMode,
+): Promise<EngineOutput> {
+  const generationStart = Date.now();
+  const heuristicDraft = input.generateHeuristicDraft();
+  let draftOutput = enforceTwoStepOutputShape(spec, sanitizeArtifact(heuristicDraft.payload));
+  let executionSource: "heuristic" | "llm" = heuristicDraft.payload.executionSource ?? "heuristic";
+  if (input.generateModelDraft) {
+    try {
+      draftOutput = enforceTwoStepOutputShape(
+        spec,
+        sanitizeArtifact(await input.generateModelDraft(structuredTask, mode), draftOutput),
+      );
+      executionSource = "llm";
+    } catch {
+      executionSource = "heuristic";
+    }
+  }
+  void buildTwoStepGenerationPrompt(input.definition, structuredTask, refinementContext);
+  const generationMs = Date.now() - generationStart;
+
+  const improvementStart = Date.now();
+  const baseEvaluation = evaluateDraft(structuredTask, draftOutput);
+  const evaluation = addTwoStepCriteriaToEvaluation(spec, draftOutput, baseEvaluation);
+  const improvedOutput = enforceTwoStepOutputShape(
+    spec,
+    improveDraft(input.definition, structuredTask, draftOutput, evaluation),
+  );
+  void buildTwoStepEvaluationImprovementPrompt(input.definition, structuredTask, evaluation);
+  const improvementMs = Date.now() - improvementStart;
+
+  const finalEvaluation = addTwoStepCriteriaToEvaluation(spec, improvedOutput, evaluateDraft(structuredTask, improvedOutput));
+  const qualityScore = finalEvaluation.overall;
+  const confidence = finalEvaluation.confidence;
+  const stageTimingsMs = {
+    structuring: structuringMs,
+    generation: generationMs,
+    evaluation: 0,
+    improvement: improvementMs,
+    polish: 0,
+    total: structuringMs + generationMs + improvementMs,
+  };
+  const runSummary = buildRunSummary(input.definition, input.task, structuredTask, finalEvaluation, confidence);
+
+  const trace: PlatformAgentStageTrace = {
+    mode,
+    promptVersions: PLATFORM_AGENT_PROMPT_VERSIONS,
+    rawTaskInput: buildPlatformTaskContext(input.task, refinementContext),
+    structuredTask,
+    draftOutput,
+    evaluation: finalEvaluation,
+    improvedOutput,
+    polishedOutput: null,
+    finalOutput: improvedOutput,
+    runSummary,
+    stageTimingsMs,
+    score: qualityScore,
+    confidence,
+    executionSource,
+    refinement: refinementContext,
+    reviewOutcome: null,
+    settlementOutcome: null,
+  };
+
+  return {
+    mode,
+    executionSource,
+    structuredTask,
+    draftOutput,
+    evaluation: finalEvaluation,
+    improvedOutput,
+    polishedOutput: null,
+    finalOutput: improvedOutput,
+    qualityScore,
+    confidence,
+    stageTimingsMs,
+    promptVersions: PLATFORM_AGENT_PROMPT_VERSIONS,
+    trace,
+    latencyMs: Math.max(heuristicDraft.latencyMs, stageTimingsMs.total || heuristicDraft.latencyMs),
+  };
 }
 
 export function resolveQualityMode(task: TaskDetailView, refinementContext: PlatformRefinementContext | null = null): PlatformQualityMode {

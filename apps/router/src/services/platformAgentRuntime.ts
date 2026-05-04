@@ -153,6 +153,16 @@ function buildSpecialistHeuristic(
   focus: ReturnType<typeof inferFocus>,
 ): SpecialistHeuristic | null {
   switch (definition.specialization) {
+    case "thread_writer":
+      return buildThreadWriterHeuristic(definition, task, focus);
+    case "summarizer":
+      return buildSummarizerHeuristic(definition, task, focus);
+    case "rewriter":
+      return buildRewriterHeuristic(definition, task, focus);
+    case "research_brief":
+      return buildResearchBriefHeuristic(definition, task, focus);
+    case "content_repurposer":
+      return buildContentRepurposerHeuristic(definition, task, focus);
     case "executive_summarizer":
       return buildBrieflyHeuristic(definition, task, focus);
     case "document_reviewer":
@@ -446,6 +456,196 @@ function buildHeuristicUncertainties(task: TaskDetailView) {
   }
   items.push("Any external facts or citations still need retrieval-backed execution before they should be treated as verified.");
   return items.slice(0, 3);
+}
+
+function buildThreadWriterHeuristic(
+  definition: BuiltInPlatformAgentDefinition,
+  task: TaskDetailView,
+  focus: ReturnType<typeof inferFocus>,
+): SpecialistHeuristic {
+  const sourceLines = collectSourceSentences(task);
+  const lead = sourceLines[0] ?? task.description ?? task.title;
+  const usefulContext = sourceLines.slice(1, 4);
+
+  return {
+    summary: `${definition.publicName} turned "${task.title}" into a concise Twitter/X thread with a hook, readable flow, and optional CTA.`,
+    sections: [
+      {
+        heading: "Hook",
+        bullets: [`${clipForJobOutput(lead, 118)}. Here is the useful breakdown.`],
+      },
+      {
+        heading: "Thread",
+        bullets: [
+          `1/ ${clipForJobOutput(lead, 180)}`,
+          `2/ The core idea: ${clipForJobOutput(focus.sentence, 160)}`,
+          `3/ Why it matters: ${clipForJobOutput(usefulContext[0] ?? `It helps ${focus.audience} understand ${focus.primaryNoun} faster.`, 160)}`,
+          `4/ Practical takeaway: ${clipForJobOutput(usefulContext[1] ?? `Turn ${focus.primaryNoun} into one clear next step instead of a loose idea.`, 160)}`,
+          `5/ Save this when you need a clear way to explain ${focus.primaryNoun}.`,
+        ],
+      },
+      {
+        heading: "CTA (optional)",
+        bullets: ["Want the next piece turned into a thread? Paste the source and keep the momentum going."],
+      },
+    ],
+    nextActions: ["Review the hook for voice.", "Confirm whether the CTA should be educational, promotional, or soft."],
+    uncertainties: buildHeuristicUncertainties(task),
+    confidence: sourceLines.length >= 2 ? "medium" : "low",
+    deliveryNote: `${definition.publicName} produced a job-shaped X thread using the staged platform quality engine.`,
+  };
+}
+
+function buildSummarizerHeuristic(
+  definition: BuiltInPlatformAgentDefinition,
+  task: TaskDetailView,
+  focus: ReturnType<typeof inferFocus>,
+): SpecialistHeuristic {
+  const sourceLines = collectSourceSentences(task);
+  const takeaways = sourceLines.length > 0
+    ? sourceLines.slice(0, 4).map((line) => clipForJobOutput(line, 150))
+    : [`The task asks for a concise summary of ${focus.primaryNoun}.`];
+
+  return {
+    summary: `${definition.publicName} compressed "${task.title}" into a short summary, key takeaways, and action items.`,
+    sections: [
+      {
+        heading: "Summary",
+        bullets: [clipForJobOutput(sourceLines[0] ?? focus.sentence, 220)],
+      },
+      {
+        heading: "Key Points",
+        bullets: takeaways,
+      },
+      {
+        heading: "Actionable (if applicable)",
+        bullets: [
+          "Confirm which takeaway matters most for the next decision.",
+          "Use the summary as the approval-ready version before sharing the full source.",
+        ],
+      },
+    ],
+    nextActions: ["Add source text or attachment content for a more complete summary.", "Mark any decision-critical points that need extra emphasis."],
+    uncertainties: buildHeuristicUncertainties(task),
+    confidence: sourceLines.length >= 3 ? "medium" : "low",
+    deliveryNote: `${definition.publicName} produced a structured summary instead of loose prose.`,
+  };
+}
+
+function buildRewriterHeuristic(
+  definition: BuiltInPlatformAgentDefinition,
+  task: TaskDetailView,
+  focus: ReturnType<typeof inferFocus>,
+): SpecialistHeuristic {
+  const sourceLines = collectSourceSentences(task);
+  const original = sourceLines[0] ?? task.description ?? focus.sentence;
+  const polished = polishVisibleText(original, focus);
+
+  return {
+    summary: `${definition.publicName} rewrote "${task.title}" for clarity, structure, and a more polished tone while preserving meaning.`,
+    sections: [
+      {
+        heading: "Polished Version",
+        bullets: [polished],
+      },
+      {
+        heading: "Simplified Version (optional)",
+        bullets: [`${clipForJobOutput(focus.sentence, 120)}. The main point should be easy to understand and ready to act on.`],
+      },
+    ],
+    nextActions: ["Confirm the desired tone: professional, casual, direct, or persuasive.", "Paste the full draft if more than one paragraph needs editing."],
+    uncertainties: buildHeuristicUncertainties(task),
+    confidence: sourceLines.length > 0 ? "medium" : "low",
+    deliveryNote: `${definition.publicName} preserved the user's meaning while improving clarity and tone.`,
+  };
+}
+
+function buildResearchBriefHeuristic(
+  definition: BuiltInPlatformAgentDefinition,
+  task: TaskDetailView,
+  focus: ReturnType<typeof inferFocus>,
+): SpecialistHeuristic {
+  const sourceLines = collectSourceSentences(task);
+  const evidence = sourceLines.slice(0, 4);
+
+  return {
+    summary: `${definition.publicName} prepared a structured research brief for "${task.title}" with insights, pros, risks, and a conclusion.`,
+    sections: [
+      {
+        heading: "Overview",
+        bullets: [`The brief focuses on ${focus.primaryNoun} for ${focus.audience}.`, clipForJobOutput(evidence[0] ?? focus.sentence, 160)],
+      },
+      {
+        heading: "Key Insights",
+        bullets: evidence.length > 1
+          ? evidence.slice(1, 4).map((line) => clipForJobOutput(line, 150))
+          : [`The strongest visible signal is the task owner's need to understand ${focus.primaryNoun} clearly before acting.`],
+      },
+      {
+        heading: "Pros",
+        bullets: [
+          `Creates a clearer decision frame around ${focus.primaryNoun}.`,
+          "Turns a broad topic into reviewable points and next steps.",
+        ],
+      },
+      {
+        heading: "Risks",
+        bullets: [
+          "External facts are not verified unless source material or retrieval is provided.",
+          "Thin prompts can make the brief useful but not exhaustive.",
+        ],
+      },
+      {
+        heading: "Conclusion",
+        bullets: [`Use this as a first-pass brief, then add evidence or links where the decision needs stronger support.`],
+      },
+    ],
+    nextActions: ["Add links, notes, or source material for stronger research grounding.", "Tell the agent whether the brief is for strategy, learning, or execution."],
+    uncertainties: buildHeuristicUncertainties(task),
+    confidence: evidence.length >= 2 ? "medium" : "low",
+    deliveryNote: `${definition.publicName} stayed bounded to visible input and separated useful analysis from unverified claims.`,
+  };
+}
+
+function buildContentRepurposerHeuristic(
+  definition: BuiltInPlatformAgentDefinition,
+  task: TaskDetailView,
+  focus: ReturnType<typeof inferFocus>,
+): SpecialistHeuristic {
+  const sourceLines = collectSourceSentences(task);
+  const lead = sourceLines[0] ?? task.description ?? focus.sentence;
+
+  return {
+    summary: `${definition.publicName} repurposed "${task.title}" into multiple ready-to-use content formats.`,
+    sections: [
+      {
+        heading: "Thread",
+        bullets: [
+          `1/ ${clipForJobOutput(lead, 160)}`,
+          `2/ The main takeaway is simple: ${clipForJobOutput(focus.sentence, 140)}`,
+          `3/ Use this idea to make ${focus.primaryNoun} clearer, faster, and easier to share.`,
+        ],
+      },
+      {
+        heading: "Summary",
+        bullets: [clipForJobOutput(lead, 220)],
+      },
+      {
+        heading: "Bullet Points",
+        bullets: (sourceLines.length > 0 ? sourceLines : [focus.sentence])
+          .slice(0, 4)
+          .map((line) => clipForJobOutput(line, 130)),
+      },
+      {
+        heading: "Short Post",
+        bullets: [`${clipForJobOutput(lead, 120)}. Here is the practical takeaway: make ${focus.primaryNoun} easier to understand and act on.`],
+      },
+    ],
+    nextActions: ["Choose the strongest format for publishing first.", "Add platform preference if the output should be optimized for X, LinkedIn, email, or a caption."],
+    uncertainties: buildHeuristicUncertainties(task),
+    confidence: sourceLines.length >= 2 ? "medium" : "low",
+    deliveryNote: `${definition.publicName} created distinct reusable formats from the same source material.`,
+  };
 }
 
 function buildBrieflyHeuristic(
@@ -1051,6 +1251,25 @@ function inferAudience(text: string) {
   if (lower.includes("support")) return "support operators";
   if (lower.includes("sales") || lower.includes("gtm")) return "go-to-market teams";
   return "the task owner";
+}
+
+function clipForJobOutput(value: string, maxLength: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
+}
+
+function polishVisibleText(value: string, focus: ReturnType<typeof inferFocus>) {
+  const normalized = clipForJobOutput(value, 220);
+  if (!normalized) {
+    return `Here is a clearer version focused on ${focus.primaryNoun}: make the main point direct, specific, and easy to act on.`;
+  }
+  const withoutFiller = normalized
+    .replace(/\b(just|really|very|basically|actually)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const sentence = withoutFiller.endsWith(".") ? withoutFiller : `${withoutFiller}.`;
+  return `${sentence} The revised version keeps the idea focused, readable, and ready for ${focus.audience}.`;
 }
 
 function collectSourceSentences(task: TaskDetailView) {

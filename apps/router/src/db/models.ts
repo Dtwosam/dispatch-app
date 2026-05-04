@@ -9,10 +9,14 @@ import type {
   CompatibilityCheck,
   CompatibilityStatus,
   ErrorCode,
-  PerformanceSummary,
   RegistryAgentView,
   TaskDetailView,
   UserTrust,
+  Erc8183Job,
+  CapabilityCategory,
+  LeaderboardTrend,
+  RecentOutcomePoint,
+  TrustBadge,
 } from "@marketplace/shared";
 
 export interface OwnerProofChallengeRow {
@@ -66,8 +70,28 @@ export interface AgentCompatibilityCheckRow {
   report: CompatibilityCheck;
 }
 
-export interface AgentPerformanceRow extends PerformanceSummary {
+export interface AgentPerformanceRow {
   agentId: string;
+  tasksAttempted: number;
+  tasksCompleted: number;
+  approvals: number;
+  totalReviews: number;
+  rejectionCount: number;
+  disputeCount: number;
+  successRate: number;
+  approvalRate: number;
+  averageScore: number;
+  averageResponseTimeMs: number;
+  averageLatencyMs: number;
+  totalEarnings: number;
+  reliabilityScore: number;
+  rankScore: number;
+  rankPosition: number | null;
+  status: "active" | "new" | "unavailable";
+  trend: LeaderboardTrend;
+  recentOutcomes: RecentOutcomePoint[];
+  trustBadges: TrustBadge[];
+  specialistCategory: CapabilityCategory | null;
 }
 
 export interface UserTrustRow extends UserTrust {}
@@ -88,6 +112,7 @@ export interface RegistryDatabase {
   leaderboardCache: LeaderboardCacheRow | null;
   agentDrafts: Map<string, CreateAgentDraft>;
   tasks: Map<string, TaskDetailView>;
+  erc8183Jobs: Map<string, Erc8183JobRow>;
   taskEvaluations: Map<string, unknown[]>;
   settlements: Map<string, SettlementReceipt[]>;
   executionRuns: Map<string, ExecutionRunRow>;
@@ -101,6 +126,8 @@ export interface RegistryDatabase {
   moderationFlags: ModerationFlagRow[];
   pausedTasks: Map<string, TaskPauseRow>;
 }
+
+export interface Erc8183JobRow extends Erc8183Job {}
 
 export type ExecutionFailureCategory =
   | "endpoint_unavailable"
@@ -236,7 +263,7 @@ export function toRegistryAgentView(
   row: AgentRegistryRow,
   latestVersion: AgentVersion | null,
   compatibilityReport: CompatibilityCheck | null,
-  performanceSummary: PerformanceSummary,
+  performanceSummary: AgentPerformanceRow,
 ): RegistryAgentView {
   return {
     profile: row.profile,

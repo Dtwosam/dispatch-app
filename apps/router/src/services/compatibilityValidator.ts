@@ -8,6 +8,7 @@ import {
 import type { AgentCompatibilityDeclarationRow, AgentRegistryRow } from "../db/models";
 import { fetchJson } from "../lib/http";
 import { makeId } from "../lib/ids";
+import { mapDispatchTaskToErc8183Job } from "../lib/arcStandards";
 import { signRouterRequest } from "./routerAuth";
 import { HealthcheckRunner } from "./healthcheckRunner";
 
@@ -63,9 +64,52 @@ export class CompatibilityValidator {
     }
 
     const requestId = makeId("probe");
+    const probeTaskId = `compat_${requestId}`;
+    const erc8183Job = mapDispatchTaskToErc8183Job({
+      taskId: probeTaskId,
+      title: "Compatibility probe",
+      description: "Compatibility probe for registry validation. Do not treat as billable work.",
+      category: row.profile.category,
+      rewardAmount: 0,
+      deadline: new Date(Date.now() + 60_000).toISOString(),
+      status: "CREATED",
+      resultStatus: "not_started",
+      creatorWallet: row.profile.ownerWallet,
+      creatorDisplay: row.profile.ownerWallet,
+      selectedAgentId: row.profile.agentId,
+      participatingAgentIds: [row.profile.agentId],
+      maxParticipants: 1,
+      transactionState: "pending_wallet",
+      onchainTaskRef: null,
+      createdAt: checkedAt,
+      updatedAt: checkedAt,
+      attachments: [],
+      evaluationPreference: "assisted_evaluation",
+      structuredNotes: "Compatibility validation payload only.",
+      hiringMode: "direct_hire",
+      timeline: [],
+      selectedAgents: [],
+      reviewActions: [],
+      latestEvaluation: null,
+      userReview: null,
+      latestSubmissionId: null,
+      latestSettlement: null,
+      disputeRecord: null,
+      appealRecord: null,
+      settlementState: "reward_funded",
+    }, {
+      providerAgentId: row.profile.agentId,
+      evaluator: row.profile.ownerWallet,
+      state: "mapped",
+      hook: null,
+      paymentTokenAddress: null,
+      paymentTokenSymbol: "USDC",
+      paymentTokenDecimals: 6,
+      now: checkedAt,
+    });
     const probePayload = agentAdapterTaskRequestSchema.parse({
       requestId,
-      taskId: `compat_${requestId}`,
+      taskId: probeTaskId,
       taskType: row.profile.category,
       title: "Compatibility probe",
       description: "Compatibility probe for registry validation. Do not treat as billable work.",
@@ -79,9 +123,12 @@ export class CompatibilityValidator {
         signature: signRouterRequest({
           ownerWallet: row.profile.ownerWallet,
           requestId,
-          taskId: `compat_${requestId}`,
+          taskId: probeTaskId,
         }),
         timestamp: Math.floor(Date.now() / 1000),
+      },
+      interop: {
+        erc8183Job,
       },
     });
 

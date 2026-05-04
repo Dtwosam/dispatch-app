@@ -6,6 +6,7 @@ import type {
   AgentPerformanceRow,
   AgentRegistryRow,
   AgentVersionRow,
+  Erc8183JobRow,
   EndpointBlacklistRow,
   ExecutionLogRow,
   ExecutionMetricRow,
@@ -30,6 +31,7 @@ type StoreSnapshot = {
   leaderboardCache: LeaderboardCacheRow | null;
   agentDrafts: Array<[string, CreateAgentDraft]>;
   tasks: Array<[string, TaskDetailView]>;
+  erc8183Jobs: Array<[string, Erc8183JobRow]>;
   taskEvaluations: Array<[string, unknown[]]>;
   settlements: Array<[string, SettlementReceipt[]]>;
   executionRuns: Array<[string, ExecutionRunRow]>;
@@ -118,6 +120,7 @@ export class InMemoryRegistryStore implements RegistryDatabase {
   userTrust: Map<string, UserTrustRow>;
   agentDrafts: Map<string, CreateAgentDraft>;
   tasks: Map<string, TaskDetailView>;
+  erc8183Jobs: Map<string, Erc8183JobRow>;
   taskEvaluations: Map<string, unknown[]>;
   settlements: Map<string, SettlementReceipt[]>;
   executionRuns: Map<string, ExecutionRunRow>;
@@ -146,6 +149,7 @@ export class InMemoryRegistryStore implements RegistryDatabase {
     this.userTrust = trackMap(new Map(), () => this.notifyChange());
     this.agentDrafts = trackMap(new Map(), () => this.notifyChange());
     this.tasks = trackMap(new Map(), () => this.notifyChange());
+    this.erc8183Jobs = trackMap(new Map(), () => this.notifyChange());
     this.taskEvaluations = trackMap(new Map(), () => this.notifyChange());
     this.settlements = trackMap(new Map(), () => this.notifyChange());
     this.executionRuns = trackMap(new Map(), () => this.notifyChange());
@@ -185,6 +189,7 @@ export class InMemoryRegistryStore implements RegistryDatabase {
       leaderboardCache: this.leaderboardCache,
       agentDrafts: [...this.agentDrafts.entries()],
       tasks: [...this.tasks.entries()],
+      erc8183Jobs: [...this.erc8183Jobs.entries()],
       taskEvaluations: [...this.taskEvaluations.entries()],
       settlements: [...this.settlements.entries()],
       executionRuns: [...this.executionRuns.entries()],
@@ -223,6 +228,8 @@ export class InMemoryRegistryStore implements RegistryDatabase {
       for (const [key, value] of snapshot.agentDrafts ?? []) this.agentDrafts.set(key, value);
       this.tasks.clear();
       for (const [key, value] of snapshot.tasks ?? []) this.tasks.set(key, value);
+      this.erc8183Jobs.clear();
+      for (const [key, value] of snapshot.erc8183Jobs ?? []) this.erc8183Jobs.set(key, value);
       this.taskEvaluations.clear();
       for (const [key, value] of snapshot.taskEvaluations ?? []) this.taskEvaluations.set(key, value);
       this.settlements.clear();
@@ -282,13 +289,19 @@ export class InMemoryRegistryStore implements RegistryDatabase {
       tasksAttempted: 0,
       tasksCompleted: 0,
       approvals: 0,
+      totalReviews: 0,
       rejectionCount: 0,
       disputeCount: 0,
+      successRate: 0,
       approvalRate: 0,
       averageScore: 0,
+      averageResponseTimeMs: 0,
       averageLatencyMs: 0,
       totalEarnings: 0,
       reliabilityScore: 0,
+      rankScore: 0,
+      rankPosition: null,
+      status: "new",
       trend: "flat",
       recentOutcomes: [],
       trustBadges: [],

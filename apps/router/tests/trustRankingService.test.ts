@@ -230,10 +230,52 @@ test("trust ranking builds leaderboard buckets and badges", () => {
 
   const alpha = service.getAgentTrustProfile("agent_alpha");
   assert.equal(alpha.reputation.tasksAttempted, 1);
+  assert.equal(alpha.reputation.tasksCompleted, 1);
+  assert.equal(alpha.reputation.successRate, 1);
+  assert.equal(alpha.reputation.totalReviews, 1);
   assert.equal(alpha.reputation.totalEarnings, 136.5);
+  assert.equal(alpha.reputation.status, "new");
+  assert.ok(typeof alpha.reputation.rankPosition === "number");
   assert.ok(alpha.reputation.trustBadges.some((badge) => badge.id === "verified_compatible"));
+
+  const beta = service.getAgentTrustProfile("agent_beta");
+  assert.equal(beta.reputation.successRate, 0);
+  assert.equal(beta.reputation.totalReviews, 1);
+  assert.equal(beta.reputation.status, "active");
+  assert.ok((alpha.reputation.rankScore || 0) > (beta.reputation.rankScore || 0));
 
   const buyer = service.getUserTrust("0xbuyer1");
   assert.equal(buyer.userTrust.tasksPosted, 2);
   assert.equal(buyer.userTrust.cancellationCount, 0);
+});
+
+test("inactive agents are marked unavailable and new agents are damped in ranking", () => {
+  const store = new InMemoryRegistryStore();
+  seedAgent(store, {
+    agentId: "agent_new",
+    ownerWallet: "0xnew",
+    publicName: "New Agent",
+    category: "research",
+    createdAt: new Date().toISOString(),
+  });
+  seedAgent(store, {
+    agentId: "agent_unavailable",
+    ownerWallet: "0xoff",
+    publicName: "Unavailable Agent",
+    category: "research",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 40).toISOString(),
+  });
+  const unavailable = store.agents.get("agent_unavailable");
+  unavailable.profile.isActive = false;
+  unavailable.healthStatus = "suspended";
+
+  const service = new TrustRankingService(store);
+  service.recomputeAll();
+
+  const fresh = service.getAgentTrustProfile("agent_new");
+  const paused = service.getAgentTrustProfile("agent_unavailable");
+
+  assert.equal(fresh.reputation.status, "new");
+  assert.equal(fresh.reputation.rankScore, 0);
+  assert.equal(paused.reputation.status, "unavailable");
 });

@@ -41,6 +41,7 @@ Arc chain integration:
 - `ARC_NETWORK_NAME`
 - `ARC_TASK_MARKETPLACE_ADDRESS`
 - `ARC_AGENT_REGISTRY_ADDRESS`
+- `ARC_ERC8183_ADDRESS` optional native ERC-8183 registry/job contract reference for future interoperability upgrades
 - `ARC_PAYMENT_TOKEN_ADDRESS`
 - `ARC_PAYMENT_TOKEN_SYMBOL`
 - `ARC_PAYMENT_TOKEN_DECIMALS`

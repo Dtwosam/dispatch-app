@@ -19,7 +19,7 @@ import { CompatibilityValidator } from "./compatibilityValidator";
 import { HealthcheckRunner } from "./healthcheckRunner";
 import { OwnerProofService } from "./ownerProofService";
 import { SafetyService } from "./safetyService";
-import { bootstrapPlatformAgents } from "./platformAgentCatalog";
+import { bootstrapPlatformAgents, isDeprecatedBuiltInPlatformAgentId } from "./platformAgentCatalog";
 
 type SkillAwareProfile = AgentRegistryRow["profile"] & {
   skills?: string[];
@@ -231,7 +231,9 @@ export class AgentRegistryService {
 
   listAgents(): RegistryAgentView[] {
     this.ensurePlatformAgents();
-    return [...this.store.agents.keys()].map((agentId) => this.getAgent(agentId));
+    return [...this.store.agents.keys()]
+      .filter((agentId) => !isDeprecatedBuiltInPlatformAgentId(agentId))
+      .map((agentId) => this.getAgent(agentId));
   }
 
   getAgent(agentId: string): RegistryAgentView {

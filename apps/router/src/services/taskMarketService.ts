@@ -15,6 +15,7 @@ import type {
   TaskListResponse,
   TaskSummaryView,
   TaskTimelineEvent,
+  Erc8183Job,
 } from "@marketplace/shared";
 import {
   assertTaskStatusRecovery,
@@ -28,6 +29,7 @@ import {
 import { InMemoryRegistryStore } from "../db/store";
 import { makeId } from "../lib/ids";
 import { AgentRegistryService } from "./agentRegistryService";
+import { Erc8183AdapterService } from "./erc8183AdapterService";
 import { EvaluatorClient } from "./evaluatorClient";
 import { SafetyService } from "./safetyService";
 import type { PlatformRefinementContext, PlatformQualityMode } from "./platformQualityTypes";
@@ -64,9 +66,11 @@ type OnchainAwareTaskDetail = TaskDetailView & {
   latestAssignTxHash?: string | null;
   latestSubmissionId?: string | null;
   latestSubmissionTxHash?: string | null;
+  erc8183Job?: Erc8183Job | null;
 };
 
 export class TaskMarketService {
+  private readonly erc8183: Erc8183AdapterService;
   private executionEngine: {
     dispatchTask(taskId: string, agentId: string): Promise<unknown>;
     requestImproveAgain?(taskId: string, agentId: string, refinementContext: PlatformRefinementContext): Promise<unknown>;
@@ -78,7 +82,9 @@ export class TaskMarketService {
     private readonly registryService: AgentRegistryService,
     private readonly evaluatorClient: EvaluatorClient,
     private readonly safetyService: SafetyService,
-  ) {}
+  ) {
+    this.erc8183 = new Erc8183AdapterService(store);
+  }
 
   attachExecutionEngine(engine: { dispatchTask(taskId: string, agentId: string): Promise<unknown> }) {
     this.executionEngine = engine;
@@ -302,6 +308,7 @@ export class TaskMarketService {
   getTask(taskId: string): TaskDetailView {
     const task = this.store.tasks.get(taskId);
     if (!task) throw new Error(`Task ${taskId} not found`);
+    task.erc8183Job = this.erc8183.syncWithTask(task);
     return task;
   }
 
@@ -377,6 +384,10 @@ export class TaskMarketService {
     };
 
     this.store.tasks.set(taskId, recovered);
+    recovered.erc8183Job = this.erc8183.ensureForTask(recovered, {
+      providerAgentId: recovered.selectedAgentId,
+      evaluator: recovered.creatorWallet,
+    });
     return this.reconcileTaskFromOnchain(taskId, onchainTask, onchainTaskRef);
   }
 
@@ -532,6 +543,10 @@ export class TaskMarketService {
       );
     }
     task.updatedAt = new Date().toISOString();
+    task.erc8183Job = this.erc8183.syncWithTask(task, {
+      providerAgentId: task.selectedAgentId,
+      evaluator: task.creatorWallet,
+    });
     this.store.tasks.set(taskId, task);
     return task;
   }
@@ -679,6 +694,10 @@ export class TaskMarketService {
     task.updatedAt = new Date().toISOString();
     task.timeline.push(this.timeline("approved", "Submission approved", "The submission passed review and is ready for settlement."));
     task.reviewActions = ["settle"];
+    task.erc8183Job = this.erc8183.syncWithTask(task, {
+      providerAgentId: task.selectedAgentId,
+      evaluator: task.creatorWallet,
+    });
     this.store.tasks.set(taskId, task);
     this.annotateLatestRun(taskId, { reviewOutcome: "approve" });
     return taskActionResponseSchema.parse({ task });
@@ -787,6 +806,10 @@ export class TaskMarketService {
     task.updatedAt = new Date().toISOString();
     task.timeline.push(this.timeline("rejected", "Submission rejected", "The buyer rejected the current output and can now refund or dispute."));
     task.reviewActions = ["refund", "dispute", "appeal"];
+    task.erc8183Job = this.erc8183.syncWithTask(task, {
+      providerAgentId: task.selectedAgentId,
+      evaluator: task.creatorWallet,
+    });
     this.store.tasks.set(taskId, task);
     this.annotateLatestRun(taskId, { reviewOutcome: "reject" });
     return taskActionResponseSchema.parse({ task });
@@ -822,6 +845,10 @@ export class TaskMarketService {
     task.reviewActions = [];
     task.updatedAt = new Date().toISOString();
     task.timeline.push(this.timeline("appeal_opened", `Appeal round ${appealRound} opened`, reason));
+    task.erc8183Job = this.erc8183.syncWithTask(task, {
+      providerAgentId: task.selectedAgentId,
+      evaluator: task.creatorWallet,
+    });
     this.store.tasks.set(taskId, task);
     if (this.chainBridge?.appealTask) {
       const appealReceipt = await this.chainBridge.appealTask(task, `appeal:${appealRound}:${reason.slice(0, 48)}`);
@@ -975,6 +1002,9 @@ export class TaskMarketService {
     task.resultStatus = "in_progress";
     task.updatedAt = new Date().toISOString();
     task.timeline.push(this.timeline("execution_started", "Execution running", `Execution is now running for agent ${agentId}.`));
+    task.erc8183Job = this.erc8183.markDispatched(task, {
+      providerAgentId: agentId,
+    });
     this.store.tasks.set(taskId, task);
   }
 
@@ -1026,6 +1056,9 @@ export class TaskMarketService {
     if (noteParts.length > 0) {
       task.structuredNotes = noteParts.join("\n\n");
     }
+    task.erc8183Job = this.erc8183.markSubmitted(task, {
+      providerAgentId: agentId,
+    });
     this.store.tasks.set(taskId, task);
   }
 
@@ -1038,6 +1071,10 @@ export class TaskMarketService {
     task.updatedAt = new Date().toISOString();
     task.timeline.push(this.timeline("execution_failed", "Execution failed", `${agentId} failed to complete execution: ${message}`));
     task.reviewActions = task.transactionState === "accepted" ? ["cancel"] : [];
+    task.erc8183Job = this.erc8183.syncWithTask(task, {
+      providerAgentId: agentId,
+      evaluator: task.creatorWallet,
+    });
     this.store.tasks.set(taskId, task);
   }
 
@@ -1060,6 +1097,7 @@ export class TaskMarketService {
       ),
     );
     task.reviewActions = [];
+    task.erc8183Job = this.erc8183.markSettled(task, "settled");
     this.store.tasks.set(taskId, task);
   }
 
@@ -1081,6 +1119,7 @@ export class TaskMarketService {
       ),
     );
     task.reviewActions = [];
+    task.erc8183Job = this.erc8183.markSettled(task, "refunded");
     this.store.tasks.set(taskId, task);
   }
 
@@ -1103,6 +1142,10 @@ export class TaskMarketService {
     task.updatedAt = new Date().toISOString();
     task.timeline.push(this.timeline("disputed", "Dispute paused payout", reason));
     task.reviewActions = [];
+    task.erc8183Job = this.erc8183.syncWithTask(task, {
+      providerAgentId: task.selectedAgentId,
+      evaluator: task.creatorWallet,
+    });
     this.store.tasks.set(taskId, task);
   }
 
@@ -1132,6 +1175,9 @@ export class TaskMarketService {
       ),
     );
     task.reviewActions = [];
+    task.erc8183Job = paid
+      ? this.erc8183.markSettled(task, "settled")
+      : this.erc8183.markSettled(task, "refunded");
     this.store.tasks.set(taskId, task);
   }
 
@@ -1426,6 +1472,10 @@ export class TaskMarketService {
       disputeRecord: null,
       appealRecord: null,
     };
+    detail.erc8183Job = this.erc8183.ensureForTask(detail, {
+      providerAgentId: input.selectedAgentId ?? null,
+      evaluator: input.creatorWallet,
+    });
     return detail;
   }
 
@@ -1483,6 +1533,10 @@ export class TaskMarketService {
     if (["OPEN", "ASSIGNED"].includes(task.status)) {
       task.reviewActions = ["cancel"];
     }
+    task.erc8183Job = this.erc8183.syncWithTask(task, {
+      providerAgentId: task.selectedAgentId,
+      evaluator: task.creatorWallet,
+    });
   }
 
   private readBigIntLike(value: unknown) {

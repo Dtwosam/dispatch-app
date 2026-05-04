@@ -12,6 +12,8 @@ import {
   labelize,
   liveActivityEntries,
   rankingDeltaLabel,
+  agentStatusLabel,
+  agentStatusTone,
   revealSections,
   sortAgents,
   speedLabel,
@@ -19,6 +21,7 @@ import {
   trustScore,
 } from "./app-ui.js";
 import { buildAgentIdentityBadges } from "./ui-models.js";
+import { buildRecentAgentWork } from "./ui-models.js";
 
 function topAgentBucket(state) {
   return (state.leaderboards?.buckets || []).find((item) => item.key === "top_earning_agents")
@@ -186,12 +189,16 @@ function renderPerformanceColumn(state) {
 }
 
 function renderAgentCard(agent) {
-  const approval = Math.round((agent.performanceSummary.approvalRate || 0) * 100);
-  const latency = agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
+  const successRate = Math.round((agent.performanceSummary.successRate || 0) * 100);
+  const latency = agent.performanceSummary.averageResponseTimeMs || agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
   const completedJobs = agent.performanceSummary.tasksCompleted || 0;
+  const totalEarnings = agent.performanceSummary.totalEarnings || 0;
   const tagline = agent.profile.description.split(".")[0].slice(0, 92);
-  const tags = (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 2);
+  const tags = [...new Set([...(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags), speedLabel(agent)])].slice(0, 4);
   const identityBadges = buildAgentIdentityBadges(agent);
+  const statusTone = agentStatusTone(agent);
+  const statusLabel = agentStatusLabel(agent);
+  const rankPosition = agent.performanceSummary.rankPosition;
 
   return `
     <article class="agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
@@ -203,18 +210,22 @@ function renderAgentCard(agent) {
             <p class="agent-card__tagline">${escapeHtml(tagline)}</p>
           </div>
         </div>
-        <div class="agent-tags">
-          ${identityBadges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-          ${agent.performanceSummary?.trend === "up" ? '<span class="tag">Trending</span>' : ""}
+        <div class="agent-card__meta">
+          ${rankPosition ? `<span class="agent-rank">#${rankPosition}</span>` : ""}
+          <span class="status-chip ${statusTone}">${statusLabel}</span>
         </div>
+      </div>
+      <div class="agent-tags">
+          ${identityBadges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
       </div>
       <div class="agent-tags">
         ${tags.map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
       </div>
       <div class="agent-metrics">
-        <div><strong class="metric-success">${formatPercent(approval)}</strong><span>Success</span></div>
-        <div><strong>${completedJobs}</strong><span>Completed</span></div>
-        <div><strong>${speedLabel(agent)}</strong><span>${formatLatency(latency)}</span></div>
+        <div><strong class="metric-success">${formatPercent(successRate)}</strong><span>Success rate</span></div>
+        <div><strong>${completedJobs}</strong><span>Tasks completed</span></div>
+        <div><strong>${formatLatency(latency)}</strong><span>Avg response</span></div>
+        <div><strong>${formatCurrency(totalEarnings)}</strong><span>Total earned</span></div>
       </div>
       <footer>
         <button class="hero-primary" data-direct="${agent.profile.agentId}">Hire Agent</button>
@@ -490,6 +501,15 @@ export function renderAgentsMarketplacePage({ el, state, onNavigate, rerender })
               ${skills.map((skill) => `<option value="${skill}" ${state.filters.skill === skill ? "selected" : ""}>${labelize(skill)}</option>`).join("")}
             </select>
           </label>
+          <label class="field-stack">
+            <span class="muted">Sort</span>
+            <select id="sortFilter">
+              <option value="best_overall" ${state.filters.sort === "best_overall" ? "selected" : ""}>Best overall</option>
+              <option value="fastest" ${state.filters.sort === "fastest" ? "selected" : ""}>Fastest</option>
+              <option value="highest_success" ${state.filters.sort === "highest_success" ? "selected" : ""}>Highest success rate</option>
+              <option value="top_earning" ${state.filters.sort === "top_earning" ? "selected" : ""}>Top earning</option>
+            </select>
+          </label>
         </div>
       </section>
       <section class="shell-section reveal-on-scroll">
@@ -510,6 +530,10 @@ export function renderAgentsMarketplacePage({ el, state, onNavigate, rerender })
   });
   document.getElementById("skillFilter")?.addEventListener("input", (event) => {
     state.filters.skill = event.target.value;
+    rerender();
+  });
+  document.getElementById("sortFilter")?.addEventListener("input", (event) => {
+    state.filters.sort = event.target.value;
     rerender();
   });
   document.querySelectorAll("[data-direct]").forEach((node) => {
@@ -533,9 +557,11 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
     .slice(0, 4)
     .map((item) => labelize(item));
 
-  const recentExecutions = [...(state.tasks?.completedTasks || []), ...(state.tasks?.activeTasks || [])]
-    .filter((task) => task.participatingAgentIds.includes(agent.profile.agentId))
-    .slice(0, 4);
+  const recentWork = buildRecentAgentWork(agent, {
+    completedTasks: state.tasks?.completedTasks || [],
+    rejectedTasks: state.tasks?.rejectedTasks || [],
+    disputedTasks: state.tasks?.disputedTasks || [],
+  });
 
   el.appRoot.innerHTML = `
     <section data-structure="agent-profile">
@@ -554,12 +580,15 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
           </div>
           <div class="agent-tags">
             ${buildAgentIdentityBadges(agent).map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
+            <span class="status-chip ${agentStatusTone(agent)}">${agentStatusLabel(agent)}</span>
           </div>
           <div class="task-summary">
-            <div class="metric-card"><strong>${formatPercent(Math.round((agent.performanceSummary.approvalRate || 0) * 100))}</strong><span>Success</span></div>
-            <div class="metric-card"><strong>${Math.round(agent.performanceSummary.averageScore || 0)}</strong><span>Score</span></div>
-            <div class="metric-card"><strong>${formatLatency(agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs)}</strong><span>Latency</span></div>
-            <div class="metric-card"><strong>${agent.performanceSummary.tasksCompleted || 0}</strong><span>Completed jobs</span></div>
+            <div class="metric-card"><strong>${formatPercent(Math.round((agent.performanceSummary.successRate || 0) * 100))}</strong><span>Success rate</span></div>
+            <div class="metric-card"><strong>${formatPercent(Math.round((agent.performanceSummary.approvalRate || 0) * 100))}</strong><span>Approval rate</span></div>
+            <div class="metric-card"><strong>${formatLatency(agent.performanceSummary.averageResponseTimeMs || agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs)}</strong><span>Avg response</span></div>
+            <div class="metric-card"><strong>${agent.performanceSummary.tasksCompleted || 0}</strong><span>Tasks completed</span></div>
+            <div class="metric-card"><strong>${formatCurrency(agent.performanceSummary.totalEarnings || 0)}</strong><span>Total earned</span></div>
+            <div class="metric-card"><strong>${agent.performanceSummary.rankPosition ? `#${agent.performanceSummary.rankPosition}` : "--"}</strong><span>Marketplace rank</span></div>
           </div>
           <div class="agent-tags">
             ${(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 6).map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
@@ -588,12 +617,23 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
       <section class="shell-section reveal-on-scroll">
         <div class="section-head">
           <div>
-            <p class="mini-label">Recent executions</p>
-            <h2>Work this agent has touched</h2>
+            <p class="mini-label">Recent work</p>
+            <h2>What this agent has recently completed</h2>
           </div>
         </div>
-        <div class="steps-grid">
-          ${recentExecutions.map(renderTaskRow).join("") || emptyState("No recent executions yet.")}
+        <div class="work-history">
+          ${recentWork.map((item) => `
+            <article class="work-history__item">
+              <div class="work-history__main">
+                <strong>${escapeHtml(item.title)}</strong>
+                <p>${escapeHtml(item.category)} | ${escapeHtml(item.status)}</p>
+              </div>
+              <div class="work-history__meta">
+                <span class="tag">${escapeHtml(item.approvalIndicator)}</span>
+                <small>${escapeHtml(new Date(item.completedAt).toLocaleDateString())}</small>
+              </div>
+            </article>
+          `).join("") || emptyState("No completed work history yet.")}
         </div>
       </section>
     </section>
