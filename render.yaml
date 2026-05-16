@@ -3,11 +3,13 @@ services:
     name: dispatch-evaluator
     runtime: node
     rootDir: .
-    plan: starter
-    buildCommand: npm install && npm --workspace packages/shared run build && npm --workspace apps/evaluator run build
+    plan: free
+    buildCommand: npm ci && npm --workspace packages/shared run build && npm --workspace apps/evaluator run build
     startCommand: npm --workspace apps/evaluator run start
     healthCheckPath: /health
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: PORT
         value: "4030"
 
@@ -15,11 +17,13 @@ services:
     name: dispatch-router
     runtime: node
     rootDir: .
-    plan: starter
-    buildCommand: npm install && npm --workspace packages/shared run build && npm --workspace packages/agent-sdk run build && npm --workspace apps/router run build
+    plan: free
+    buildCommand: npm ci && npm --workspace packages/shared run build && npm --workspace packages/agent-sdk run build && npm --workspace apps/router run build
     startCommand: npm --workspace apps/router run start
     healthCheckPath: /health
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: PORT
         value: "4020"
       - key: EVALUATOR_BASE_URL
@@ -36,7 +40,7 @@ services:
       - key: ROUTER_PUBLIC_BASE_URL
         sync: false
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: https://dispatch-arc.vercel.app
       - key: ADMIN_WALLETS
         sync: false
       - key: ROUTER_AGENT_SHARED_SECRET
@@ -64,23 +68,23 @@ services:
       - key: ENABLE_MARKETPLACE_SEEDING
         value: "false"
       - key: ARC_RPC_URL
-        sync: false
+        value: https://rpc.testnet.arc.network
       - key: ARC_BROWSER_RPC_URL
-        sync: false
+        value: https://rpc.testnet.arc.network
       - key: ARC_CHAIN_ID
-        sync: false
+        value: "5042002"
       - key: ARC_CHAIN_KEY
-        sync: false
+        value: arcTestnet
       - key: ARC_CHAIN_MODE
-        sync: false
+        value: browser_wallet
       - key: ARC_NETWORK_NAME
-        sync: false
+        value: Arc Testnet
       - key: ARC_TASK_MARKETPLACE_ADDRESS
-        sync: false
+        value: 0xbd79cff0ff452b566f7c84ffc4dd4a2ee24c73eb
       - key: ARC_AGENT_REGISTRY_ADDRESS
-        sync: false
+        value: 0x9bd24fdf0563e6cf6827e02eb5dfd4f84ae20eeb
       - key: ARC_PAYMENT_TOKEN_ADDRESS
-        sync: false
+        value: 0x3600000000000000000000000000000000000000
       - key: ARC_PAYMENT_TOKEN_SYMBOL
         value: "USDC"
       - key: ARC_PAYMENT_TOKEN_DECIMALS
@@ -90,8 +94,10 @@ services:
       - key: ARC_GAS_TOKEN_DECIMALS
         value: "18"
       - key: ARC_EXPLORER_BASE_URL
-        sync: false
+        value: https://testnet.arcscan.app
       - key: ARC_SERVER_PRIVATE_KEY
         sync: false
       - key: ARC_SERVER_WALLET_ADDRESS
-        sync: false
+        value: 0x85DCC174dE5e785Cda3069154D097172F1B39aAA
+      - key: DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK
+        value: "false"

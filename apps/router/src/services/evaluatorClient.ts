@@ -7,7 +7,7 @@ import { evaluationRunResponseSchema } from "@marketplace/shared";
 import { fetchJson } from "../lib/http";
 
 export class EvaluatorClient {
-  constructor(private readonly baseUrl = process.env.EVALUATOR_BASE_URL ?? "http://localhost:4030") {}
+  constructor(private readonly baseUrl = normalizeEvaluatorBaseUrl(process.env.EVALUATOR_BASE_URL ?? "http://localhost:4030")) {}
 
   async runAssisted(request: EvaluationRunRequest) {
     const response = await fetchJson(`${this.baseUrl}/api/evaluations/assisted`, {
@@ -48,4 +48,11 @@ export class EvaluatorClient {
     });
     return evaluationRunResponseSchema.parse(response.data);
   }
+}
+
+function normalizeEvaluatorBaseUrl(value: string) {
+  const trimmed = value.trim().replace(/\/+$/, "");
+  if (!trimmed) return "http://localhost:4030";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `http://${trimmed}`;
 }

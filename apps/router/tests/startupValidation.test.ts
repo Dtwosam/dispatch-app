@@ -28,6 +28,9 @@ test("hosted router validation requires database and core runtime env", () => {
     "ALLOWED_ORIGINS",
     "ROUTER_AGENT_SHARED_SECRET",
     "ROUTER_CALLBACK_SECRET",
+    "NODE_ENV",
+    "OWNER_PROOF_VERIFIER_URL",
+    "ALLOW_INSECURE_DEV_OWNER_PROOFS",
     "ARC_RPC_URL",
     "ARC_BROWSER_RPC_URL",
     "ARC_CHAIN_ID",
@@ -36,19 +39,28 @@ test("hosted router validation requires database and core runtime env", () => {
     "ARC_NETWORK_NAME",
     "ARC_TASK_MARKETPLACE_ADDRESS",
     "ARC_AGENT_REGISTRY_ADDRESS",
+    "ARC_PAYMENT_TOKEN_ADDRESS",
     "ARC_EXPLORER_BASE_URL",
+    "ARC_SERVER_WALLET_ADDRESS",
+    "ARC_SERVER_PRIVATE_KEY",
   ]);
 
   process.env.RENDER_SERVICE_NAME = "dispatch-router";
   for (const key of Object.keys(snapshot).filter((key) => key !== "RENDER_SERVICE_NAME")) {
-    delete process.env[key];
+    process.env[key] = "";
   }
+  process.env.NODE_ENV = "production";
+  process.env.ARC_CHAIN_MODE = "browser_wallet";
 
   try {
     const result = validateRouterStartupEnv();
+    const errors = result.errors.join("\n");
     assert.ok(result.errors.some((item) => item.includes("SUPABASE_DATABASE_URL") || item.includes("DATABASE_URL")));
     assert.ok(result.errors.some((item) => item.includes("EVALUATOR_BASE_URL")));
-    assert.ok(result.errors.some((item) => item.includes("ARC_TASK_MARKETPLACE_ADDRESS")));
+    assert.match(errors, /ARC_TASK_MARKETPLACE_ADDRESS/);
+    assert.match(errors, /ARC_PAYMENT_TOKEN_ADDRESS/);
+    assert.match(errors, /ARC_SERVER_PRIVATE_KEY/);
+    assert.match(errors, /OWNER_PROOF_VERIFIER_URL/);
   } finally {
     restoreMany(snapshot);
   }

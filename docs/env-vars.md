@@ -52,6 +52,7 @@ Arc chain integration:
 - `ARC_EXPLORER_BASE_URL`
 - `ARC_SERVER_PRIVATE_KEY`
 - `ARC_SERVER_WALLET_ADDRESS`
+- `DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK` optional demo-only fallback, keep `false` for strict wallet-funded public testing
 
 ## Evaluator
 
@@ -86,12 +87,15 @@ ARC_CHAIN_ID=5042002
 ARC_CHAIN_KEY=arcTestnet
 ARC_CHAIN_MODE=browser_wallet
 ARC_NETWORK_NAME=Arc Testnet
+ARC_TASK_MARKETPLACE_ADDRESS=0xbd79cff0ff452b566f7c84ffc4dd4a2ee24c73eb
+ARC_AGENT_REGISTRY_ADDRESS=0x9bd24fdf0563e6cf6827e02eb5dfd4f84ae20eeb
 ARC_PAYMENT_TOKEN_ADDRESS=0x3600000000000000000000000000000000000000
 ARC_PAYMENT_TOKEN_SYMBOL=USDC
 ARC_PAYMENT_TOKEN_DECIMALS=6
 ARC_GAS_TOKEN_SYMBOL=USDC
 ARC_GAS_TOKEN_DECIMALS=18
 ARC_EXPLORER_BASE_URL=https://testnet.arcscan.app
+ARC_SERVER_WALLET_ADDRESS=0x85DCC174dE5e785Cda3069154D097172F1B39aAA
 PLATFORM_FEE_BPS=250
 ```
 
@@ -110,3 +114,15 @@ For hosted Render deployments, the router now validates:
 - `ROUTER_CALLBACK_SECRET`
 - one of `SUPABASE_DATABASE_URL` or `DATABASE_URL`
 - required Arc env vars
+- `ARC_SERVER_PRIVATE_KEY` only in backend secret env, never in Vercel
+- `OWNER_PROOF_VERIFIER_URL` for production external-agent registration, or explicit `ALLOW_INSECURE_DEV_OWNER_PROOFS=true` for Arc Testnet/demo-only deployments
+
+## Vercel production env
+
+Only set public-safe frontend config:
+
+```text
+DISPATCH_API_BASE=https://<your-router>.onrender.com
+```
+
+Do not set database credentials, deployer keys, or operator private keys in Vercel.
