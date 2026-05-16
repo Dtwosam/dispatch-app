@@ -283,14 +283,26 @@ export class InMemoryRegistryStore implements RegistryDatabase {
 
   ensurePerformance(agentId: string): AgentPerformanceRow {
     const existing = this.performance.get(agentId);
-    if (existing) return existing;
+    if (existing) {
+      const normalized = {
+        ...existing,
+        paidTasksCompleted: existing.paidTasksCompleted ?? 0,
+        refundedTasks: existing.refundedTasks ?? 0,
+        paidEarnings: existing.paidEarnings ?? existing.totalEarnings ?? 0,
+        pendingEarnings: existing.pendingEarnings ?? 0,
+      };
+      this.performance.set(agentId, normalized);
+      return normalized;
+    }
     const seeded: AgentPerformanceRow = {
       agentId,
       tasksAttempted: 0,
       tasksCompleted: 0,
+      paidTasksCompleted: 0,
       approvals: 0,
       totalReviews: 0,
       rejectionCount: 0,
+      refundedTasks: 0,
       disputeCount: 0,
       successRate: 0,
       approvalRate: 0,
@@ -298,6 +310,8 @@ export class InMemoryRegistryStore implements RegistryDatabase {
       averageResponseTimeMs: 0,
       averageLatencyMs: 0,
       totalEarnings: 0,
+      paidEarnings: 0,
+      pendingEarnings: 0,
       reliabilityScore: 0,
       rankScore: 0,
       rankPosition: null,

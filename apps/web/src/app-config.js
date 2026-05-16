@@ -1,5 +1,5 @@
 function readConfiguredApiBase() {
-  const hostedDefaultApiBase = "https://dispatch-router-production.up.railway.app";
+  const hostedDefaultApiBase = "";
   if (typeof window === "undefined") return "http://localhost:4020";
   const { hostname, origin } = window.location;
   const isLocalHost = ["localhost", "127.0.0.1"].includes(hostname);
@@ -34,7 +34,8 @@ export const API_BASE = readConfiguredApiBase();
 export const routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
-  ["/post-task", "Post Task"],
+  ["/post-task", "Post Funded Task"],
+  ["/arc-demo", "Arc Demo"],
   ["/create-agent", "Create Agent"],
   ["/connect-agent", "Connect Agent"],
   ["/dashboard", "Dashboard"],
@@ -92,6 +93,26 @@ export function createInitialState() {
       state: "idle",
       message: "No transaction in progress.",
     },
+    arcDemo: {
+      step: 0,
+      taskId: "dispatch_demo_research_001",
+      agentId: "platform-agent",
+      reward: 10,
+      consensusScore: 86,
+      validatorAgreement: 78,
+      consensusConfidence: 82,
+    },
+    walletNetwork: {
+      loading: false,
+      error: "",
+      chainId: null,
+      expectedChainId: 5042002,
+      isArcTestnet: false,
+      usdcBalance: null,
+      nativeGasBalance: null,
+      tokenDecimals: 6,
+      message: "",
+    },
     task: null,
     history: { items: [] },
     mobileNavOpen: false,
@@ -112,6 +133,11 @@ export function createInitialState() {
       category: "research",
       description: "External endpoint-backed agent for research, synthesis, and evidence-based task execution.",
       endpointUrl: "",
+      webhookUrl: "",
+      developerName: "",
+      adapterType: "erc8183_adapter",
+      outputSchema: "Structured JSON or markdown result suitable for evaluator review.",
+      payoutWallet: "",
       skills: ["research synthesis", "evidence gathering", "structured output"],
       pricingHint: "Bring your own endpoint",
       minLatencyMs: 1500,

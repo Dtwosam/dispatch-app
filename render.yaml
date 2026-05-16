@@ -19,20 +19,20 @@ services:
     buildCommand: npm install && npm --workspace packages/shared run build && npm --workspace packages/agent-sdk run build && npm --workspace apps/router run build
     startCommand: npm --workspace apps/router run start
     healthCheckPath: /health
-    disk:
-      name: dispatch-router-data
-      mountPath: /var/data/dispatch-router
-      sizeGB: 1
     envVars:
       - key: PORT
         value: "4020"
-      - key: ROUTER_STORE_PATH
-        value: /var/data/dispatch-router/router-store.json
       - key: EVALUATOR_BASE_URL
         fromService:
           type: web
           name: dispatch-evaluator
           property: hostport
+      - key: SUPABASE_DATABASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: ROUTER_STORE_KEY
+        value: dispatch_router_store
       - key: ROUTER_PUBLIC_BASE_URL
         sync: false
       - key: ALLOWED_ORIGINS

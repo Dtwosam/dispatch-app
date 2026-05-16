@@ -136,10 +136,13 @@ watchInjectedWallet({
     localStorage.setItem("walletConnectionType", state.walletConnectionType);
     localStorage.setItem("walletProviderLabel", nextProviderLabel);
     el.ownerWallet.value = nextWallet;
+    void refreshWalletNetworkState();
     renderTopbar();
     safeRender("Wallet change render failed");
   },
   onChainChanged: () => {
+    chainClient.resetBrowserContext?.();
+    void refreshWalletNetworkState();
     safeRender("Chain change render failed");
   },
 });
@@ -206,6 +209,7 @@ function renderWalletSheet(open) {
         localStorage.setItem("activeWallet", wallet);
         localStorage.setItem("walletConnectionType", state.walletConnectionType);
         localStorage.setItem("walletProviderLabel", providerLabel);
+        await refreshWalletNetworkState();
         updateStatus("Wallet connected", `${providerLabel} connected as ${shortWallet(wallet)}.`, "success");
         closeWalletSheet(el);
         safeRender("Wallet connect render failed");
@@ -217,6 +221,15 @@ function renderWalletSheet(open) {
       state.wallet = "";
       state.walletConnectionType = "manual";
       state.walletProviderLabel = "";
+      state.walletNetwork = {
+        ...state.walletNetwork,
+        error: "",
+        chainId: null,
+        isArcTestnet: false,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        message: "",
+      };
       el.ownerWallet.value = "";
       localStorage.removeItem("activeWallet");
       localStorage.setItem("walletConnectionType", state.walletConnectionType);
@@ -225,8 +238,43 @@ function renderWalletSheet(open) {
       closeWalletSheet(el);
       safeRender("Wallet disconnect render failed");
     },
+    onSwitchNetwork: async () => {
+      try {
+        state.walletNetwork.loading = true;
+        updateStatus("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
+        const snapshot = await chainClient.switchWalletToArcTestnet();
+        state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+        updateStatus("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+        renderWalletSheet(true);
+        safeRender("Wallet network switch render failed");
+      } catch (error) {
+        state.walletNetwork = {
+          ...state.walletNetwork,
+          loading: false,
+          error: statusMessage(error, "Could not switch to Arc Testnet."),
+        };
+        updateStatus("Network switch failed", state.walletNetwork.error, "warn");
+      }
+    },
     onClose: () => closeWalletSheet(el),
   });
+}
+
+async function refreshWalletNetworkState() {
+  if (!state.wallet.trim()) return null;
+  try {
+    state.walletNetwork = { ...state.walletNetwork, loading: true, error: "" };
+    const snapshot = await chainClient.getWalletNetworkSnapshot();
+    state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+    return snapshot;
+  } catch (error) {
+    state.walletNetwork = {
+      ...state.walletNetwork,
+      loading: false,
+      error: statusMessage(error, "Wallet network check failed."),
+    };
+    return null;
+  }
 }
 
 async function loadMarketData() {
@@ -280,19 +328,116 @@ function renderHome() {
   setChrome(
     "Landing / Home",
     "Dispatch Home",
-    "Post work, hire AI specialists, review outcomes.",
-    "Hire AI agents that actually deliver.",
+    "Post funded work, hire AI specialists, and release USDC after verified completion.",
+    "Verified AI work, settled on Arc Testnet.",
     100,
   );
   renderHomePage({ el, state, onNavigate: navigate });
+}
+
+function renderArcDemo() {
+  const demo = state.arcDemo;
+  const steps = [
+    ["Task posted", "create_funded_task", "Buyer anchors the task spec hash and reward in the Intelligent Contract."],
+    ["Agent assigned", "assign_task", "The Platform Agent is selected through the same marketplace path future agents use."],
+    ["Result submitted", "submit_result", "The agent stores rich output offchain and anchors a result hash onchain."],
+    ["Review finalized", "finalize_review", "Three validator inputs are aggregated with equivalence-aware scoring."],
+    ["Settlement ready", "settle_task", "Accepted work becomes payout-safe and updates agent reputation."],
+  ];
+  const current = Math.min(Number(demo.step || 0), steps.length - 1);
+  const currentState = current >= 4 ? "accepted" : current >= 3 ? "under_review" : current >= 2 ? "submitted" : current >= 1 ? "assigned" : "funded";
+  setChrome(
+    "Arc Demo",
+    "Arc Testnet Flow",
+    "See how Dispatch turns a marketplace task into an Arc Testnet funded work result.",
+    "Post task, verify result, settle only after evaluator-backed approval.",
+    96,
+  );
+  el.appRoot.innerHTML = `
+    <section class="hero-shell" data-reveal>
+      <div class="hero-copy">
+        <p class="mini-label">Reviewer demo</p>
+        <h1>Dispatch is a USDC-powered AI work marketplace on Arc.</h1>
+        <p>This reviewer-safe demo is credential-free: it shows how agents, evaluator review, and the Arc Testnet settlement path fit together without requiring a wallet signature.</p>
+        <div class="hero-actions">
+          <button class="hero-primary" type="button" data-arc-demo-next>${current >= steps.length - 1 ? "Replay Final Step" : "Advance Demo Flow"}</button>
+          <button type="button" data-arc-demo-reset>Reset</button>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <p class="mini-label">Current contract state</p>
+        <h3>${escapeHtml(currentState)}</h3>
+        <div class="metric-row">
+          <span>Task</span><strong>${escapeHtml(demo.taskId)}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Reward</span><strong>${demo.reward} USDC</strong>
+        </div>
+        <div class="metric-row">
+          <span>Agent</span><strong>${escapeHtml(demo.agentId)}</strong>
+        </div>
+      </aside>
+    </section>
+    <section class="shell-section" data-reveal>
+      <div class="section-head">
+        <div>
+          <p class="mini-label">Optimistic Democracy</p>
+          <h2>Multi-validator review, not one model verdict.</h2>
+        </div>
+        <span class="meta-pill">Equivalence-aware</span>
+      </div>
+      <div class="steps-grid">
+        ${steps
+          .map(([label, method, body], index) => `
+            <article class="step-card ${index <= current ? "is-active" : ""}">
+              <span class="step-index">${index + 1}</span>
+              <strong>${escapeHtml(label)}</strong>
+              <p><code>${escapeHtml(method)}</code></p>
+              <p>${escapeHtml(body)}</p>
+            </article>
+          `)
+          .join("")}
+      </div>
+    </section>
+    <section class="shell-section" data-reveal>
+      <div class="section-head">
+        <div>
+          <p class="mini-label">Result verification</p>
+          <h2>Settlement becomes possible only after accepted review.</h2>
+        </div>
+      </div>
+      <div class="metrics-grid">
+        <article class="metric-card"><strong>${demo.consensusScore}%</strong><span>Consensus score</span></article>
+        <article class="metric-card"><strong>${demo.validatorAgreement}%</strong><span>Validator agreement</span></article>
+        <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Consensus confidence</span></article>
+        <article class="metric-card"><strong>${current >= 4 ? "yes" : "no"}</strong><span>Settlement eligible</span></article>
+      </div>
+      <div class="status-banner ${current >= 4 ? "is-success" : "is-neutral"}">
+        <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
+        <p>${current >= 4
+          ? "The Intelligent Contract can settle because the result passed score, agreement, and confidence thresholds."
+          : "Advance the demo to see the task move from funded work to result review and settlement eligibility."}</p>
+      </div>
+    </section>
+  `;
+
+  document.querySelector("[data-arc-demo-next]")?.addEventListener("click", () => {
+    state.arcDemo.step = Math.min(current + 1, steps.length - 1);
+    renderArcDemo();
+  });
+  document.querySelector("[data-arc-demo-reset]")?.addEventListener("click", () => {
+    state.arcDemo.step = 0;
+    renderArcDemo();
+  });
+  revealSections(el.appRoot);
 }
 
 function renderAgentsPage() {
   setChrome(
     "Agent Marketplace",
     "Browse Agents",
-    "Find the right specialist faster.",
-    "Dispatch keeps trust, results, and response expectations easy to scan before you hire.",
+    "Find the right worker for funded execution faster.",
+    "Dispatch keeps trust, verified outcomes, and response expectations easy to scan before you hire.",
     92,
   );
   renderAgentsMarketplacePage({ el, state, onNavigate: navigate, rerender: renderAgentsPage });
@@ -302,8 +447,8 @@ async function renderAgentProfile(slug) {
   setChrome(
     "Agent Profile",
     "Agent Profile",
-    "A sales page for hiring, not a technical profile dump.",
-    "Trust stats, recent outcomes, response time, and a strong hire action keep this page conversion-focused.",
+    "A sales page for funded hiring, not a technical profile dump.",
+    "Trust stats, verified outcomes, response time, and a strong hire action keep this page conversion-focused.",
     88,
   );
   renderAgentProfilePage({ el, state, slug, onNavigate: navigate });
@@ -604,11 +749,17 @@ function buildExternalAgentRegistrationPayload() {
     description: state.externalAgentForm.description.trim(),
     avatarUrl: null,
     originType: "external",
+    developerName: state.externalAgentForm.developerName.trim() || undefined,
     category: state.externalAgentForm.category,
     capabilityTags: skills,
     skills,
     skillCategories: [state.externalAgentForm.category],
     endpointUrl: state.externalAgentForm.endpointUrl.trim(),
+    webhookUrl: state.externalAgentForm.webhookUrl.trim() || null,
+    adapterType: state.externalAgentForm.adapterType || "erc8183_adapter",
+    outputSchema: state.externalAgentForm.outputSchema.trim() || "External endpoint-managed output schema",
+    payoutWallet: state.externalAgentForm.payoutWallet.trim() || state.wallet,
+    erc8183Compatible: true,
     expectedLatencyMsRange: {
       minMs: Number(state.externalAgentForm.minLatencyMs || 0),
       maxMs: Number(state.externalAgentForm.maxLatencyMs || 0),
@@ -824,13 +975,21 @@ async function createTask() {
     };
       payload = taskPayloadFromForm();
       requireWallet();
+      const walletSnapshot = await refreshWalletNetworkState();
+      if (!walletSnapshot?.isArcTestnet) {
+        throw new Error("Switch to Arc Testnet to fund tasks with testnet USDC.");
+      }
+      const walletUsdcBalance = walletSnapshot.usdcBalance == null ? null : Number(walletSnapshot.usdcBalance);
+      if (walletUsdcBalance != null && walletUsdcBalance < Number(payload.rewardAmount || 0)) {
+        throw new Error(`Your ERC-20 testnet USDC balance is too low for this task reward. Required: ${payload.rewardAmount} USDC.`);
+      }
       if (payload.title.length < 3) throw new Error("Add a clearer task title.");
       if (payload.description.length < 20) throw new Error("Add a fuller task description so the agent can execute confidently.");
       if (!Number.isFinite(payload.rewardAmount) || payload.rewardAmount <= 0) throw new Error("Set a reward before posting the task.");
       if (!payload.deadline) throw new Error("Set a valid deadline before posting the task.");
       if (payload.hiringMode === "direct_hire" && !payload.selectedAgentId) throw new Error("Select an agent for direct hire.");
 
-    updateStatus("Draft created", "Creating the offchain task record before the Arc write.", "neutral");
+    updateStatus("Draft created", "Creating the offchain task record before the Arc wallet write.", "neutral");
     const draft = await sendJson("/api/task-market/tasks/draft", "POST", payload, validateTaskDraftCreateResponse);
     taskId = draft.task.taskId;
     const metadataHash = `task_meta_${taskId}`;
@@ -849,10 +1008,10 @@ async function createTask() {
     state.taskForm.selectedAgentId = "";
     state.taskForm.maxParticipants = 3;
 
-    updateStatus("Task created", "Opening the new task page while wallet confirmations continue.", "success");
+    updateStatus("Funded task created", "Opening the new task page while Arc wallet confirmations continue.", "success");
     navigate(`/tasks/${taskId}`);
 
-    updateStatus("Wallet ready", "Sending create_task and fund_task through the Arc client adapter.", "neutral");
+    updateStatus("Wallet ready", "Sending create_task and fund_task through the Arc adapter for funded task creation.", "neutral");
     writeResult = await chainClient.createTaskLifecycle({
       taskId,
       rewardAmount: payload.rewardAmount,
@@ -950,10 +1109,10 @@ async function renderPostTaskPage() {
   }
 
   setChrome(
-    "Post Task",
-    "Post Task",
-    "One clean form from task idea to funded work.",
-    "The form should feel simple, buyer-friendly, and trustworthy instead of technical or protocol-heavy.",
+    "Post Funded Task",
+    "Post Funded Task",
+    "One clean form from task idea to funded work on Arc Testnet.",
+    "The form should feel simple, buyer-friendly, and trustworthy while making USDC funding and review expectations obvious.",
     76,
   );
 
@@ -962,25 +1121,40 @@ async function renderPostTaskPage() {
   const selectedAgentIdeas = selectedAgent ? starterIdeasForAgent(selectedAgent) : [];
   const taskChecklist = buildPostTaskChecklist(state.taskForm, selectedAgent);
   const walletReady = Boolean(state.wallet.trim());
+  if (walletReady) {
+    await refreshWalletNetworkState();
+  }
   const chainMode = state.chainConfig?.chainMode || "unknown";
   const chainStatus = state.chainStatus;
   const chainWritable = chainMode !== "read_only" && chainMode !== "unknown";
-  if (walletReady && chainMode === "browser_wallet") {
+  const walletOnArc = !walletReady || state.walletNetwork?.isArcTestnet;
+  if (walletReady && walletOnArc && chainMode === "browser_wallet") {
     void chainClient.primeBrowserLifecycle().catch(() => {});
   }
-  const fundingBlocked = !chainWritable;
+  const rewardAmountForBalance = Number(state.taskForm.rewardAmount || 0);
+  const usdcBalanceNumber = state.walletNetwork?.usdcBalance == null ? null : Number(state.walletNetwork.usdcBalance);
+  const balanceTooLow = walletReady && walletOnArc && rewardAmountForBalance > 0 && usdcBalanceNumber != null && usdcBalanceNumber < rewardAmountForBalance;
+  const fundingBlocked = !walletReady || !chainWritable || !walletOnArc || balanceTooLow;
   const primaryActionLabel = !walletReady
     ? "Connect Wallet to Fund"
+    : !walletOnArc
+      ? "Switch to Arc Testnet"
+    : balanceTooLow
+      ? "Insufficient Testnet USDC"
     : state.taskForm.hiringMode === "direct_hire"
-      ? "Create, Fund, and Assign"
+      ? "Create, Fund, and Assign Task"
       : "Create and Fund Task";
   const fundingHint = !walletReady
     ? "Connect a wallet before funding a task."
+    : !walletOnArc
+      ? "Switch to Arc Testnet to fund tasks with testnet USDC."
+    : balanceTooLow
+      ? `Your ERC-20 testnet USDC balance is lower than the ${state.taskForm.rewardAmount} USDC reward.`
     : !chainWritable
       ? "Arc writes are disabled in this environment. Switch to a writable chain mode to fund tasks."
       : state.taskForm.hiringMode === "direct_hire"
-        ? "Direct hire usually takes 3 wallet confirmations on Arc: create, fund, and assign. The first task may ask for one extra one-time USDC approval."
-        : "Open market usually takes 2 wallet confirmations on Arc: create and fund. The first task may ask for one extra one-time USDC approval.";
+        ? "Direct hire usually takes 3 wallet confirmations on Arc: create, fund, and assign."
+        : "Open market usually takes 2 wallet confirmations on Arc: create and fund.";
   const chainBanner = !walletReady
     ? {
         title: "Wallet required",
@@ -1012,24 +1186,24 @@ async function renderPostTaskPage() {
   el.appRoot.innerHTML = `
     <section data-structure="task-composer">
       <header>
-        <p class="mini-label">Execution Input</p>
-        <h1>What do you want an AI to do?</h1>
-        <p>Describe the work, route it to the right execution path, and fund only when the task is ready to move.</p>
+        <p class="mini-label">Funded Execution Input</p>
+        <h1>Post funded AI work on Arc Testnet.</h1>
+        <p>Describe the work, route it to the right execution path, and fund only when the task is ready for evaluator-backed review and testnet USDC settlement.</p>
       </header>
       <section class="composer-grid">
         <div class="composer-main">
           <article class="composer-intro reveal-on-scroll">
             <div class="composer-title-row">
               <div>
-                <p class="mini-label">Command</p>
-                <h2>Turn a task into funded execution.</h2>
+                <p class="mini-label">Funded command</p>
+                <h2>Turn a request into funded work with a clear payout path.</h2>
               </div>
               <div class="composer-badges">
                 <span class="meta-pill">${escapeHtml(state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market")}</span>
                 <span class="meta-pill">${walletReady ? "Wallet connected" : "Connect wallet to fund"}</span>
               </div>
             </div>
-            <p class="muted">Write the task once, route it cleanly, and keep the funding path obvious. This surface is optimized for execution, not exploration.</p>
+            <p class="muted">Write the task once, route it cleanly, and keep the funding, review, and settlement path obvious. This surface is optimized for execution, not exploration.</p>
           </article>
           ${chainBanner ? `
             <article class="status-banner ${chainBanner.tone} reveal-on-scroll">
@@ -1037,11 +1211,18 @@ async function renderPostTaskPage() {
               <p>${escapeHtml(chainBanner.body)}</p>
             </article>
           ` : ""}
+          <article class="status-banner info reveal-on-scroll">
+            <strong>3-minute Arc Testnet demo</strong>
+            <p>Start a polished Thread Writer demo task with 10 USDC demo funding, evaluator approval, settlement release, reputation update, and external-agent context.</p>
+            <div class="secondary-actions" style="margin-top:12px;">
+              <button type="button" data-start-demo-flow>Start Demo Flow</button>
+            </div>
+          </article>
           <article class="shell-section reveal-on-scroll">
               <div class="section-head">
               <div>
                 <p class="mini-label">Composer</p>
-                <h2>Task brief</h2>
+                <h2>Funded task brief</h2>
               </div>
                 <div class="meta-inline">
                 <span class="meta-pill">${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
@@ -1137,7 +1318,7 @@ async function renderPostTaskPage() {
           <article class="shell-panel info-panel reveal-on-scroll">
             <p class="mini-label">Assignment</p>
             <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Open execution path"}</h3>
-            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the task."}</p>
+            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the funded task through the same verified work loop."}</p>
             ${selectedAgent ? `
               <div class="tag-cloud">
                 ${selectedAgentBestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}
@@ -1155,7 +1336,15 @@ async function renderPostTaskPage() {
           <article class="shell-panel info-panel reveal-on-scroll">
             <p class="mini-label">Funding state</p>
             <h3>${escapeHtml(primaryActionLabel)}</h3>
-            <p class="muted">${escapeHtml(fundingHint)}</p>
+            <p class="muted">${escapeHtml(fundingHint)} Wallet mode uses Arc Testnet ERC-20 USDC for task funding; demo settlement stays separate unless the chain confirms the funded task and later payout action.</p>
+            ${walletReady ? `
+              <div class="agent-tags" style="margin-top:12px;">
+                <span class="tag">Network: ${escapeHtml(state.walletNetwork?.isArcTestnet ? "Arc Testnet" : state.walletNetwork?.chainId ? `Wrong network ${state.walletNetwork.chainId}` : "Unknown")}</span>
+                <span class="tag">Testnet USDC balance: ${escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>
+                ${state.walletNetwork?.nativeGasBalance == null ? "" : `<span class="tag">Native USDC gas: ${escapeHtml(Number(state.walletNetwork.nativeGasBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>`}
+              </div>
+              ${!walletOnArc ? `<div class="secondary-actions" style="margin-top:12px;"><button type="button" id="switchArcFromPost">Switch to Arc Testnet</button></div>` : ""}
+            ` : ""}
             ${state.chainTransaction?.state && state.chainTransaction.state !== "idle" ? `
               <div class="status-banner ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
                 <strong>${escapeHtml(labelize(state.chainTransaction.state))}</strong>
@@ -1211,6 +1400,18 @@ async function renderPostTaskPage() {
       state.taskForm.description = idea;
       renderPostTaskPage();
     });
+  });
+
+  document.getElementById("switchArcFromPost")?.addEventListener("click", async () => {
+    try {
+      updateStatus("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
+      const snapshot = await chainClient.switchWalletToArcTestnet();
+      state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+      updateStatus("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+      renderPostTaskPage();
+    } catch (error) {
+      updateStatus("Network switch failed", statusMessage(error, "Could not switch to Arc Testnet."), "warn");
+    }
   });
 
   document.getElementById("addAttachment")?.addEventListener("click", () => {
@@ -1287,7 +1488,43 @@ async function renderPostTaskPage() {
   [document.getElementById("fundTaskButton"), document.getElementById("fundTaskMobile")]
     .filter(Boolean)
     .forEach((node) => node.addEventListener("click", createTask));
+  document.querySelector("[data-start-demo-flow]")?.addEventListener("click", (event) => {
+    startDemoFlow(event.currentTarget);
+  });
   revealSections(el.appRoot);
+}
+
+async function startDemoFlow(trigger) {
+  try {
+    setButtonLoading(trigger, true, "Starting");
+    const payload = {
+      creatorWallet: state.wallet?.trim() || "demo_buyer_wallet",
+    };
+    const response = await sendJson("/api/demo/thread-writer/start", "POST", payload);
+    await loadMarketData();
+    updateStatus("Demo task funded", response.message || "Thread Writer demo task is ready.", "success");
+    navigate(`/tasks/${response.task.taskId}`);
+  } catch (error) {
+    updateStatus("Demo flow unavailable", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
+
+async function advanceDemoFlow(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Advancing");
+    const response = await sendJson(`/api/demo/thread-writer/${taskId}/next`, "POST", {
+      actorWallet: state.wallet?.trim() || "demo_buyer_wallet",
+    });
+    await loadMarketData();
+    updateStatus("Demo advanced", response.message || "Demo task moved to the next lifecycle step.", "success");
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus("Demo step failed", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
 }
 
 async function runTaskAction(taskId, action, trigger) {
@@ -1406,8 +1643,8 @@ async function renderTaskDetail(taskId) {
   setChrome(
     "Task Detail",
     "Task Detail",
-    "Execution, evaluation, and settlement in one page.",
-    "Status, deadline, participating agents, result state, review controls, and payout history stay legible in one view.",
+    "Funded execution, evaluator review, and settlement in one page.",
+    "Funding state, participating agents, verified result state, review controls, and Arc payout history stay legible in one view.",
     82,
   );
 
@@ -1432,7 +1669,7 @@ async function renderTaskDetail(taskId) {
         <p>${escapeHtml(error.message)}</p>
         <div class="empty-state-actions">
           <button class="hero-primary" data-route="/">Go Home</button>
-          <button data-route="/post-task">Post Task</button>
+          <button data-route="/post-task">Post Funded Task</button>
         </div>
       </div>
     `;
@@ -1503,6 +1740,9 @@ function bindTaskDetailActions(task) {
   });
   document.querySelectorAll("[data-check-funding]").forEach((node) => {
     node.addEventListener("click", () => checkFundingStatus(task.taskId, node));
+  });
+  document.querySelectorAll("[data-demo-next]").forEach((node) => {
+    node.addEventListener("click", () => advanceDemoFlow(node.dataset.demoNext || task.taskId, node));
   });
 }
 
@@ -1623,7 +1863,7 @@ function renderCreateAgent() {
     "Create Agent",
     "Create Agent",
     "Shape a capable marketplace worker without drowning in setup.",
-    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel polished and encouraging.",
+    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel ready for funded work and verified outcomes.",
     Math.round((state.wizardStep / 7) * 100),
   );
   renderCreateAgentWizardPage({ el, state });
@@ -1763,8 +2003,8 @@ function renderConnectExternalAgent() {
   setChrome(
     "Connect External Agent",
     "Connect External Agent",
-    "Bring an endpoint-backed worker into the marketplace cleanly.",
-    "Verify ownership, register the endpoint, and let the marketplace run safety and compatibility checks before listing it.",
+    "Bring an endpoint-backed worker into the funded marketplace cleanly.",
+    "Verify ownership, register the endpoint, and let Dispatch run compatibility checks for structured funded work, including adapter-based interoperability.",
     84,
   );
   renderConnectExternalAgentPage({ el, state });
@@ -1775,6 +2015,11 @@ function renderConnectExternalAgent() {
     ["externalAgentCategory", "category"],
     ["externalAgentDescription", "description"],
     ["externalAgentEndpoint", "endpointUrl"],
+    ["externalAgentWebhook", "webhookUrl"],
+    ["externalAgentDeveloper", "developerName"],
+    ["externalAgentAdapterType", "adapterType"],
+    ["externalAgentOutputSchema", "outputSchema"],
+    ["externalAgentPayoutWallet", "payoutWallet"],
     ["externalAgentSkills", "skills"],
     ["externalAgentPricingHint", "pricingHint"],
     ["externalAgentMinLatency", "minLatencyMs"],
@@ -2087,6 +2332,7 @@ async function render() {
   if (path === "/agents") return renderAgentsPage();
   if (path.startsWith("/agents/")) return renderAgentProfile(path.split("/")[2]);
   if (path === "/post-task") return renderPostTaskPage();
+  if (path === "/arc-demo") return renderArcDemo();
   if (path.startsWith("/tasks/")) return renderTaskDetail(path.split("/")[2]);
   if (path === "/create-agent") return renderCreateAgent();
   if (path === "/connect-agent") return renderConnectExternalAgent();

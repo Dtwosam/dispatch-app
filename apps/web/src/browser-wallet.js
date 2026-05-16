@@ -47,7 +47,15 @@ export async function connectInjectedWallet() {
   if (!provider?.request) {
     throw new Error("Rabby or another injected wallet was not detected in this browser.");
   }
-  const accounts = await provider.request({ method: "eth_requestAccounts" });
+  let accounts;
+  try {
+    accounts = await provider.request({ method: "eth_requestAccounts" });
+  } catch (error) {
+    if (error?.code === 4001) {
+      throw new Error("Wallet connection was rejected. Approve the connection request to fund tasks with testnet USDC.");
+    }
+    throw error;
+  }
   if (!Array.isArray(accounts) || !accounts[0]) {
     throw new Error("No browser wallet account was returned.");
   }

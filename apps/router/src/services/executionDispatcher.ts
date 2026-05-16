@@ -103,6 +103,14 @@ export class ExecutionDispatcher {
         evaluationPreference: task.evaluationPreference,
         structuredNotes: task.structuredNotes,
         rewardAmount: task.rewardAmount,
+        rewardCurrency: "USDC",
+        network: {
+          name: "Arc Testnet",
+          chainId: 5042002,
+        },
+        fundingStatus: task.transactionState,
+        settlementStatus: task.settlementState,
+        settlementReadinessLabel: task.settlementSummary?.settlementReadinessLabel ?? null,
       },
       attachments: task.attachments.map((item) => ({
         name: item.title,

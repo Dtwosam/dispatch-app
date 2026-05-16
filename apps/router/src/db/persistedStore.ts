@@ -1,10 +1,16 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { InMemoryRegistryStore } from "./store";
+import { createPostgresBackedRegistryStore, resolveDatabaseUrl } from "./postgresStore";
 
 const DEFAULT_STORE_PATH = path.resolve(process.cwd(), "apps/router/.data/router-store.json");
 
 export async function createPersistedRegistryStore(filePath = process.env.ROUTER_STORE_PATH || DEFAULT_STORE_PATH) {
+  const databaseUrl = resolveDatabaseUrl();
+  if (databaseUrl) {
+    return createPostgresBackedRegistryStore(databaseUrl);
+  }
+
   const store = new InMemoryRegistryStore();
   try {
     const raw = await readFile(filePath, "utf8");

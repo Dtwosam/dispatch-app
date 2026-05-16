@@ -1,3 +1,4 @@
+// Arc-focused marketplace UI helpers.
 export function applyTheme(el, theme) {
   el.body.classList.toggle("theme-light", theme === "light");
 }
@@ -78,7 +79,7 @@ export function setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progres
     <div class="brand-mark">D</div>
     <div class="brand-copy">
       <strong>Dispatch</strong>
-      <p>Hire AI agents that actually deliver.</p>
+      <p>Verified AI work, settled in USDC.</p>
     </div>
   `;
 }
@@ -159,8 +160,10 @@ export function renderWalletSheet({
   onClose,
   onConnectInjected,
   onDisconnect,
+  onSwitchNetwork,
 }) {
   const providerLabel = walletProviderLabel || "Rabby";
+  const walletNetwork = state.walletNetwork || {};
   const chainMode = state.chainStatusError
     ? "Chain status unavailable"
     : !state.chainConfig
@@ -171,6 +174,12 @@ export function renderWalletSheet({
         ? "Server signer"
         : "Read only";
   el.walletSheet.classList.toggle("open", true);
+  const networkLabel = walletNetwork.chainId
+    ? (walletNetwork.isArcTestnet ? "Arc Testnet" : `Wrong network (${walletNetwork.chainId})`)
+    : "Network not checked";
+  const balanceLabel = walletNetwork.usdcBalance == null
+    ? "Connect on Arc Testnet to read balance"
+    : `${Number(walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} testnet USDC`;
   el.walletSheet.innerHTML = `
     <div class="wallet-sheet-backdrop" data-wallet="close"></div>
     <div class="wallet-sheet-panel">
@@ -178,12 +187,13 @@ export function renderWalletSheet({
       <div class="wallet-sheet-hero">
         <div>
           <p class="mini-label">Wallet</p>
-          <h3>Connect and fund work in Dispatch</h3>
-          <p class="muted">Move from browsing to funded execution with a clear signing path, network confirmation, and wallet-owned final approval.</p>
+          <h3>Connect and fund verified work in Dispatch</h3>
+          <p class="muted">Move from browsing to funded execution with an Arc Testnet wallet path, evaluator-backed review, and wallet-owned payout approval.</p>
         </div>
         <div class="wallet-sheet-badges">
           <span class="meta-pill">${escapeHtml(providerLabel)}</span>
           <span class="meta-pill">${escapeHtml(chainMode)}</span>
+          <span class="meta-pill">${escapeHtml(networkLabel)}</span>
         </div>
       </div>
       <div class="wallet-flow-grid">
@@ -195,24 +205,30 @@ export function renderWalletSheet({
         <article class="wallet-flow-card">
           <span class="wallet-flow-step">2</span>
           <strong>Switch network</strong>
-          <p>Confirm Arc Testnet so funding, escrow, and receipt tracking stay aligned.</p>
+          <p>Confirm Arc Testnet so funding, settlement, and receipt tracking stay aligned.</p>
         </article>
         <article class="wallet-flow-card">
           <span class="wallet-flow-step">3</span>
-          <strong>Sign task execution</strong>
-          <p>Approve only the exact action you want to fund or settle. The wallet stays in control.</p>
+          <strong>Sign funding and settlement</strong>
+          <p>Approve only the exact Arc Testnet action you want to fund or settle. The wallet stays in control.</p>
         </article>
       </div>
       <article class="wallet-session-card">
         <div>
           <p class="mini-label">Current session</p>
           <h3>${state.wallet.trim() ? escapeHtml(shortWallet(state.wallet)) : "No wallet connected"}</h3>
-          <p class="muted">${state.wallet.trim() ? `Connected from ${escapeHtml(providerLabel)} and ready for marketplace signing.` : "Connect once and keep the session ready for task funding, review, and settlement."}</p>
+          <p class="muted">${state.wallet.trim() ? `Connected from ${escapeHtml(providerLabel)}. ${escapeHtml(walletNetwork.message || "Switch to Arc Testnet to fund with testnet USDC.")}` : "Connect once and keep the session ready for task funding, review, and Arc Testnet settlement."}</p>
+          <div class="agent-tags" style="margin-top:12px;">
+            <span class="tag">Network: ${escapeHtml(networkLabel)}</span>
+            <span class="tag">ERC-20 balance: ${escapeHtml(balanceLabel)}</span>
+            ${walletNetwork.nativeGasBalance == null ? "" : `<span class="tag">Native USDC gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>`}
+          </div>
         </div>
         <div class="wallet-session-actions">
           <button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>
             ${walletAvailable ? `${state.wallet.trim() ? "Reconnect" : "Connect"} ${escapeHtml(providerLabel)}` : "No injected wallet detected"}
           </button>
+          ${state.wallet.trim() && !walletNetwork.isArcTestnet ? `<button type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : ""}
           ${state.wallet.trim() ? `<button type="button" id="disconnectWallet">Disconnect</button>` : ""}
           <button type="button" data-wallet="close">Close</button>
         </div>
@@ -224,7 +240,7 @@ export function renderWalletSheet({
           : "Connect once and the marketplace will keep this workspace ready for live task execution."}</p>
       </div>
       <div class="wallet-sheet-footer">
-        <small>Dispatch handles execution flow, but the final signature and payment decision stay in your wallet.</small>
+        <small>Dispatch handles execution flow, but each Arc Testnet signature and testnet USDC payment decision stays in your wallet. Testnet USDC has no financial value.</small>
       </div>
     </div>
   `;
@@ -235,6 +251,10 @@ export function renderWalletSheet({
 
   document.getElementById("disconnectWallet")?.addEventListener("click", () => {
     onDisconnect?.();
+  });
+
+  document.getElementById("switchArcNetwork")?.addEventListener("click", () => {
+    onSwitchNetwork?.();
   });
 
   document.querySelectorAll("[data-wallet='close']").forEach((node) => {

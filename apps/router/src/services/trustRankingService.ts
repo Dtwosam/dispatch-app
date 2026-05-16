@@ -108,8 +108,11 @@ export class TrustRankingService {
         task.selectedAgents.some((agent) => agent.agentId === agentId),
     );
     const terminalTasks = linkedTasks.filter((task) => ["SETTLED", "REFUNDED"].includes(task.status));
+    const paidTasks = linkedTasks.filter((task) => task.status === "SETTLED" || task.settlementState === "settled");
+    const pendingApprovedTasks = linkedTasks.filter((task) => task.status === "APPROVED" && task.settlementState === "pending_settlement");
     const approvedTasks = linkedTasks.filter((task) => task.status === "SETTLED" || task.status === "APPROVED");
     const rejectedTasks = linkedTasks.filter((task) => task.status === "REJECTED" || task.status === "REFUNDED");
+    const refundedTasks = linkedTasks.filter((task) => task.status === "REFUNDED" || task.settlementState === "refunded");
     const disputedTasks = linkedTasks.filter((task) => task.disputeRecord);
     const scoredTasks = linkedTasks
       .map((task) => task.latestEvaluation?.overallScore ?? (task.userReview?.starRating ? task.userReview.starRating * 20 : null))
@@ -120,12 +123,13 @@ export class TrustRankingService {
       .map((run) => new Date(run.completedAt as string).getTime() - new Date(run.startedAt as string).getTime())
       .filter((value) => Number.isFinite(value) && value >= 0);
 
-    const totalEarnings = (this.store.settlements.size
+    const paidEarnings = (this.store.settlements.size
       ? [...this.store.settlements.entries()]
           .filter(([taskId]) => this.belongsToAgent(taskId, agentId))
           .flatMap(([, receipts]) => receipts)
           .reduce((sum, receipt) => sum + receipt.agentPayout, 0)
       : 0);
+    const pendingEarnings = pendingApprovedTasks.reduce((sum, task) => sum + task.rewardAmount, 0);
 
     const approvalRate =
       approvedTasks.length + rejectedTasks.length === 0
@@ -164,16 +168,20 @@ export class TrustRankingService {
       agentId,
       tasksAttempted: linkedTasks.length,
       tasksCompleted: approvedTasks.length,
+      paidTasksCompleted: paidTasks.length,
       approvals: approvedTasks.length,
       totalReviews,
       rejectionCount: rejectedTasks.length,
+      refundedTasks: refundedTasks.length,
       disputeCount: disputedTasks.length,
       successRate: round(successRate, 4),
       approvalRate: round(approvalRate, 4),
       averageScore: round(averageScore, 2),
       averageResponseTimeMs: averageLatencyMs,
       averageLatencyMs,
-      totalEarnings: round(totalEarnings, 2),
+      totalEarnings: round(paidEarnings, 2),
+      paidEarnings: round(paidEarnings, 2),
+      pendingEarnings: round(pendingEarnings, 2),
       reliabilityScore: round(reliabilityScore, 2),
       rankScore: 0,
       rankPosition: null,
@@ -383,12 +391,14 @@ export class TrustRankingService {
   }
 
   private applyRankings(rows: AgentPerformanceRow[]) {
-    const maxCompleted = Math.max(1, ...rows.map((row) => row.tasksCompleted));
-    const maxEarnings = Math.max(1, ...rows.map((row) => row.totalEarnings));
+    const maxCompleted = Math.max(1, ...rows.map((row) => row.paidTasksCompleted || row.tasksCompleted));
+    const maxEarnings = Math.max(1, ...rows.map((row) => row.paidEarnings || row.totalEarnings));
 
     rows.forEach((row) => {
-      const completionScore = row.tasksCompleted / maxCompleted;
-      const earningsScore = row.totalEarnings / maxEarnings;
+      const paidCompleted = row.paidTasksCompleted || row.tasksCompleted;
+      const paidEarnings = row.paidEarnings || row.totalEarnings;
+      const completionScore = paidCompleted / maxCompleted;
+      const earningsScore = paidEarnings / maxEarnings;
       const speedScore = row.averageResponseTimeMs === 0
         ? 0.55
         : clamp(1 - row.averageResponseTimeMs / 90000, 0.2, 1);

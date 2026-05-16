@@ -16,6 +16,7 @@ import type {
   TaskSummaryView,
   TaskTimelineEvent,
   Erc8183Job,
+  TaskSettlementSummary,
 } from "@marketplace/shared";
 import {
   assertTaskStatusRecovery,
@@ -71,6 +72,7 @@ type OnchainAwareTaskDetail = TaskDetailView & {
 
 export class TaskMarketService {
   private readonly erc8183: Erc8183AdapterService;
+  private readonly demoFundingFallbackEnabled = process.env.DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK === "true";
   private executionEngine: {
     dispatchTask(taskId: string, agentId: string): Promise<unknown>;
     requestImproveAgain?(taskId: string, agentId: string, refinementContext: PlatformRefinementContext): Promise<unknown>;
@@ -108,32 +110,40 @@ export class TaskMarketService {
     this.store.tasks.set(taskId, detail);
 
     const rollbackToken = makeId("rollback");
-    setTimeout(() => {
-      const current = this.store.tasks.get(taskId);
-      if (!current || current.transactionState !== "pending_chain") return;
-      current.transactionState = "accepted";
-      this.transitionTask(current, "ESCROW_FUNDED");
-      current.status = "ESCROW_FUNDED";
-      this.transitionTask(current, "OPEN");
-      current.status = "OPEN";
-      if (input.hiringMode === "direct_hire") {
-        this.transitionTask(current, "ASSIGNED");
-        current.status = "ASSIGNED";
-      }
-      current.onchainTaskRef = `onchain:${taskId}`;
-      current.updatedAt = new Date().toISOString();
-      current.timeline.push(
-        this.timeline("escrow_funded", "Escrow funded", "Reward funding is now anchored and the task is live."),
-      );
-      if (input.hiringMode === "direct_hire" && input.selectedAgentId) {
+    if (this.demoFundingFallbackEnabled) {
+      // Demo fallback keeps local/manual environments usable without pretending browser-signed funding
+      // was actually confirmed onchain. Production/testnet flows should confirm via receipts instead.
+      setTimeout(() => {
+        const current = this.store.tasks.get(taskId);
+        if (!current || current.transactionState !== "pending_chain") return;
+        current.transactionState = "accepted";
+        this.transitionTask(current, "ESCROW_FUNDED");
+        current.status = "ESCROW_FUNDED";
+        this.transitionTask(current, "OPEN");
+        current.status = "OPEN";
+        if (input.hiringMode === "direct_hire") {
+          this.transitionTask(current, "ASSIGNED");
+          current.status = "ASSIGNED";
+        }
+        current.onchainTaskRef = `demo:${taskId}`;
+        current.updatedAt = new Date().toISOString();
         current.timeline.push(
-          this.timeline("agent_invited", "Agent invited", "The selected agent has been invited and assigned."),
+          this.timeline("escrow_funded", "Demo funding fallback enabled", "Demo/testnet fallback advanced this task without a confirmed Arc funding receipt."),
         );
-      }
-      current.reviewActions = ["cancel"];
-      this.store.tasks.set(taskId, current);
-      void this.maybeAutoDispatchPlatformAgent(taskId);
-    }, 1200);
+        if (input.hiringMode === "direct_hire" && input.selectedAgentId) {
+          current.timeline.push(
+            this.timeline("agent_invited", "Demo assignment fallback enabled", "Demo/testnet fallback assigned the selected agent before a confirmed onchain receipt."),
+          );
+        }
+        current.reviewActions = ["cancel"];
+        current.erc8183Job = this.erc8183.syncWithTask(current, {
+          providerAgentId: current.selectedAgentId,
+          evaluator: current.creatorWallet,
+        });
+        this.store.tasks.set(taskId, current);
+        void this.maybeAutoDispatchPlatformAgent(taskId);
+      }, 1200);
+    }
 
     return taskCreateResponseSchema.parse({
       task: detail,
@@ -271,24 +281,27 @@ export class TaskMarketService {
       .filter((agent) => agent.profile.ownerWallet === viewerWallet)
       .map((agent) => agent.profile.agentId);
 
-    const toSummary = (task: TaskDetailView): TaskSummaryView =>
-      taskSummaryViewSchema.parse({
-        taskId: task.taskId,
-        title: task.title,
-        category: task.category,
-        rewardAmount: task.rewardAmount,
-        deadline: task.deadline,
-        status: task.status,
-        resultStatus: task.resultStatus,
-        creatorWallet: task.creatorWallet,
-        selectedAgentId: task.selectedAgentId,
-        participatingAgentIds: task.participatingAgentIds,
-        maxParticipants: task.maxParticipants,
-        transactionState: task.transactionState,
-        onchainTaskRef: task.onchainTaskRef,
-        createdAt: task.createdAt,
-        updatedAt: task.updatedAt,
+    const toSummary = (task: TaskDetailView): TaskSummaryView => {
+      const current = this.hydrateDerivedTaskState(task);
+      return taskSummaryViewSchema.parse({
+        taskId: current.taskId,
+        title: current.title,
+        category: current.category,
+        rewardAmount: current.rewardAmount,
+        deadline: current.deadline,
+        status: current.status,
+        resultStatus: current.resultStatus,
+        creatorWallet: current.creatorWallet,
+        selectedAgentId: current.selectedAgentId,
+        participatingAgentIds: current.participatingAgentIds,
+        maxParticipants: current.maxParticipants,
+        transactionState: current.transactionState,
+        onchainTaskRef: current.onchainTaskRef,
+        settlementSummary: current.settlementSummary,
+        createdAt: current.createdAt,
+        updatedAt: current.updatedAt,
       });
+    };
 
     return taskListResponseSchema.parse({
       allOpenTasks: all.filter((task) => task.status === "OPEN").map(toSummary),
@@ -309,7 +322,7 @@ export class TaskMarketService {
     const task = this.store.tasks.get(taskId);
     if (!task) throw new Error(`Task ${taskId} not found`);
     task.erc8183Job = this.erc8183.syncWithTask(task);
-    return task;
+    return this.hydrateDerivedTaskState(task);
   }
 
   recoverTaskFromOnchain(taskId: string, onchainTask: unknown, onchainTaskRef: string | null) {
@@ -607,6 +620,9 @@ export class TaskMarketService {
     if (!["pending_wallet", "pending_chain"].includes(task.transactionState)) {
       return task;
     }
+    if (!this.demoFundingFallbackEnabled) {
+      return task;
+    }
 
     const createdAgeMs = Date.now() - new Date(task.createdAt).getTime();
     const hasFundingTrace = Boolean(task.latestFundTxHash);
@@ -623,8 +639,10 @@ export class TaskMarketService {
   }
 
   async acceptTask(taskId: string, actorWallet: string): Promise<TaskActionResponse> {
+    await this.refreshTaskFromChain(taskId);
     const task = this.getTask(taskId);
     this.assertNotPaused(taskId);
+    this.assertTaskFunded(task, "Task must be funded before assignment.");
     if (task.status !== "OPEN" && task.status !== "ASSIGNED") {
       throw new Error("Task cannot be accepted in its current state");
     }
@@ -674,6 +692,7 @@ export class TaskMarketService {
     this.assertNotPaused(taskId);
     await this.refreshTaskFromChain(taskId);
     const task = this.requireCreatorTask(taskId, actorWallet) as OnchainAwareTaskDetail;
+    this.assertTaskFunded(task, "Task must be funded before review approval.");
     if (!["SUBMITTED", "UNDER_REVIEW"].includes(task.status)) {
       throw new Error("Only submitted work can be approved");
     }
@@ -707,6 +726,7 @@ export class TaskMarketService {
     this.assertNotPaused(taskId);
     await this.refreshTaskFromChain(taskId);
     const task = this.requireCreatorTask(taskId, review.reviewerWallet);
+    this.assertTaskFunded(task, "Task must be funded before evaluator review.");
     if (!["SUBMITTED", "UNDER_REVIEW"].includes(task.status)) {
       throw new Error("User review requires a submitted result");
     }
@@ -725,6 +745,7 @@ export class TaskMarketService {
     this.assertNotPaused(taskId);
     await this.refreshTaskFromChain(taskId);
     const task = this.requireCreatorTask(taskId, actorWallet);
+    this.assertTaskFunded(task, "Task must be funded before evaluator review.");
     if (!["SUBMITTED", "UNDER_REVIEW"].includes(task.status)) {
       throw new Error("Assisted evaluation requires a submitted result");
     }
@@ -736,6 +757,7 @@ export class TaskMarketService {
     this.assertNotPaused(taskId);
     await this.refreshTaskFromChain(taskId);
     const task = this.requireCreatorTask(taskId, actorWallet);
+    this.assertTaskFunded(task, "Task must be funded before evaluator review.");
     if (!["SUBMITTED", "UNDER_REVIEW"].includes(task.status)) {
       throw new Error("Hybrid review requires a submitted result");
     }
@@ -786,6 +808,7 @@ export class TaskMarketService {
     this.assertNotPaused(taskId);
     await this.refreshTaskFromChain(taskId);
     const task = this.requireCreatorTask(taskId, actorWallet) as OnchainAwareTaskDetail;
+    this.assertTaskFunded(task, "Task must be funded before review rejection.");
     if (!["SUBMITTED", "UNDER_REVIEW"].includes(task.status)) {
       throw new Error("Only submitted work can be rejected");
     }
@@ -819,6 +842,7 @@ export class TaskMarketService {
     this.assertNotPaused(taskId);
     await this.refreshTaskFromChain(taskId);
     const task = this.requireCreatorTask(taskId, actorWallet);
+    this.assertTaskFunded(task, "Task must be funded before appeal.");
     if (!["DISPUTED", "REJECTED", "UNRESOLVED"].includes(task.status)) {
       throw new Error("Appeal is only available for disputed, rejected, or unresolved tasks");
     }
@@ -865,6 +889,7 @@ export class TaskMarketService {
     this.assertNotPaused(taskId);
     await this.refreshTaskFromChain(taskId);
     const task = this.requireCreatorTask(taskId, actorWallet);
+    this.assertTaskFunded(task, "Task must be funded before execution.");
     if (!["SUBMITTED", "UNDER_REVIEW", "REJECTED"].includes(task.status)) {
       throw new Error("Improve Again is only available after a platform agent has submitted work and before final settlement");
     }
@@ -931,6 +956,7 @@ export class TaskMarketService {
     this.assertNotPaused(taskId);
     await this.refreshTaskFromChain(taskId);
     const task = this.requireCreatorTask(taskId, actorWallet);
+    this.assertTaskFunded(task, "Only funded tasks awaiting execution can be cancelled");
     if (!["OPEN", "ASSIGNED"].includes(task.status)) {
       throw new Error("Only funded tasks awaiting execution can be cancelled");
     }
@@ -986,6 +1012,7 @@ export class TaskMarketService {
 
   async markExecutionStarted(taskId: string, agentId: string) {
     const task = this.getTask(taskId);
+    this.assertTaskFunded(task, "Task must be funded before execution.");
     if (task.status === "EXECUTING") return;
     if (!["OPEN", "ASSIGNED"].includes(task.status)) {
       throw new Error("Execution can only start from OPEN or ASSIGNED");
@@ -1017,6 +1044,7 @@ export class TaskMarketService {
     submissionNonce?: string | null,
   ) {
     const task = this.getTask(taskId) as OnchainAwareTaskDetail;
+    this.assertTaskFunded(task, "Task must be funded before execution.");
     if (["APPROVED", "DISPUTED", "SETTLED", "REFUNDED"].includes(task.status)) {
       return;
     }
@@ -1468,6 +1496,7 @@ export class TaskMarketService {
       latestSubmissionId: null,
       latestSubmissionTxHash: null,
       settlementState: "reward_funded",
+      settlementSummary: undefined,
       latestSettlement: null,
       disputeRecord: null,
       appealRecord: null,
@@ -1476,7 +1505,7 @@ export class TaskMarketService {
       providerAgentId: input.selectedAgentId ?? null,
       evaluator: input.creatorWallet,
     });
-    return detail;
+    return this.hydrateDerivedTaskState(detail);
   }
 
   private annotateLatestRun(taskId: string, patch: Record<string, unknown>) {
@@ -1598,6 +1627,7 @@ export class TaskMarketService {
     if (!this.executionEngine) return;
 
     const task = this.getTask(taskId);
+    if (!this.isTaskFunded(task)) return;
     if (task.hiringMode === "direct_hire") {
       if (task.status !== "ASSIGNED") return;
     } else if (!["OPEN", "ASSIGNED"].includes(task.status)) {
@@ -1660,6 +1690,76 @@ export class TaskMarketService {
       .sort((left, right) => right.performanceSummary.reliabilityScore - left.performanceSummary.reliabilityScore);
 
     return candidates[0]?.profile.agentId ?? null;
+  }
+
+  private hydrateDerivedTaskState(task: TaskDetailView) {
+    task.settlementSummary = this.deriveSettlementSummary(task);
+    return task;
+  }
+
+  private deriveSettlementSummary(task: TaskDetailView): TaskSettlementSummary {
+    const funded = this.isTaskFunded(task);
+    const openDispute = task.disputeRecord?.status === "open";
+    const terminal = task.status === "SETTLED" || task.status === "REFUNDED";
+    const canReleasePayment =
+      funded
+      && !terminal
+      && !openDispute
+      && task.status === "APPROVED"
+      && task.settlementState === "pending_settlement";
+    const canRefund =
+      funded
+      && !terminal
+      && !openDispute
+      && ["REJECTED", "CANCELLED"].includes(task.status)
+      && task.settlementState === "pending_settlement";
+    const settlementNextAction: TaskSettlementSummary["settlementNextAction"] =
+      canReleasePayment
+        ? "release_payment"
+        : canRefund
+          ? "refund_reward"
+          : openDispute || ["DISPUTED", "APPEALED", "UNRESOLVED"].includes(task.status) || ["disputed", "unresolved"].includes(task.settlementState)
+            ? "dispute_review"
+            : "none";
+    const settlementReadinessLabel =
+      openDispute || task.status === "DISPUTED" || task.settlementState === "disputed"
+        ? "Disputed. Settlement paused."
+        : !funded
+          ? "Settlement unavailable until funding and approval."
+          : task.status === "SETTLED" || task.settlementState === "settled"
+          ? "Payment released."
+          : task.status === "REFUNDED" || task.settlementState === "refunded"
+            ? "Reward refunded."
+            : canReleasePayment
+              ? "Approved. USDC release is ready."
+              : canRefund
+                ? "Rejected. Refund available."
+                : task.status === "APPROVED"
+                  ? "Settlement unavailable until funding and approval."
+                  : "Settlement unavailable until funding and approval.";
+
+    return {
+      settlementAvailable: canReleasePayment || canRefund,
+      settlementNextAction,
+      settlementReadinessLabel,
+      canReleasePayment,
+      canRefund,
+      isFunded: funded,
+    };
+  }
+
+  private isTaskFunded(task: TaskDetailView) {
+    if (task.transactionState !== "accepted") return false;
+    if (task.onchainTaskRef?.startsWith("demo:")) {
+      return this.demoFundingFallbackEnabled;
+    }
+    return Boolean(task.onchainTaskRef);
+  }
+
+  private assertTaskFunded(task: TaskDetailView, message: string) {
+    if (!this.isTaskFunded(task)) {
+      throw new Error(message);
+    }
   }
 
   private transitionTask(

@@ -74,9 +74,11 @@ export interface AgentPerformanceRow {
   agentId: string;
   tasksAttempted: number;
   tasksCompleted: number;
+  paidTasksCompleted: number;
   approvals: number;
   totalReviews: number;
   rejectionCount: number;
+  refundedTasks: number;
   disputeCount: number;
   successRate: number;
   approvalRate: number;
@@ -84,6 +86,8 @@ export interface AgentPerformanceRow {
   averageResponseTimeMs: number;
   averageLatencyMs: number;
   totalEarnings: number;
+  paidEarnings: number;
+  pendingEarnings: number;
   reliabilityScore: number;
   rankScore: number;
   rankPosition: number | null;

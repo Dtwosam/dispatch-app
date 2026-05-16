@@ -151,6 +151,56 @@ test("direct hire task syncs to assigned state and remains assigned until execut
   assert.ok(accepted.task.participatingAgentIds.includes("agent_fast"));
 });
 
+test("unfunded tasks cannot be accepted or executed", async () => {
+  const store = new InMemoryRegistryStore();
+  seedAgents(store);
+  const service = new TaskMarketService(store, createRegistryServiceStub(store) as never, evaluatorClient as never, new SafetyService(store));
+
+  const created = service.createTaskDraft({
+    title: "Funding gate task",
+    description: "Keep this task blocked until funding is confirmed.",
+    category: "research",
+    rewardAmount: 50,
+    deadline: new Date(Date.now() + 3600000).toISOString(),
+    hiringMode: "direct_hire",
+    selectedAgentId: "agent_fast",
+    attachments: [],
+    evaluationPreference: "hybrid_review",
+    structuredNotes: null,
+    creatorWallet: "0xbuyer",
+    maxParticipants: 1,
+  });
+
+  await assert.rejects(() => service.acceptTask(created.task.taskId, "0xagentA"), /funded before assignment/i);
+  await assert.rejects(() => service.markExecutionStarted(created.task.taskId, "agent_fast"), /funded before execution/i);
+});
+
+test("unfunded tasks cannot record submissions before funding confirmation", async () => {
+  const store = new InMemoryRegistryStore();
+  seedAgents(store);
+  const service = new TaskMarketService(store, createRegistryServiceStub(store) as never, evaluatorClient as never, new SafetyService(store));
+
+  const created = service.createTaskDraft({
+    title: "Submission gate task",
+    description: "Do not allow execution output until the reward is funded.",
+    category: "research",
+    rewardAmount: 50,
+    deadline: new Date(Date.now() + 3600000).toISOString(),
+    hiringMode: "direct_hire",
+    selectedAgentId: "agent_fast",
+    attachments: [],
+    evaluationPreference: "hybrid_review",
+    structuredNotes: null,
+    creatorWallet: "0xbuyer",
+    maxParticipants: 1,
+  });
+
+  await assert.rejects(
+    () => service.markSubmissionReceived(created.task.taskId, "agent_fast", "memory://result", "hash_blocked"),
+    /funded before execution/i,
+  );
+});
+
 test("submission and settlement keep ERC-8183 job state aligned without changing built-in task flow", async () => {
   const store = new InMemoryRegistryStore();
   seedAgents(store);
@@ -188,6 +238,13 @@ test("submission and settlement keep ERC-8183 job state aligned without changing
   await service.markSubmissionReceived(created.task.taskId, "agent_fast", "memory://result", "hash_interop", "Ready", "submission_erc8183");
   assert.equal(service.getTask(created.task.taskId).erc8183Job?.state, "submitted");
   assert.equal(service.getTask(created.task.taskId).erc8183Job?.lastSubmissionAt !== null, true);
+  await service.approveTask(created.task.taskId, "0xbuyer");
+  const approvedJob = service.getTask(created.task.taskId).erc8183Job;
+  assert.equal(approvedJob?.reward.tokenSymbol, "USDC");
+  assert.equal(approvedJob?.dispatchMetadata.network && typeof approvedJob.dispatchMetadata.network === "object", true);
+  assert.equal((approvedJob?.dispatchMetadata.reward as { funded?: boolean } | undefined)?.funded, true);
+  assert.equal(approvedJob?.dispatchMetadata.settlementStatus, "pending_settlement");
+  assert.equal(approvedJob?.outputRequirements && typeof approvedJob.outputRequirements === "object", true);
 
   service.markSettlement(created.task.taskId, {
     settlementId: "settlement_1",
@@ -202,6 +259,96 @@ test("submission and settlement keep ERC-8183 job state aligned without changing
   });
 
   assert.equal(service.getTask(created.task.taskId).erc8183Job?.state, "settled");
+});
+
+test("funded approved and disputed tasks expose settlement readiness summaries", async () => {
+  const store = new InMemoryRegistryStore();
+  seedAgents(store);
+  const service = new TaskMarketService(store, createRegistryServiceStub(store) as never, evaluatorClient as never, new SafetyService(store));
+
+  const approved = service.createTaskDraft({
+    title: "Funded approval rail",
+    description: "Make settlement the obvious next action after a funded approval.",
+    category: "research",
+    rewardAmount: 80,
+    deadline: new Date(Date.now() + 3600000).toISOString(),
+    hiringMode: "direct_hire",
+    selectedAgentId: "agent_fast",
+    attachments: [],
+    evaluationPreference: "user_review_only",
+    structuredNotes: null,
+    creatorWallet: "0xbuyer",
+    maxParticipants: 1,
+  });
+
+  service.syncTaskWithChain(approved.task.taskId, {
+    createTxHash: "tx_create_ready",
+    fundTxHash: "tx_fund_ready",
+    assignTxHash: "tx_assign_ready",
+    onchainTaskRef: "onchain:settlement_ready",
+    latestReceipt: {
+      hash: "tx_assign_ready",
+      status: "ACCEPTED",
+      finalized: false,
+      blockNumber: 321,
+      createdAt: new Date().toISOString(),
+    },
+  });
+  await service.markSubmissionReceived(approved.task.taskId, "agent_fast", "memory://ready", "hash_ready");
+  await service.approveTask(approved.task.taskId, "0xbuyer");
+
+  const approvedView = service.getTask(approved.task.taskId);
+  assert.equal(approvedView.settlementSummary?.settlementAvailable, true);
+  assert.equal(approvedView.settlementSummary?.settlementNextAction, "release_payment");
+  assert.equal(approvedView.settlementSummary?.settlementReadinessLabel, "Approved. USDC release is ready.");
+
+  const disputed = service.createTaskDraft({
+    title: "Disputed settlement rail",
+    description: "Keep payout paused when review confidence moves into a dispute path.",
+    category: "research",
+    rewardAmount: 90,
+    deadline: new Date(Date.now() + 3600000).toISOString(),
+    hiringMode: "direct_hire",
+    selectedAgentId: "agent_fast",
+    attachments: [],
+    evaluationPreference: "hybrid_review",
+    structuredNotes: null,
+    creatorWallet: "0xbuyer",
+    maxParticipants: 1,
+  });
+
+  service.syncTaskWithChain(disputed.task.taskId, {
+    createTxHash: "tx_create_disputed",
+    fundTxHash: "tx_fund_disputed",
+    assignTxHash: "tx_assign_disputed",
+    onchainTaskRef: "onchain:settlement_disputed",
+    latestReceipt: {
+      hash: "tx_assign_disputed",
+      status: "ACCEPTED",
+      finalized: false,
+      blockNumber: 322,
+      createdAt: new Date().toISOString(),
+    },
+  });
+  await service.markSubmissionReceived(disputed.task.taskId, "agent_fast", "memory://disputed", "hash_disputed");
+  disputed.task.status = "DISPUTED";
+  disputed.task.resultStatus = "disputed";
+  disputed.task.settlementState = "disputed";
+  disputed.task.disputeRecord = {
+    disputeId: "disp_1",
+    openedByWallet: "0xbuyer",
+    reason: "Need manual review",
+    status: "open",
+    openedAt: new Date().toISOString(),
+    resolvedAt: null,
+    resolution: null,
+  };
+  store.tasks.set(disputed.task.taskId, disputed.task);
+
+  const disputedView = service.getTask(disputed.task.taskId);
+  assert.equal(disputedView.settlementSummary?.settlementAvailable, false);
+  assert.equal(disputedView.settlementSummary?.settlementNextAction, "dispute_review");
+  assert.equal(disputedView.settlementSummary?.settlementReadinessLabel, "Disputed. Settlement paused.");
 });
 
 test("open market task enforces participant caps", async () => {
@@ -344,7 +491,7 @@ test("Improve Again reopens a built-in platform task and dispatches a controlled
     participatingAgentIds: ["agent_fast"],
     maxParticipants: 1,
     transactionState: "accepted",
-    onchainTaskRef: null,
+    onchainTaskRef: "onchain:task_improve_again",
     createdAt: now,
     updatedAt: now,
     attachments: [],

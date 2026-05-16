@@ -41,7 +41,10 @@ export class SettlementService {
       throw new Error("Consensus review has not reached a payout-safe final state yet");
     }
     if (task.status !== "APPROVED") {
-      throw new Error("Task must be approved before settlement");
+      throw new Error("Task must be approved before settlement release.");
+    }
+    if (!this.isFundedTask(task)) {
+      throw new Error("Settlement is not available for unfunded tasks.");
     }
 
     const grossReward = task.rewardAmount;
@@ -94,6 +97,9 @@ export class SettlementService {
     if (!["REJECTED", "CANCELLED"].includes(task.status)) {
       throw new Error("Task must be rejected or cancelled before refund");
     }
+    if (!this.isFundedTask(task)) {
+      throw new Error("Settlement is not available for unfunded tasks.");
+    }
 
     const chainReceipt = this.chainBridge ? await this.chainBridge.refundTask(taskId) : null;
     const receipt = {
@@ -138,6 +144,9 @@ export class SettlementService {
     }
     if (!["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task.status)) {
       throw new Error("Disputes can only be opened after a result exists or a review decision has been made");
+    }
+    if (!this.isFundedTask(task)) {
+      throw new Error("Settlement is not available for unfunded tasks.");
     }
     const chainReceipt = this.chainBridge ? await this.chainBridge.disputeTask(taskId) : null;
     const receipt = {
@@ -232,8 +241,10 @@ export class SettlementService {
     if (!agentId) return;
     const performance = this.store.ensurePerformance(agentId);
     performance.tasksCompleted += 1;
+    performance.paidTasksCompleted += 1;
     performance.approvals += 1;
     performance.totalEarnings = roundTokenAmount(performance.totalEarnings + agentPayout);
+    performance.paidEarnings = roundTokenAmount(performance.paidEarnings + agentPayout);
     performance.approvalRate =
       performance.tasksCompleted === 0 ? 0 : performance.approvals / performance.tasksCompleted;
     this.store.performance.set(agentId, performance);
@@ -245,6 +256,7 @@ export class SettlementService {
     if (!agentId) return;
     const performance = this.store.ensurePerformance(agentId);
     performance.tasksCompleted += 1;
+    performance.refundedTasks += 1;
     performance.rejectionCount += 1;
     performance.approvalRate =
       performance.tasksCompleted === 0 ? 0 : performance.approvals / performance.tasksCompleted;
@@ -298,6 +310,10 @@ export class SettlementService {
     if (history.some((receipt) => receipt.settlementState === "settled" || receipt.settlementState === "refunded")) {
       throw new Error(`Task ${taskId} already has a terminal settlement receipt`);
     }
+  }
+
+  private isFundedTask(task: { transactionState?: string; onchainTaskRef?: string | null }) {
+    return task.transactionState === "accepted" && Boolean(task.onchainTaskRef);
   }
 
   private log(event: string, payload: Record<string, unknown>) {

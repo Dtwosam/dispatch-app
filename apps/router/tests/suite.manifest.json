@@ -8,6 +8,7 @@
   { "file": "./tests/platformAgentTaskPacks.test.ts" },
   { "file": "./tests/settlementService.test.ts" },
   { "file": "./tests/storePersistence.test.ts" },
+  { "file": "./tests/startupValidation.test.ts" },
   { "file": "./tests/taskMarketService.test.ts" },
   { "file": "./tests/trustRankingService.test.ts" },
   { "file": "./tests/platformAgentRuntime.signalForge.test.ts" },

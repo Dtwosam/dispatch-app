@@ -24,16 +24,35 @@ import { bootstrapPlatformAgents, isDeprecatedBuiltInPlatformAgentId } from "./p
 type SkillAwareProfile = AgentRegistryRow["profile"] & {
   skills?: string[];
   skillCategories?: string[];
+  developerName?: string;
+  webhookUrl?: string | null;
+  adapterType?: "platform" | "http" | "webhook" | "erc8183_adapter";
+  outputSchema?: string | Record<string, unknown>;
+  payoutWallet?: string;
+  erc8183Compatible?: boolean;
+  connectionStatus?: "unknown" | "connected" | "degraded" | "offline";
 };
 
 type SkillAwareRegisterInput = RegisterAgentInput & {
   skills?: string[];
   skillCategories?: string[];
+  developerName?: string;
+  webhookUrl?: string | null;
+  adapterType?: "platform" | "http" | "webhook" | "erc8183_adapter";
+  outputSchema?: string | Record<string, unknown>;
+  payoutWallet?: string;
+  erc8183Compatible?: boolean;
 };
 
 type SkillAwareUpdateInput = UpdateAgentMetadataInput & {
   skills?: string[];
   skillCategories?: string[];
+  developerName?: string;
+  webhookUrl?: string | null;
+  adapterType?: "platform" | "http" | "webhook" | "erc8183_adapter";
+  outputSchema?: string | Record<string, unknown>;
+  payoutWallet?: string;
+  erc8183Compatible?: boolean;
 };
 
 export class AgentRegistryService {
@@ -58,11 +77,18 @@ export class AgentRegistryService {
       description: input.description,
       avatarUrl: input.avatarUrl,
       originType: input.originType,
+      developerName: skillAwareInput.developerName,
       category: input.category,
       capabilityTags: input.capabilityTags,
       skills: skillAwareInput.skills ?? [],
       skillCategories: skillAwareInput.skillCategories ?? [],
       endpointUrl: input.endpointUrl,
+      webhookUrl: skillAwareInput.webhookUrl ?? null,
+      adapterType: skillAwareInput.adapterType ?? (input.originType === "external" ? "erc8183_adapter" : "platform"),
+      outputSchema: skillAwareInput.outputSchema,
+      payoutWallet: skillAwareInput.payoutWallet ?? input.ownerWallet,
+      erc8183Compatible: skillAwareInput.erc8183Compatible ?? (input.originType === "external"),
+      connectionStatus: input.originType === "external" ? "unknown" : "connected",
       expectedLatencyMsRange: input.expectedLatencyMsRange,
       pricingHint: input.pricingHint,
       activeVersionHash: input.activeVersionHash,
@@ -104,10 +130,16 @@ export class AgentRegistryService {
       publicName: input.publicName ?? row.profile.publicName,
       description: input.description ?? row.profile.description,
       avatarUrl: input.avatarUrl ?? row.profile.avatarUrl,
+      developerName: skillAwareInput.developerName ?? currentProfile.developerName,
       category: input.category ?? row.profile.category,
       capabilityTags: input.capabilityTags ?? row.profile.capabilityTags,
       skills: skillAwareInput.skills ?? currentProfile.skills ?? [],
       skillCategories: skillAwareInput.skillCategories ?? currentProfile.skillCategories ?? [],
+      webhookUrl: skillAwareInput.webhookUrl ?? currentProfile.webhookUrl ?? null,
+      adapterType: skillAwareInput.adapterType ?? currentProfile.adapterType,
+      outputSchema: skillAwareInput.outputSchema ?? currentProfile.outputSchema,
+      payoutWallet: skillAwareInput.payoutWallet ?? currentProfile.payoutWallet,
+      erc8183Compatible: skillAwareInput.erc8183Compatible ?? currentProfile.erc8183Compatible,
       pricingHint: input.pricingHint ?? row.profile.pricingHint,
       expectedLatencyMsRange: input.expectedLatencyMsRange ?? row.profile.expectedLatencyMsRange,
       updatedAt: new Date().toISOString(),
@@ -190,6 +222,7 @@ export class AgentRegistryService {
 
     const result = await this.healthcheckRunner.run(row.profile.endpointUrl);
     row.healthStatus = result.ok ? "healthy" : "unhealthy";
+    (row.profile as SkillAwareProfile).connectionStatus = result.ok ? "connected" : "offline";
     this.store.upsertAgent(row);
 
     const healthRow: AgentHealthcheckRow = {
@@ -218,6 +251,12 @@ export class AgentRegistryService {
       runExecutionProbe,
     );
     row.compatibilityStatus = report.compatibilityStatus;
+    (row.profile as SkillAwareProfile).connectionStatus =
+      report.compatibilityStatus === "compatible"
+        ? "connected"
+        : report.compatibilityStatus === "warning"
+          ? "degraded"
+          : "offline";
     this.store.upsertAgent(row);
 
     const checkRow: AgentCompatibilityCheckRow = {

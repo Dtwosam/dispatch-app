@@ -50,7 +50,7 @@ async function main() {
       totalEarnings: 1420,
     },
   });
-  assert.equal(highlights.length, 4);
+  assert.equal(highlights.length, 5);
   assert.match(highlights[0], /94% approval/);
 
   const reviewModel = buildReviewPanelModel({
@@ -141,7 +141,7 @@ async function main() {
     onStatus: (state, message) => events.push(`${state}:${message}`),
   });
 
-  await client.createTaskLifecycle({
+  await assert.rejects(() => client.createTaskLifecycle({
     taskId: "task_1",
     rewardAmount: 100,
     deadlineIso: new Date().toISOString(),
@@ -149,11 +149,10 @@ async function main() {
     metadataUri: "offchain://task_1",
     metadataHash: "hash_1",
     selectedAgentId: null,
-  });
+  }), /GenLayer must be signed/);
 
   const receipt = await client.pollReceipt("tx_fund", { intervalMs: 0, maxAttempts: 3 });
   assert.equal(receipt.status, "ACCEPTED");
-  assert.ok(events.some((item) => item.includes("pending_wallet")));
   assert.ok(events.some((item) => item.includes("accepted")));
 
   global.fetch = originalFetch;

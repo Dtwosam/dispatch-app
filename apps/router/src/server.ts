@@ -5,6 +5,7 @@ import { createExecutionRoutes } from "./routes/executionRoutes";
 import { createAgentRegistryRoutes } from "./routes/agentRegistryRoutes";
 import { createAdminRoutes } from "./routes/adminRoutes";
 import { createChainRoutes } from "./routes/chainRoutes";
+import { createDemoRoutes } from "./routes/demoRoutes";
 import { createSettlementRoutes } from "./routes/settlementRoutes";
 import { createTaskMarketRoutes } from "./routes/taskMarketRoutes";
 import { createTrustRoutes } from "./routes/trustRoutes";
@@ -12,6 +13,7 @@ import { AgentBuilderService } from "./services/agentBuilderService";
 import { AgentRegistryService } from "./services/agentRegistryService";
 import { EvaluatorClient } from "./services/evaluatorClient";
 import { CompatibilityValidator } from "./services/compatibilityValidator";
+import { DemoFlowService } from "./services/demoFlowService";
 import { HealthcheckRunner } from "./services/healthcheckRunner";
 import { OwnerProofService } from "./services/ownerProofService";
 import { createOwnerProofVerifier } from "./services/ownerProofVerifier";
@@ -25,6 +27,7 @@ import { AdminService } from "./services/adminService";
 import { seedMarketplaceData } from "./seed/seedMarketplace";
 import { resolvePlatformAgentOwnerWallet } from "./services/platformAgentCatalog";
 import { resolveAllowedOrigins } from "./lib/publicBaseUrl";
+import { validateRouterStartupEnv } from "./config/startupValidation";
 
 type OnchainAwareAgent = {
   profile: {
@@ -34,6 +37,13 @@ type OnchainAwareAgent = {
 };
 
 const app = express();
+const startupValidation = validateRouterStartupEnv();
+for (const warning of startupValidation.warnings) {
+  console.warn(`startup warning: ${warning}`);
+}
+if (startupValidation.errors.length > 0) {
+  throw new Error(`Router startup validation failed:\n- ${startupValidation.errors.join("\n- ")}`);
+}
 const allowedOrigins = resolveAllowedOrigins();
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -69,6 +79,7 @@ const builderService = new AgentBuilderService(store, registryService);
 const taskMarketService = new TaskMarketService(store, registryService, evaluatorClient, safetyService);
 const settlementService = new SettlementService(store, taskMarketService);
 const trustRankingService = new TrustRankingService(store);
+const demoFlowService = new DemoFlowService(store, taskMarketService, settlementService, trustRankingService);
 const chainService = new ArcChainService();
 for (const issue of chainService.startupIssues()) {
   console.warn(`arc config warning: ${issue}`);
@@ -197,6 +208,7 @@ app.use(
 );
 app.use("/api/agent-builder", createAgentBuilderRoutes(builderService));
 app.use("/api/task-market", createTaskMarketRoutes(taskMarketService, chainService));
+app.use("/api/demo", createDemoRoutes(demoFlowService));
 app.use("/api/chain", createChainRoutes(chainService, taskMarketService, registryService));
 app.use("/api/execution", createExecutionRoutes(executionEngine));
 app.use("/api/settlements", createSettlementRoutes(settlementService, adminWallets));

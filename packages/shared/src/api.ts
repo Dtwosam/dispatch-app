@@ -65,11 +65,17 @@ export const registerAgentInputSchema = z.object({
   description: z.string().min(10).max(2000),
   avatarUrl: z.string().url().nullable(),
   originType: originTypeSchema,
+  developerName: z.string().min(1).max(120).optional(),
   category: capabilityCategorySchema,
   capabilityTags: z.array(z.string().min(1)).max(24),
   skills: z.array(z.string().min(1)).max(16).default([]),
   skillCategories: z.array(z.string().min(1)).max(8).default([]),
   endpointUrl: z.string().url().nullable(),
+  webhookUrl: z.string().url().nullable().optional(),
+  adapterType: z.enum(["platform", "http", "webhook", "erc8183_adapter"]).optional(),
+  outputSchema: z.union([z.string().min(1), z.record(z.string(), z.unknown())]).optional(),
+  payoutWallet: z.string().min(3).optional(),
+  erc8183Compatible: z.boolean().optional(),
   expectedLatencyMsRange: latencyRangeSchema,
   pricingHint: z.string().max(120),
   activeVersionHash: z.string().min(1),
@@ -98,10 +104,16 @@ export const updateAgentMetadataInputSchema = z.object({
   publicName: z.string().min(2).max(80).optional(),
   description: z.string().min(10).max(2000).optional(),
   avatarUrl: z.string().url().nullable().optional(),
+  developerName: z.string().min(1).max(120).optional(),
   category: capabilityCategorySchema.optional(),
   capabilityTags: z.array(z.string().min(1)).max(24).optional(),
   skills: z.array(z.string().min(1)).max(16).optional(),
   skillCategories: z.array(z.string().min(1)).max(8).optional(),
+  webhookUrl: z.string().url().nullable().optional(),
+  adapterType: z.enum(["platform", "http", "webhook", "erc8183_adapter"]).optional(),
+  outputSchema: z.union([z.string().min(1), z.record(z.string(), z.unknown())]).optional(),
+  payoutWallet: z.string().min(3).optional(),
+  erc8183Compatible: z.boolean().optional(),
   pricingHint: z.string().max(120).optional(),
   expectedLatencyMsRange: latencyRangeSchema.optional(),
 });
@@ -136,9 +148,11 @@ export const healthcheckRequestSchema = z.object({
 export const performanceSummarySchema = z.object({
   tasksAttempted: z.number().int().nonnegative(),
   tasksCompleted: z.number().int().nonnegative(),
+  paidTasksCompleted: z.number().int().nonnegative().default(0),
   approvals: z.number().int().nonnegative(),
   totalReviews: z.number().int().nonnegative(),
   rejectionCount: z.number().int().nonnegative(),
+  refundedTasks: z.number().int().nonnegative().default(0),
   disputeCount: z.number().int().nonnegative(),
   successRate: z.number().min(0).max(1),
   approvalRate: z.number().min(0).max(1),
@@ -146,6 +160,8 @@ export const performanceSummarySchema = z.object({
   averageResponseTimeMs: z.number().int().nonnegative(),
   averageLatencyMs: z.number().int().nonnegative(),
   totalEarnings: z.number().nonnegative(),
+  paidEarnings: z.number().nonnegative().default(0),
+  pendingEarnings: z.number().nonnegative().default(0),
   reliabilityScore: z.number().min(0).max(100),
   rankScore: z.number().min(0).max(100),
   rankPosition: z.number().int().positive().nullable(),
@@ -386,6 +402,15 @@ export const taskVisibilityModeSchema = z.enum(["direct_hire", "open_market"]);
 export const taskResultStatusSchema = z.enum(["not_started", "in_progress", "submitted", "approved", "rejected", "disputed", "appealed", "unresolved", "settled"]);
 export const taskTransactionStateSchema = z.enum(["idle", "draft_saved", "pending_wallet", "pending_chain", "accepted", "failed"]);
 export const taskSettlementStateSchema = z.enum(["reward_funded", "pending_settlement", "settled", "refunded", "disputed", "unresolved"]);
+export const taskSettlementNextActionSchema = z.enum(["release_payment", "refund_reward", "dispute_review", "none"]);
+export const taskSettlementSummarySchema = z.object({
+  settlementAvailable: z.boolean(),
+  settlementNextAction: taskSettlementNextActionSchema,
+  settlementReadinessLabel: z.string().min(1),
+  canReleasePayment: z.boolean(),
+  canRefund: z.boolean(),
+  isFunded: z.boolean(),
+});
 
 export const taskCreateRequestSchema = z.object({
   title: z.string().min(3).max(140),
@@ -452,6 +477,7 @@ export const taskSummaryViewSchema = z.object({
   maxParticipants: z.number().int().positive(),
   transactionState: taskTransactionStateSchema,
   onchainTaskRef: z.string().nullable(),
+  settlementSummary: taskSettlementSummarySchema.optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -481,6 +507,7 @@ export const taskDetailViewSchema = taskSummaryViewSchema.extend({
   userReview: userReviewDecisionSchema.nullable().optional(),
   erc8183Job: erc8183JobSchema.nullable().optional(),
   settlementState: taskSettlementStateSchema.default("reward_funded"),
+  settlementSummary: taskSettlementSummarySchema.optional(),
   latestSettlement: z
     .object({
       settlementId: z.string().min(1),
@@ -822,6 +849,7 @@ export type PublishAgentDraftResponse = z.infer<typeof publishAgentDraftResponse
 export type TaskAttachment = z.infer<typeof taskAttachmentSchema>;
 export type TaskCreateRequest = z.infer<typeof taskCreateRequestSchema>;
 export type TaskTimelineEvent = z.infer<typeof taskTimelineEventSchema>;
+export type TaskSettlementSummary = z.infer<typeof taskSettlementSummarySchema>;
 export type TaskSummaryView = z.infer<typeof taskSummaryViewSchema>;
 export type TaskDetailView = z.infer<typeof taskDetailViewSchema>;
 export type TaskCreateResponse = z.infer<typeof taskCreateResponseSchema>;

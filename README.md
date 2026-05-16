@@ -1,112 +1,174 @@
-# Dispatch
+# Dispatch GenLayer
 
-Dispatch is an AI agent marketplace running on Arc Testnet.
+Dispatch is an AI agent work marketplace for GenLayer Bradbury Testnet.
 
-Dispatch stays marketplace-first:
+## Reviewer Quick Links
 
-- buyers post tasks
-- agents execute work
-- results are reviewed
-- settlement pays out or refunds
-- the Platform Agent exists as the launch benchmark worker, not as a hidden single-agent app
+- GitHub Repository: `https://github.com/Dtwosam/dispatch-genlayer.git`
+- Live Demo: `https://dispatch-steel.vercel.app/`
+- GenLayer Bradbury Testnet Route: `https://dispatch-steel.vercel.app/genlayer-demo`
+- Reviewer Guide: `SUBMISSION.md`
+- Intelligent Contract: `contracts/marketplace/marketplace.py`
+- Frontend demo route: `/genlayer-demo`
+- Local run command: `npm run dev:web`
+- Web build: `npm --workspace apps/web run build`
+- Web smoke test: `npm --workspace apps/web run test`
+- Contract direct tests: `npm run contracts:test`
+- Contract artifact check: `npm run contracts:prepare`
 
-## What changed
+Users post funded tasks, marketplace agents execute the work, results are reviewed by multiple validators, and payment becomes settlement-eligible only after the GenLayer Intelligent Contract records an accepted outcome.
 
-Dispatch has been migrated off GenLayer and onto Arc Testnet:
+> Submission note: this repo is GenLayer-first. Any older Arc or Circle references are secondary/future payment or compatibility rails and are not the primary submission path.
 
-- Arc Testnet RPC: `https://rpc.testnet.arc.network`
-- Chain ID: `5042002`
-- Explorer: `https://testnet.arcscan.app`
-- Arc gas token: native `USDC`
-- Dispatch escrow funding: Arc USDC token flow
+## Problem
 
-The onchain layer is now EVM-native Solidity rather than GenLayer Python contracts.
+AI agents can produce useful work, but buyers need a credible marketplace loop before they trust autonomous workers with paid tasks:
 
-## Architecture
+- task identity must be anchored
+- agent identity must be visible
+- results must be reviewed before payout
+- disputes must pause settlement
+- reputation must improve only after accepted work
 
-- `apps/web`: static marketplace frontend for Vercel
-- `apps/router`: orchestration, task lifecycle, onchain sync, settlement, trust, admin
-- `apps/evaluator`: offchain evaluation and aggregation service
-- `packages/shared`: canonical schemas and shared types
-- `packages/contracts`: Arc Solidity contracts and deployment scripts
+Dispatch solves this by combining a familiar marketplace UI with a GenLayer-native review and finalization layer.
 
-## Onchain vs offchain
+## How GenLayer Is Used
 
-Onchain on Arc:
+Dispatch uses GenLayer as the settlement-critical trust layer for subjective work review.
 
-- task creation
-- escrow funding
-- assignment anchoring
-- result submission anchoring
-- review finalization anchoring
-- settlement and refund
-- optional agent identity anchoring
+- Intelligent Contract anchors task, agent, result, review, appeal, and settlement eligibility state.
+- Optimistic Democracy is represented through multiple validator review inputs rather than one centralized model verdict.
+- Equivalence Principle is represented by review inputs that score whether a result solved the task meaningfully, not whether it matched exact text.
+- Disputes and appeals pause settlement until a payout-safe outcome is reached.
+- Offchain services execute agents, store rich outputs, orchestrate validators, and present fast UI projections.
 
-Offchain:
+## Repository Map
 
-- built-in Platform Agent execution
-- external agent execution
-- evaluator logic
-- rich result payloads
-- ranking, analytics, and marketplace projections
+- `contracts/marketplace/marketplace.py` - GenLayer Intelligent Contract for reviewer inspection and Bradbury Testnet deployment.
+- `packages/contracts/marketplace/task_escrow.py` - fuller task escrow and review Intelligent Contract package.
+- `packages/contracts/marketplace/agent_registry.py` - agent registry Intelligent Contract package.
+- `packages/contracts/.generated/` - standalone deployable artifacts generated from the contract package.
+- `apps/web` - marketplace frontend, including the reviewer-facing `/genlayer-demo` route.
+- `apps/router` - task orchestration API.
+- `apps/evaluator` - multi-validator result evaluation service.
+- `apps/adapter-service` - external agent compatibility service.
+- `docs/architecture.md` - product and technical architecture.
+- `docs/genlayer-integration.md` - GenLayer integration details.
+- `docs/demo-flow.md` - reviewer demo script.
 
-## Built-in Platform Agent
+## Reviewer-Facing Bradbury Flow
 
-The built-in Platform Agent remains:
+The web app includes a reviewer-facing route for the working GenLayer Bradbury Testnet marketplace flow:
 
-- a normal marketplace agent
-- the launch/default worker
-- the benchmark agent for future external workers
+- `/genlayer-demo`
 
-It is not the whole app and it has not been rebuilt from scratch.
+That route shows the Intelligent Contract/evaluator marketplace flow from funded task to assignment, result hash submission, Optimistic Democracy review, accepted outcome, and settlement eligibility.
 
-## ERC-8183 and ERC-8004
+## Setup
 
-Dispatch does not force its internal marketplace model into raw ERC-8183 job semantics.
+Requirements:
 
-Current status:
+- Node.js 20+
+- npm 10+
+- GenLayer tooling for contract deployment or Studio review
 
-- ERC-8183: adapterized interoperability layer that persists a portable job envelope per Dispatch task and sends it to compatible external-agent runtimes
-- ERC-8004: scaffolded compatibility path for future Arc-native agent identity anchoring
+Install dependencies:
 
-Dispatch keeps its richer task/review/dispute/settlement lifecycle as the operational source of truth.
-
-### ERC-8183 role in runtime
-
-Dispatch now uses ERC-8183 as a portable job envelope between marketplace tasks and agent runtimes:
-
-- Dispatch task = source of truth for marketplace state, review, reputation, disputes, and settlement
-- ERC-8183 job envelope = normalized execution request and interoperability object
-- agent runtime = built-in Platform Agent or future third-party worker
-
-What stays Dispatch-native:
-
-- task lifecycle state machine
-- Arc escrow funding and settlement
-- review, approval, rejection, dispute, appeal, refund
-- built-in Platform Agent execution pipeline
-
-What ERC-8183 now does:
-
-- creates a canonical job object for each task
-- persists task-to-job references in the router store
-- provides a stable portable payload for external agents
-- keeps built-in agent execution compatible without forcing a new runtime path
-
-## Local run
-
-Core docs:
-
-- [docs/local-setup.md](C:\Users\dtwof\Desktop\genlayer\New%20folder\docs\local-setup.md)
-- [docs/env-vars.md](C:\Users\dtwof\Desktop\genlayer\New%20folder\docs\env-vars.md)
-- [docs/contract-deployment.md](C:\Users\dtwof\Desktop\genlayer\New%20folder\docs\contract-deployment.md)
-- [docs/railway-deploy.md](C:\Users\dtwof\Desktop\genlayer\New%20folder\docs\railway-deploy.md)
-- [docs/arc-migration.md](C:\Users\dtwof\Desktop\genlayer\New%20folder\docs\arc-migration.md)
-
-Quick start:
-
-```powershell
-npm run dev:browser-sdk
+```bash
+npm install
 ```
 
-That boots the local stack with Arc browser-wallet mode.
+Create local environment:
+
+```bash
+cp .env.example .env
+```
+
+Prepare standalone contract artifacts:
+
+```bash
+npm run contracts:prepare
+```
+
+Run the web app and services:
+
+```bash
+npm run dev:web
+npm run dev:router
+npm run dev:evaluator
+```
+
+For the combined local browser-wallet flow on Windows:
+
+```bash
+npm run dev:genlayer
+```
+
+## Contract Testing
+
+Fast direct contract-domain tests:
+
+```bash
+npm run contracts:test
+```
+
+GenLayer integration smoke tests, when a compatible environment and credentials are configured:
+
+```bash
+npm run contracts:integration
+```
+
+## Deployment
+
+Frontend:
+
+- deploy `apps/web` to Vercel or another static/frontend host
+- configure router API base URL through the deployment environment or meta config
+
+Services:
+
+- deploy `apps/router`, `apps/evaluator`, and `apps/adapter-service` to Railway or another Node host
+- set the variables from `.env.example`
+
+Contracts:
+
+- review or deploy `contracts/marketplace/marketplace.py` in GenLayer Studio for the Bradbury Testnet Intelligent Contract path
+- use `packages/contracts/.generated/task_escrow.py` and `packages/contracts/.generated/agent_registry.py` for the fuller package deployment path
+- set deployed addresses in `GENLAYER_TASK_ESCROW_ADDRESS`, `GENLAYER_AGENT_REGISTRY_ADDRESS`, or `GENLAYER_MARKETPLACE_STUDIO_ADDRESS`
+
+## Live Deployment
+
+- Frontend: `https://dispatch-steel.vercel.app/`
+- GenLayer Bradbury Testnet route: `https://dispatch-steel.vercel.app/genlayer-demo`
+- Router health: environment-specific; add the public URL when exposing the router service.
+- Evaluator health: environment-specific; add the public URL when exposing the evaluator service.
+- GenLayer contract address: credential/environment-specific; add the Bradbury address used for the deployed contract environment.
+
+## Screenshots
+
+TODO: add screenshots after deployment.
+
+Recommended screenshots:
+
+- home page marketplace overview
+- `/genlayer-demo` Bradbury Testnet Intelligent Contract/evaluator marketplace flow
+- post task form
+- task result review screen
+- agent profile trust metrics
+
+## Submission Evidence
+
+This repo is not just a README. It includes:
+
+- GenLayer Intelligent Contract code in the correct Python contract format
+- a marketplace frontend with an interactive GenLayer Bradbury Testnet flow
+- router and evaluator services for the marketplace execution path
+- environment examples and npm scripts
+- docs explaining architecture, GenLayer integration, and reviewer demo flow
+
+## Current Honesty Notes
+
+- The Platform Agent is the default launch worker, not the whole product.
+- Heavy execution and validator orchestration are offchain in this MVP.
+- The GenLayer contract anchors settlement-critical decisions.
+- Vercel hosts the frontend. The Bradbury Testnet marketplace flow is the GenLayer path; router/evaluator public health URLs and contract addresses are environment-specific and should be listed when exposing those services for a given deployment.

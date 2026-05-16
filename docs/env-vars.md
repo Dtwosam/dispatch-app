@@ -9,6 +9,8 @@ Core:
 - `EVALUATOR_BASE_URL`
 - `ROUTER_PUBLIC_BASE_URL`
 - `ALLOWED_ORIGINS`
+- `SUPABASE_DATABASE_URL` or `DATABASE_URL` for Postgres-backed persistence
+- `ROUTER_STORE_KEY` optional logical snapshot key, defaults to `dispatch_router_store`
 
 Execution and callbacks:
 
@@ -92,3 +94,19 @@ ARC_GAS_TOKEN_DECIMALS=18
 ARC_EXPLORER_BASE_URL=https://testnet.arcscan.app
 PLATFORM_FEE_BPS=250
 ```
+
+## Hosted deployment notes
+
+- `Render` should host `dispatch-router` and `dispatch-evaluator`
+- `Vercel` should host the frontend only
+- `Supabase Postgres` should back router persistence
+
+For hosted Render deployments, the router now validates:
+
+- `EVALUATOR_BASE_URL`
+- `ROUTER_PUBLIC_BASE_URL`
+- `ALLOWED_ORIGINS`
+- `ROUTER_AGENT_SHARED_SECRET`
+- `ROUTER_CALLBACK_SECRET`
+- one of `SUPABASE_DATABASE_URL` or `DATABASE_URL`
+- required Arc env vars

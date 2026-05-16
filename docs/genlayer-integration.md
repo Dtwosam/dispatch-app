@@ -1,72 +1,110 @@
-# GenLayer Integration Notes
+# GenLayer Integration
 
-This MVP is designed around the official GenLayer documentation and keeps GenLayer usage focused on places where Intelligent Contracts add value.
+Dispatch uses GenLayer to make subjective AI work review settlement-aware.
 
-## Source-of-Truth Areas
+## Intelligent Contract Locations
 
-- Intelligent Contracts
-- GenVM and non-deterministic operations
-- LLM access
-- web access
-- GenLayer Studio
-- GenLayerJS
-- Node API methods
-- deployment and testing flow
+Reviewer-friendly single-file contract:
 
-## Intended Mapping
+- `contracts/marketplace/marketplace.py`
 
-### Intelligent Contract
+Fuller contract package:
 
-The contract in `contracts/marketplace/marketplace.py` should be adapted to the exact GenLayer decorator and import syntax documented for the currently supported Bradbury toolchain. The business logic is already separated into:
+- `packages/contracts/marketplace/task_escrow.py`
+- `packages/contracts/marketplace/agent_registry.py`
 
-- agent registration
-- funded task posting
-- claims
-- output submission
-- buyer review
-- GenLayer-assisted dispute resolution
-- settlement-linked reputation updates
+Generated standalone artifacts:
 
-### Non-Deterministic Review
+- `packages/contracts/.generated/task_escrow.py`
+- `packages/contracts/.generated/agent_registry.py`
 
-The `resolve_dispute_with_ai` path is intentionally narrow. It should:
+## Contract Format
 
-1. read the task spec and output reference
-2. fetch any required artifact or web context
-3. prompt an LLM for a strict structured decision
-4. apply an equivalence principle that tolerates materially equivalent rationales while requiring the same final decision class
+The GenLayer contracts use the Python Intelligent Contract format:
 
-This keeps GenLayer usage aligned with documented non-deterministic patterns instead of making every task execution itself a contract action.
+- dependency header: `# { "Depends": "py-genlayer:..." }`
+- `from genlayer import *`
+- contract classes extending `gl.Contract`
+- storage-safe dataclasses using `@allow_storage`
+- typed storage such as `TreeMap` and `DynArray`
+- public methods decorated with `@gl.public.write`, `@gl.public.view`, and `@gl.public.write.payable`
+- caller and value access through `gl.message.sender_address` and `gl.message.value`
 
-### Frontend
+## Marketplace Methods
 
-The frontend should integrate through `genlayer-js` for:
+The compact Studio contract exposes:
 
-- account creation or wallet connection
-- reading agent and task state
-- writing task funding, claims, submissions, and reviews
-- monitoring accepted/finalized transaction lifecycle
+- `register_agent`
+- `create_funded_task`
+- `assign_task`
+- `submit_result`
+- `finalize_review`
+- `appeal_task`
+- `settle_task`
+- `get_task`
+- `get_agent`
+- `get_reviews`
+- `get_events`
+- `get_public_schema`
 
-### Offchain Adapter Service
+## Optimistic Democracy Representation
 
-The adapter service exists because external agents are not imported automatically. It normalizes:
+`finalize_review` requires at least three validator inputs.
 
-- endpoint registration
-- ownership proof handshakes
-- health checks
-- task execution requests
-- structured output packaging
+Each validator contributes:
 
-## Deployment Intent
+- validator id
+- score
+- confidence
+- accepted signal
+- reasoning hash
+- equivalence summary
 
-- local iteration through simulator or Studio-compatible flow
-- Bradbury-targeted environment variables for chain and RPC settings
-- offchain artifact storage URI support
+The contract aggregates those inputs into consensus values and produces one of:
 
-## Verification Checklist
+- `accepted`
+- `rejected`
+- `disputed`
+- `unresolved`
 
-- contract methods match the latest GenLayer SDK syntax
-- frontend chain config can switch between simulator and Bradbury
-- transaction status handling includes pending, accepted, finalized, and failure paths
-- dispute review prompt returns a strict schema
-- adapter ownership proof cannot be spoofed by arbitrary endpoint claims
+Only accepted results become settlement-eligible.
+
+## Equivalence Principle Representation
+
+The contract intentionally stores an `equivalence_summary` for every validator input.
+
+Validators are expected to judge whether the result solves the work request equivalently, not whether it matches exact wording. The evaluator service can produce those summaries using checks like task solved, constraints satisfied, format adherence, completeness, and usefulness.
+
+## Appeal Handling
+
+The buyer can call `appeal_task` when a result is rejected, disputed, or unresolved.
+
+Appeal behavior:
+
+- increments the appeal round
+- pauses settlement
+- returns the task to an appeal state
+- allows a stricter or expanded review pass to call `finalize_review` again
+
+## Deployment Notes
+
+Use `contracts/marketplace/marketplace.py` for quick GenLayer Studio inspection and demo deployment.
+
+Use the generated files in `packages/contracts/.generated/` when the deployment path prefers one contract file per upload.
+
+After deployment, set:
+
+- `GENLAYER_MARKETPLACE_STUDIO_ADDRESS` for the compact contract, or
+- `GENLAYER_TASK_ESCROW_ADDRESS` and `GENLAYER_AGENT_REGISTRY_ADDRESS` for the package contracts
+
+## Honest MVP Split
+
+Onchain:
+
+- identity, funding, result hash, review outcome, appeal state, settlement eligibility, reputation
+
+Offchain:
+
+- agent execution, raw artifacts, validator orchestration, indexing, analytics
+
+This is still a practical MVP, but GenLayer owns the settlement-critical subjective decision layer.

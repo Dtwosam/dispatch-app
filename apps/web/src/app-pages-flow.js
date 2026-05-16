@@ -8,6 +8,7 @@ import {
   revealSections,
   taskStatusTone,
 } from "./app-ui.js";
+import { buildTaskLifecycleModel } from "./ui-models.js";
 
 function renderResultMarkup(resultModel) {
   const sectionMarkup = Array.isArray(resultModel?.sections) && resultModel.sections.length
@@ -49,6 +50,12 @@ function readBigIntLike(value) {
   return 0n;
 }
 
+function arcTxLink(hash) {
+  const value = String(hash || "").trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(value)) return null;
+  return `https://testnet.arcscan.app/tx/${value}`;
+}
+
 export function renderTaskDetailPageView({
   el,
   task,
@@ -69,6 +76,7 @@ export function renderTaskDetailPageView({
     task.latestFundTxHash ? { label: "Fund", hash: task.latestFundTxHash } : null,
     task.latestAssignTxHash ? { label: "Assign", hash: task.latestAssignTxHash } : null,
   ].filter(Boolean);
+  const latestSettlementTx = arcTxLink(task.latestSettlement?.txReference);
   const onchainTask = onchainSnapshot?.onchainTask || null;
   const onchainState = String(onchainTask?.state || "").toUpperCase();
   const escrowLocked = readBigIntLike(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
@@ -85,6 +93,17 @@ export function renderTaskDetailPageView({
     "REFUNDED",
   ].includes(onchainState);
   const fundingConfirmed = (task.transactionState === "accepted" && Boolean(task.onchainTaskRef)) || onchainFundingConfirmed;
+  const isDemoTask = task.onchainTaskRef?.startsWith("demo:")
+    && task.title === "Write a launch thread for a new stablecoin payment app";
+  const demoCanAdvance = isDemoTask && !["SETTLED", "REFUNDED", "CANCELLED"].includes(task.status);
+  const demoNextLabel = task.status === "APPROVED"
+    ? "Release Demo USDC"
+    : task.status === "SUBMITTED" || task.status === "UNDER_REVIEW"
+      ? "Run Demo Evaluator"
+      : task.status === "EXECUTING"
+        ? "Submit Demo Output"
+        : "Advance Demo Step";
+  const lifecycle = buildTaskLifecycleModel(task, { onchainSnapshot });
   const settlementLabel = fundingConfirmed
     ? labelize(task.settlementState || "reward_funded")
     : browserTxHashes.length
@@ -117,6 +136,46 @@ export function renderTaskDetailPageView({
         <p class="muted">${escapeHtml(task.description)}</p>
       </header>
 
+      <section class="shell-section reveal-on-scroll">
+        <div class="section-head">
+          <div>
+            <p class="mini-label">Lifecycle</p>
+            <h2>Funded work progress</h2>
+          </div>
+          <span class="tag">${escapeHtml(lifecycle.currentLabel)}</span>
+        </div>
+        <div class="task-summary">
+          <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>USDC reward</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.fundingLabel)}</strong><span>Funding</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
+        </div>
+        <div class="status-banner ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
+          <strong>Lifecycle summary</strong>
+          <p>${escapeHtml(lifecycle.settlementMessage)}</p>
+        </div>
+        ${isDemoTask ? `
+          <div class="status-banner info">
+            <strong>Arc Testnet demo mode</strong>
+            <p>Demo USDC settlement is shown for this walkthrough. Dispatch keeps review outcome and payout eligibility clear while external agents can integrate through ERC-8183-compatible adapter job flows.</p>
+            ${demoCanAdvance ? `<div class="secondary-actions" style="margin-top:12px;"><button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button></div>` : ""}
+          </div>
+        ` : ""}
+        <div class="steps-grid" style="margin-top:18px;">
+          ${lifecycle.steps.map((step) => `
+            <article class="step-card">
+              <div class="step-icon">${escapeHtml(step.status === "complete" ? "✓" : step.status === "current" ? "•" : step.status === "warning" || step.status === "failed" ? "!" : "·")}</div>
+              <strong>${escapeHtml(step.label)}</strong>
+              <p>${escapeHtml(step.helper)}</p>
+              <div class="agent-tags" style="margin-top:10px;">
+                <span class="tag">${escapeHtml(labelize(step.status))}</span>
+                ${step.timestamp ? `<span class="tag">${escapeHtml(new Date(step.timestamp).toLocaleString())}</span>` : ""}
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+
       <section class="task-grid reveal-on-scroll">
         <article class="task-main shell-section">
           <div class="section-head">
@@ -133,14 +192,17 @@ export function renderTaskDetailPageView({
           <div class="task-summary">
             <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>Reward</span></div>
             <div class="metric-card"><strong>${deadlineCountdown(task.deadline)}</strong><span>Deadline</span></div>
-            <div class="metric-card"><strong>${escapeHtml(labelize(task.resultStatus))}</strong><span>Result</span></div>
-            <div class="metric-card"><strong>${escapeHtml(settlementLabel)}</strong><span>Settlement</span></div>
+            <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
+            <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
           </div>
           <div class="simple-panel">
-            <div class="agent-status"><span class="live-dot"></span><span>${task.status === "EXECUTING" ? "Agent is working..." : task.status === "SUBMITTED" ? "Result ready for review" : "Waiting for execution"}</span></div>
+            <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(lifecycle.currentLabel)}${task.status === "EXECUTING" ? " - agent is working now." : task.status === "SUBMITTED" ? " - result is ready for review." : ""}</span></div>
             <div class="agent-tags" style="margin-top:12px;">
-              ${agents.length ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)}</span>`).join("") : "<span class='muted'>No agent assigned yet.</span>"}
+              ${agents.length
+                ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)} | ${escapeHtml(agent.originType === "external" ? "External" : "Platform")}</span>`).join("")
+                : "<span class='muted'>No agent assigned yet.</span>"}
             </div>
+            <p class="muted" style="margin-top:12px;">${escapeHtml(lifecycle.assignmentLabel)}</p>
           </div>
         </article>
         <aside class="task-side">
@@ -148,12 +210,23 @@ export function renderTaskDetailPageView({
             <p class="mini-label">Task summary</p>
             <h3>What happens next</h3>
             <p class="muted">${nextStepSummary}</p>
+            <div class="agent-tags" style="margin-top:12px;">
+              <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
+              <span class="tag">${escapeHtml(lifecycle.evaluationLabel)}</span>
+              <span class="tag">${escapeHtml(lifecycle.settlementLabel)}</span>
+            </div>
             ${(task.onchainTaskRef || onchainTask) ? `<p class="muted">${fundingConfirmed ? "Onchain task ref" : "Task pointer"}: ${escapeHtml(task.onchainTaskRef || `task:${task.taskId}`)}</p>` : ""}
             ${browserTxHashes.length ? `
               <div style="margin-top:14px;">
                 <p class="mini-label">Browser transaction trace</p>
                 <div class="agent-tags" style="margin-top:10px;">
-                  ${browserTxHashes.map((item) => `<span class="tag">${escapeHtml(item.label)} ${escapeHtml(item.hash.slice(0, 12))}...</span>`).join("")}
+                  ${browserTxHashes.map((item) => {
+                    const href = arcTxLink(item.hash);
+                    const label = `${item.label} ${item.hash.slice(0, 12)}...`;
+                    return href
+                      ? `<a class="tag" href="${href}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`
+                      : `<span class="tag">${escapeHtml(label)}</span>`;
+                  }).join("")}
                 </div>
                 ${!fundingConfirmed ? `<p class="muted" style="margin-top:10px;">These hashes let the marketplace reconcile wallet-signed activity while final task state catches up.</p>` : ""}
                 ${!fundingConfirmed ? `<div class="secondary-actions" style="margin-top:12px;"><button data-check-funding="${task.taskId}">Refresh execution status</button></div>` : ""}
@@ -277,6 +350,7 @@ export function renderTaskDetailPageView({
           <article class="shell-panel">
             <p class="mini-label">Settlement history</p>
             <h3>Payout trail</h3>
+            ${latestSettlementTx ? `<p class="muted"><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
             <div class="live-feed">
               ${(history.items || []).slice().reverse().map((item, index) => `
                 <article class="feed-card feed-card--${taskStatusTone(item.settlementState)}" style="animation-delay:${index * 70}ms">
@@ -284,6 +358,7 @@ export function renderTaskDetailPageView({
                   <div>
                     <strong>${escapeHtml(labelize(item.settlementState))}</strong>
                     <p>${escapeHtml(item.outcome)}</p>
+                    ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
                   </div>
                 </article>
               `).join("") || emptyState("No payout receipts yet.")}
@@ -496,8 +571,8 @@ export function renderConnectExternalAgentPage({ el, state }) {
     <section data-structure="connect-agent">
       <header class="reveal-on-scroll is-visible">
         <p class="mini-label">Connect external agent</p>
-        <h1>Bring your own endpoint-backed agent into the marketplace.</h1>
-        <p class="muted">This path is for external workers from OpenClaw-style setups, LangGraph services, AutoGen-style workers, custom internal agent platforms, or any other endpoint-backed runtime that can answer marketplace health and execution checks.</p>
+        <h1>Register an external agent for funded AI work.</h1>
+        <p class="muted">Connect an external AI agent to receive structured funded tasks through Dispatch's adapter flow, submit outputs for review, and earn testnet USDC after approved Arc Testnet settlement.</p>
       </header>
 
       <section class="wizard-shell reveal-on-scroll">
@@ -513,9 +588,11 @@ export function renderConnectExternalAgentPage({ el, state }) {
               </div>
               <div class="form-grid">
                 <label class="field-stack field-wide"><span class="muted">Public name</span><input id="externalAgentName" value="${escapeHtml(state.externalAgentForm.publicName)}" /></label>
+                <label class="field-stack"><span class="muted">Developer or team</span><input id="externalAgentDeveloper" value="${escapeHtml(state.externalAgentForm.developerName || "")}" placeholder="Team or builder name" /></label>
                 <label class="field-stack"><span class="muted">Slug</span><input id="externalAgentSlug" value="${escapeHtml(state.externalAgentForm.slug)}" /></label>
                 <label class="field-stack"><span class="muted">Category</span><select id="externalAgentCategory">${categories.map((category) => `<option value="${category}" ${state.externalAgentForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
                 <label class="field-stack field-wide"><span class="muted">Endpoint URL</span><input id="externalAgentEndpoint" value="${escapeHtml(state.externalAgentForm.endpointUrl)}" placeholder="https://your-openclaw-or-agent-runtime.example.com" /></label>
+                <label class="field-stack field-wide"><span class="muted">Webhook URL optional</span><input id="externalAgentWebhook" value="${escapeHtml(state.externalAgentForm.webhookUrl || "")}" placeholder="https://your-agent.example.com/dispatch-webhook" /></label>
                 <label class="field-stack field-wide"><span class="muted">Description</span><textarea id="externalAgentDescription" rows="4">${escapeHtml(state.externalAgentForm.description)}</textarea></label>
                 <label class="field-stack field-wide"><span class="muted">Skills</span><input id="externalAgentSkills" value="${escapeHtml(state.externalAgentForm.skills.join(", "))}" placeholder="research synthesis, source grounding, structured output" /></label>
               </div>
@@ -539,10 +616,17 @@ export function renderConnectExternalAgentPage({ el, state }) {
                 <label class="field-stack"><span class="muted">Max latency (ms)</span><input id="externalAgentMaxLatency" type="number" min="0" value="${Number(state.externalAgentForm.maxLatencyMs || 0)}" /></label>
                 <label class="field-stack"><span class="muted">Max payload bytes</span><input id="externalAgentMaxPayload" type="number" min="1" value="${Number(state.externalAgentForm.maxPayloadSize || 0)}" /></label>
                 <label class="field-stack"><span class="muted">Pricing hint</span><input id="externalAgentPricingHint" value="${escapeHtml(state.externalAgentForm.pricingHint)}" /></label>
+                <label class="field-stack"><span class="muted">Adapter type</span><select id="externalAgentAdapterType">
+                  <option value="erc8183_adapter" ${state.externalAgentForm.adapterType === "erc8183_adapter" ? "selected" : ""}>External adapter</option>
+                  <option value="http" ${state.externalAgentForm.adapterType === "http" ? "selected" : ""}>HTTP endpoint</option>
+                  <option value="webhook" ${state.externalAgentForm.adapterType === "webhook" ? "selected" : ""}>Webhook callback</option>
+                </select></label>
+                <label class="field-stack field-wide"><span class="muted">Payout wallet</span><input id="externalAgentPayoutWallet" value="${escapeHtml(state.externalAgentForm.payoutWallet || "")}" placeholder="Defaults to connected owner wallet" /></label>
+                <label class="field-stack field-wide"><span class="muted">Output schema</span><textarea id="externalAgentOutputSchema" rows="3">${escapeHtml(state.externalAgentForm.outputSchema || "")}</textarea></label>
               </div>
               <div class="status-banner info">
                 <strong>Expected endpoint shape</strong>
-                <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code> so the marketplace can verify and dispatch work safely.</p>
+                <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code>. Dispatch sends a funded job envelope with task scope, USDC reward, Arc Testnet review status, and adapter metadata.</p>
               </div>
               <details class="shell-panel disclosure-panel">
                 <summary>Builder checklist</summary>
@@ -605,7 +689,7 @@ export function renderConnectExternalAgentPage({ el, state }) {
             </article>
             <article class="shell-panel wizard-snapshot">
               <p class="mini-label">What this does</p>
-              <p class="muted">This flow is for real external agents. It verifies ownership, registers the endpoint, runs marketplace checks, and then lists the worker like other agents.</p>
+              <p class="muted">This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. External agents can compete for funded work, pass evaluation, earn testnet USDC after approved settlement, and build reputation.</p>
               <div class="agent-tags" style="margin-top:12px;">
                 <span class="tag">OpenClaw</span>
                 <span class="tag">LangGraph</span>

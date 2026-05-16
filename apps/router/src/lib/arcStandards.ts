@@ -29,6 +29,25 @@ function buildConstraints(task: TaskDetailView) {
   return [...new Set(constraints)];
 }
 
+function buildSettlementSnapshot(task: TaskDetailView, tokenSymbol: string) {
+  return {
+    network: {
+      name: "Arc Testnet",
+      chainId: 5042002,
+      explorerBaseUrl: "https://testnet.arcscan.app",
+    },
+    reward: {
+      amount: String(task.rewardAmount),
+      currency: tokenSymbol,
+      funded: task.transactionState === "accepted" && Boolean(task.onchainTaskRef),
+    },
+    fundingStatus: task.transactionState,
+    settlementStatus: task.settlementState,
+    settlementNextAction: task.settlementSummary?.settlementNextAction ?? "none",
+    settlementReadinessLabel: task.settlementSummary?.settlementReadinessLabel ?? null,
+  };
+}
+
 export function mapDispatchTaskToErc8183Job(task: TaskDetailView, options: {
   providerAgentId?: string | null;
   evaluator?: string | null;
@@ -44,6 +63,8 @@ export function mapDispatchTaskToErc8183Job(task: TaskDetailView, options: {
   const createdAt = options.now ?? task.createdAt ?? new Date().toISOString();
   const updatedAt = options.now ?? task.updatedAt ?? createdAt;
   const providerAgentId = options.providerAgentId ?? task.selectedAgentId ?? task.participatingAgentIds[0] ?? null;
+  const tokenSymbol = options.paymentTokenSymbol ?? "USDC";
+  const settlement = buildSettlementSnapshot(task, tokenSymbol);
   const payload = {
     dispatchTaskId: task.taskId,
     requester: task.creatorWallet,
@@ -56,7 +77,7 @@ export function mapDispatchTaskToErc8183Job(task: TaskDetailView, options: {
     reward: {
       amount: String(task.rewardAmount),
       tokenAddress: options.paymentTokenAddress ?? null,
-      tokenSymbol: options.paymentTokenSymbol ?? "USDC",
+      tokenSymbol,
       tokenDecimals: options.paymentTokenDecimals ?? 6,
     },
     deadlineTimestamp: Math.floor(new Date(task.deadline).getTime() / 1000),
@@ -75,6 +96,15 @@ export function mapDispatchTaskToErc8183Job(task: TaskDetailView, options: {
       resultStatus: "submitted",
       expectedReview: task.evaluationPreference,
       taskId: task.taskId,
+      expectedFormat: task.structuredNotes ?? "Return a structured, evaluator-ready result for the requested task.",
+      evaluationCriteria: [
+        "completion",
+        "relevance",
+        "correctness_proxy",
+        "formatting",
+        "usefulness",
+        "latency_awareness",
+      ],
     },
     dispatchMetadata: {
       structuredNotes: task.structuredNotes,
@@ -82,6 +112,13 @@ export function mapDispatchTaskToErc8183Job(task: TaskDetailView, options: {
       status: task.status,
       resultStatus: task.resultStatus,
       transactionState: task.transactionState,
+      network: settlement.network,
+      fundingStatus: settlement.fundingStatus,
+      settlementStatus: settlement.settlementStatus,
+      settlementNextAction: settlement.settlementNextAction,
+      settlementReadinessLabel: settlement.settlementReadinessLabel,
+      reward: settlement.reward,
+      assignedAgent: task.selectedAgents.find((agent) => agent.agentId === providerAgentId) ?? null,
     },
     inputPointer: task.attachments[0]?.pointer ?? null,
     hook: options.hook ?? null,

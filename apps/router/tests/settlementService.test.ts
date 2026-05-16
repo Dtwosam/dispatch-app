@@ -313,3 +313,171 @@ test("settlement is paused when consensus leaves a task unresolved", async () =>
     /payout-safe final state/i,
   );
 });
+
+test("settlement is not available for unfunded approved tasks", async () => {
+  const store = new InMemoryRegistryStore();
+  const taskMarket = new TaskMarketService(store, registryService as never, evaluatorClient as never, new SafetyService(store));
+  const settlement = new SettlementService(store, taskMarket, 250);
+
+  const now = new Date().toISOString();
+  store.tasks.set("task_unfunded", {
+    taskId: "task_unfunded",
+    title: "Task",
+    description: "Long enough task description for validation.",
+    category: "research",
+    rewardAmount: 110,
+    deadline: now,
+    status: "APPROVED",
+    resultStatus: "approved",
+    creatorWallet: "0xbuyer",
+    creatorDisplay: "0xbuyer",
+    selectedAgentId: "agent_1",
+    participatingAgentIds: ["agent_1"],
+    maxParticipants: 1,
+    transactionState: "pending_chain",
+    onchainTaskRef: null,
+    createdAt: now,
+    updatedAt: now,
+    attachments: [],
+    evaluationPreference: "assisted_evaluation",
+    structuredNotes: null,
+    hiringMode: "direct_hire",
+    timeline: [],
+    selectedAgents: [{ agentId: "agent_1", displayName: "Signal Forge", originType: "platform" }],
+    reviewActions: ["settle"],
+    latestSubmissionId: "submission_1",
+    latestSubmissionTxHash: null,
+    latestEvaluation: null,
+    userReview: null,
+    settlementState: "pending_settlement",
+    latestSettlement: null,
+    disputeRecord: null,
+    appealRecord: null,
+  });
+
+  await assert.rejects(
+    () => settlement.settleApprovedTask("task_unfunded", "0xbuyer"),
+    /unfunded tasks/i,
+  );
+});
+
+test("approved funded task release records latest settlement, timeline, and earnings", async () => {
+  const store = new InMemoryRegistryStore();
+  store.upsertAgent({
+    profile: {
+      agentId: "agent_1",
+      ownerWallet: "0xagent",
+      publicName: "Signal Forge",
+      slug: "signal-forge",
+      description: "Research agent.",
+      avatarUrl: null,
+      originType: "platform",
+      category: "research",
+      capabilityTags: ["research"],
+      endpointUrl: null,
+      expectedLatencyMsRange: { minMs: 1000, maxMs: 5000 },
+      pricingHint: "Research specialist.",
+      activeVersionHash: "ver_signal",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    registrationState: "active",
+    healthStatus: "healthy",
+    compatibilityStatus: "compatible",
+    latestVersionHash: "ver_signal",
+    suspensionReason: null,
+    compatibilityDeclaration: null,
+  });
+  const taskMarket = new TaskMarketService(store, registryService as never, evaluatorClient as never, new SafetyService(store));
+  const settlement = new SettlementService(store, taskMarket, 250);
+
+  const created = taskMarket.createTask({
+    title: "Release path",
+    description: "Funded work should settle cleanly after approval.",
+    category: "research",
+    rewardAmount: 100,
+    deadline: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
+    hiringMode: "direct_hire",
+    selectedAgentId: "agent_1",
+    attachments: [],
+    evaluationPreference: "user_review_only",
+    structuredNotes: null,
+    creatorWallet: "0xbuyer",
+    maxParticipants: 1,
+  }).task;
+
+  taskMarket.syncTaskWithChain(created.taskId, {
+    createTxHash: "tx_create_release",
+    fundTxHash: "tx_fund_release",
+    assignTxHash: "tx_assign_release",
+    onchainTaskRef: `onchain:${created.taskId}`,
+    latestReceipt: {
+      hash: "tx_assign_release",
+      status: "ACCEPTED",
+      finalized: false,
+      blockNumber: 401,
+      createdAt: new Date().toISOString(),
+    },
+  });
+  await taskMarket.markSubmissionReceived(created.taskId, "agent_1", "memory://release", "hash_release");
+  await taskMarket.approveTask(created.taskId, "0xbuyer");
+
+  const receipt = await settlement.settleApprovedTask(created.taskId, "0xbuyer");
+  const updated = taskMarket.getTask(created.taskId);
+  const performance = store.ensurePerformance("agent_1");
+
+  assert.equal(updated.status, "SETTLED");
+  assert.equal(updated.settlementState, "settled");
+  assert.equal(updated.latestSettlement?.settlementId, receipt.settlementId);
+  assert.ok(updated.timeline.some((event) => event.kind === "settled"));
+  assert.equal(performance.totalEarnings, receipt.agentPayout);
+  assert.equal(performance.tasksCompleted, 1);
+  assert.equal(performance.approvals, 1);
+});
+
+test("rejected funded task refund records latest settlement and keeps payout unavailable", async () => {
+  const store = new InMemoryRegistryStore();
+  const taskMarket = new TaskMarketService(store, registryService as never, evaluatorClient as never, new SafetyService(store));
+  const settlement = new SettlementService(store, taskMarket, 250);
+
+  const created = taskMarket.createTask({
+    title: "Refund path",
+    description: "Rejected funded work should refund cleanly.",
+    category: "research",
+    rewardAmount: 60,
+    deadline: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
+    hiringMode: "direct_hire",
+    selectedAgentId: "agent_1",
+    attachments: [],
+    evaluationPreference: "user_review_only",
+    structuredNotes: null,
+    creatorWallet: "0xbuyer",
+    maxParticipants: 1,
+  }).task;
+
+  taskMarket.syncTaskWithChain(created.taskId, {
+    createTxHash: "tx_create_refund",
+    fundTxHash: "tx_fund_refund",
+    assignTxHash: "tx_assign_refund",
+    onchainTaskRef: `onchain:${created.taskId}`,
+    latestReceipt: {
+      hash: "tx_assign_refund",
+      status: "ACCEPTED",
+      finalized: false,
+      blockNumber: 402,
+      createdAt: new Date().toISOString(),
+    },
+  });
+  await taskMarket.markSubmissionReceived(created.taskId, "agent_1", "memory://refund", "hash_refund");
+  await taskMarket.rejectTask(created.taskId, "0xbuyer");
+
+  const receipt = await settlement.refundTask(created.taskId, "0xbuyer");
+  const updated = taskMarket.getTask(created.taskId);
+
+  assert.equal(updated.status, "REFUNDED");
+  assert.equal(updated.settlementState, "refunded");
+  assert.equal(updated.latestSettlement?.settlementId, receipt.settlementId);
+  assert.ok(updated.timeline.some((event) => event.kind === "refund_completed"));
+  assert.equal(updated.settlementSummary?.settlementReadinessLabel, "Reward refunded.");
+});

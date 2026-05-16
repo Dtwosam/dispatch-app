@@ -3,6 +3,7 @@ import {
   createWalletClient,
   custom,
   erc20Abi,
+  formatUnits,
   parseAbi,
   parseUnits,
 } from "viem";
@@ -22,6 +23,12 @@ const marketplaceAbi = parseAbi([
   "function assign_task(string taskId, string agentId)",
 ]);
 const MAX_UINT256 = (1n << 256n) - 1n;
+export const ARC_TESTNET_CHAIN_ID = 5042002;
+export const ARC_TESTNET_CHAIN_ID_HEX = "0x4cf4d2";
+export const ARC_TESTNET_RPC_URL = "https://rpc.testnet.arc.network";
+export const ARC_TESTNET_EXPLORER_URL = "https://testnet.arcscan.app";
+export const ARC_TESTNET_USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
+export const ARC_TESTNET_USDC_DECIMALS = 6;
 
 export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
   let browserContextPromise = null;
@@ -37,7 +44,7 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
   async function connectWallet() {
     const walletAddress = getWalletAddress()?.trim();
     if (!walletAddress) {
-      throw new Error("Connect a browser wallet before sending an Arc transaction.");
+      throw new Error("Connect a browser wallet before sending an Arc Testnet transaction.");
     }
     return { walletAddress };
   }
@@ -58,8 +65,9 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
       throw new Error("Arc writes are disabled in this environment.");
     }
     if (config.chainMode !== "browser_wallet") {
-      throw new Error("Task posting on Arc must be signed from the connected browser wallet.");
+      throw new Error(`Task posting on ${chainDisplayName(config)} must be signed from the connected browser wallet.`);
     }
+    assertBrowserFundingConfig(config);
     return createBrowserTaskLifecycle({
       config,
       taskId,
@@ -84,10 +92,11 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
     selectedAgentId,
     selectedAgentOnchainId,
   }) {
+    assertBrowserFundingConfig(config);
     const walletAddress = getWalletAddress()?.trim();
     const providerLabel = getInjectedWalletProviderLabel();
     if (!walletAddress) {
-      throw new Error(`Connect ${providerLabel} before sending an Arc transaction.`);
+      throw new Error(`Connect ${providerLabel} before sending a ${chainDisplayName(config)} transaction.`);
     }
 
     const { publicClient, walletClient } = await getBrowserWriteContext(config);
@@ -228,7 +237,7 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
       latestReceipt,
       onchainTaskRef: `${config.taskEscrowAddress}:${taskId}`,
       notes: [
-        `${providerLabel} browser signing is active on Arc.`,
+        `${providerLabel} browser signing is active on Arc Testnet.`,
         `${config.paymentTokenSymbol || "USDC"} approval may be required before escrow funding.`,
         `create_task status: ${createReceipt?.status || "PENDING"}`,
         `fund_task status: ${fundReceipt?.status || "PENDING"}`,
@@ -314,12 +323,94 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
     return getBrowserWriteContext(config);
   }
 
+  async function getWalletNetworkSnapshot() {
+    const walletAddress = getWalletAddress()?.trim();
+    const config = await getConfig();
+    const provider = getInjectedWalletProvider();
+    if (!provider?.request) {
+      return {
+        walletAddress,
+        chainId: null,
+        expectedChainId: Number(config.chainId || ARC_TESTNET_CHAIN_ID),
+        isArcTestnet: false,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        tokenDecimals: Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS),
+        message: "No EVM browser wallet was detected.",
+      };
+    }
+    const rawChainId = await provider.request({ method: "eth_chainId" }).catch(() => null);
+    const chainId = parseChainId(rawChainId);
+    const expectedChainId = Number(config.chainId || ARC_TESTNET_CHAIN_ID);
+    const isArcTestnet = chainId === expectedChainId;
+    if (!walletAddress || !isArcTestnet) {
+      return {
+        walletAddress,
+        chainId,
+        expectedChainId,
+        isArcTestnet,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        tokenDecimals: Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS),
+        message: !walletAddress
+          ? "Connect a wallet to read Arc Testnet balances."
+          : `Switch to Arc Testnet to fund tasks with testnet USDC.`,
+      };
+    }
+
+    const chain = resolveArcChain(config);
+    const publicClient = createPublicClient({ chain, transport: custom(provider) });
+    const tokenAddress = config.paymentTokenAddress || ARC_TESTNET_USDC_ADDRESS;
+    const tokenDecimals = await publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: "decimals",
+    }).then((value) => Number(value)).catch(() => Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS));
+    const [tokenBalance, nativeGasBalance] = await Promise.all([
+      publicClient.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [walletAddress],
+      }).catch(() => null),
+      publicClient.getBalance({ address: walletAddress }).catch(() => null),
+    ]);
+    return {
+      walletAddress,
+      chainId,
+      expectedChainId,
+      isArcTestnet,
+      usdcBalance: tokenBalance == null ? null : formatUnits(BigInt(tokenBalance), tokenDecimals),
+      nativeGasBalance: nativeGasBalance == null ? null : formatUnits(BigInt(nativeGasBalance), Number(config.gasTokenDecimals ?? 18)),
+      tokenDecimals,
+      message: "Arc Testnet wallet is ready for testnet USDC funding.",
+    };
+  }
+
+  async function switchWalletToArcTestnet() {
+    const config = await getConfig();
+    const provider = getInjectedWalletProvider();
+    if (!provider?.request) {
+      throw new Error("No EVM browser wallet was detected.");
+    }
+    await ensureProviderChain(provider, resolveArcChain(config));
+    browserContextPromise = null;
+    return getWalletNetworkSnapshot();
+  }
+
+  function resetBrowserContext() {
+    browserContextPromise = null;
+  }
+
   return {
     getConfig,
     getStatus,
     connectWallet,
     createTaskLifecycle,
     primeBrowserLifecycle,
+    getWalletNetworkSnapshot,
+    switchWalletToArcTestnet,
+    resetBrowserContext,
     pollReceipt,
     readContractState,
     readOnchainTask,
@@ -346,7 +437,10 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
           transport: custom(provider),
         });
         return { publicClient, walletClient };
-      })();
+      })().catch((error) => {
+        browserContextPromise = null;
+        throw error;
+      });
     }
     return browserContextPromise;
   }
@@ -378,11 +472,28 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
   }
 }
 
+function assertBrowserFundingConfig(config) {
+  if (!config?.taskEscrowAddress) {
+    throw new Error("Arc marketplace contract address is not configured. Set ARC_TASK_MARKETPLACE_ADDRESS before wallet-funded task posting.");
+  }
+  if (!config?.paymentTokenAddress) {
+    throw new Error("Arc USDC token address is not configured. Set ARC_PAYMENT_TOKEN_ADDRESS to 0x3600000000000000000000000000000000000000.");
+  }
+}
+
 async function runWriteStep({ walletClient, publicClient, label, stepIndex, totalSteps, onStatus, request }) {
   const stepPrefix = totalSteps > 1 ? `Step ${stepIndex}/${totalSteps}: ` : "";
   onStatus?.("pending_wallet", `${stepPrefix}Confirm ${label} in your wallet.`);
-  const hash = await walletClient.writeContract(request);
-  onStatus?.("pending_chain", `${stepPrefix}${label} submitted. Waiting for Arc confirmation.`);
+  let hash;
+  try {
+    hash = await walletClient.writeContract(request);
+  } catch (error) {
+    if (error?.code === 4001 || /user rejected|rejected/i.test(String(error?.message || ""))) {
+      throw new Error(`Transaction rejected. Confirm ${label} in your wallet to continue funding on Arc Testnet.`);
+    }
+    throw error;
+  }
+  onStatus?.("pending_chain", `${stepPrefix}${label} submitted. Waiting for Arc Testnet confirmation.`);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (String(receipt.status).toLowerCase() !== "success") {
     throw new Error(`${label} failed onchain.`);
@@ -426,7 +537,7 @@ async function assertSufficientBalances({
   }
   if (BigInt(gasBalance || 0n) === 0n) {
     throw new Error(
-      `${providerLabel} wallet has no ${gasTokenSymbol} available for Arc gas. Add a small gas balance before posting a task.`,
+      `${providerLabel} wallet has no native ${gasTokenSymbol} available for Arc gas. Add a small gas balance before posting a task.`,
     );
   }
   return {
@@ -440,7 +551,7 @@ async function assertSufficientBalances({
 
 function resolveArcChain(config) {
   return {
-    id: Number(config.chainId || 5042002),
+    id: Number(config.chainId || ARC_TESTNET_CHAIN_ID),
     name: config.networkName || "Arc Testnet",
     nativeCurrency: {
       name: config.gasTokenSymbol || "USDC",
@@ -455,7 +566,7 @@ function resolveArcChain(config) {
     blockExplorers: config.explorerBaseUrl
       ? {
         default: {
-          name: "Arcscan",
+          name: "Explorer",
           url: config.explorerBaseUrl,
         },
       }
@@ -509,6 +620,21 @@ function toTokenBaseUnits(amount, decimals = 6) {
     throw new Error("Reward must be a valid USDC amount.");
   }
   return parseUnits(source, decimals);
+}
+
+function chainDisplayName(config = {}) {
+  const raw = `${config.chainKey || ""} ${config.networkName || ""}`.toLowerCase();
+  return raw.includes("arc") ? "Arc Testnet" : "GenLayer";
+}
+
+function parseChainId(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
+  const text = String(value || "").trim();
+  if (!text) return null;
+  if (text.startsWith("0x")) return Number.parseInt(text, 16);
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function formatBaseUnits(value, decimals = 6) {
