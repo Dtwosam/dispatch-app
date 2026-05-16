@@ -24,7 +24,7 @@ const marketplaceAbi = parseAbi([
 ]);
 const MAX_UINT256 = (1n << 256n) - 1n;
 export const ARC_TESTNET_CHAIN_ID = 5042002;
-export const ARC_TESTNET_CHAIN_ID_HEX = "0x4cf4d2";
+export const ARC_TESTNET_CHAIN_ID_HEX = "0x4cef52";
 export const ARC_TESTNET_RPC_URL = "https://rpc.testnet.arc.network";
 export const ARC_TESTNET_EXPLORER_URL = "https://testnet.arcscan.app";
 export const ARC_TESTNET_USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
@@ -624,7 +624,7 @@ function toTokenBaseUnits(amount, decimals = 6) {
 
 function chainDisplayName(config = {}) {
   const raw = `${config.chainKey || ""} ${config.networkName || ""}`.toLowerCase();
-  return raw.includes("arc") ? "Arc Testnet" : "GenLayer";
+  return raw.includes("arc") ? "Arc Testnet" : "configured EVM network";
 }
 
 function parseChainId(value) {
