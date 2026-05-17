@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: .
     plan: free
-    buildCommand: npm ci && npm --workspace packages/shared run build && npm --workspace apps/evaluator run build
+    buildCommand: npm ci --include=dev && npm --workspace packages/shared run build && npm --workspace apps/evaluator run build
     startCommand: npm --workspace apps/evaluator run start
     healthCheckPath: /health
     envVars:
@@ -18,7 +18,7 @@ services:
     runtime: node
     rootDir: .
     plan: free
-    buildCommand: npm ci && npm --workspace packages/shared run build && npm --workspace packages/agent-sdk run build && npm --workspace apps/router run build
+    buildCommand: npm ci --include=dev && npm --workspace packages/shared run build && npm --workspace packages/agent-sdk run build && npm --workspace apps/router run build
     startCommand: npm --workspace apps/router run start
     healthCheckPath: /health
     envVars:
