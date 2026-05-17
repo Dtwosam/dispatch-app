@@ -36,6 +36,17 @@ type OnchainAwareAgent = {
   };
 };
 
+function extractOnchainTaskStateName(onchainTask: unknown) {
+  if (Array.isArray(onchainTask)) {
+    return String(onchainTask[6] ?? "").toUpperCase();
+  }
+  if (onchainTask && typeof onchainTask === "object") {
+    const snapshot = onchainTask as Record<string, unknown>;
+    return String(snapshot.state_name ?? snapshot.stateName ?? snapshot.state ?? "").toUpperCase();
+  }
+  return "";
+}
+
 const app = express();
 const startupValidation = validateRouterStartupEnv();
 for (const warning of startupValidation.warnings) {
@@ -116,6 +127,14 @@ taskMarketService.attachChainBridge({
   async submitTaskResult({ task, agent, submissionNonce, resultHash, resultPointer }) {
     const onchainAgentId = (agent as OnchainAwareAgent).profile.onchainAgentId ?? agent.profile.agentId;
     if (!task.onchainTaskRef || !onchainAgentId || !chainService.canServerWrite) return null;
+    const onchainTask = await chainService.readTask(task.taskId);
+    const onchainState = extractOnchainTaskStateName(onchainTask);
+    if (!["ASSIGNED", "EXECUTING"].includes(onchainState)) {
+      console.warn(
+        `Skipping submit_task for ${task.taskId}: Arc contract state ${onchainState || "unknown"} cannot accept a submission.`,
+      );
+      return null;
+    }
     return chainService.submitTaskResult({
       taskId: task.taskId,
       agentOnchainId: onchainAgentId,

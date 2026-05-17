@@ -586,19 +586,19 @@ test("Improve Again reopens a built-in platform task and dispatches a controlled
   assert.ok(improveCalls[0].refinementContext.feedbackSummary.length > 0);
 });
 
-test("assisted consensus review can move a task into unresolved instead of naive approval", async () => {
+test("assisted review stays advisory and leaves owner approval available", async () => {
   const store = new InMemoryRegistryStore();
   seedAgents(store);
-  const consensusEvaluator = {
+  const advisoryEvaluator = {
     ...evaluatorClient,
-    async runConsensus() {
+    async runAssisted() {
       return {
-        evaluationId: "eval_consensus_1",
-        taskId: "task_consensus",
+        evaluationId: "eval_advisory_1",
+        taskId: "task_advisory",
         winningSubmissionId: "submission_1",
         scores: [],
-        summary: "Validator agreement was too weak to finalize safely.",
-        reasoning: "Mixed validator signals.",
+        summary: "AI review confidence is medium, so the owner should inspect the result.",
+        reasoning: "Mixed quality signals.",
         normalizedScore: 0.63,
         overallScore: 63,
         finalDecision: "needs_human_review",
@@ -606,18 +606,18 @@ test("assisted consensus review can move a task into unresolved instead of naive
         consensusScore: 63,
         validatorAgreement: 0.33,
         consensusConfidence: 0.57,
-        equivalenceSummary: "Partial equivalence but not enough for automatic finalization.",
-        path: "subjective_consensus",
+        equivalenceSummary: "Partial fit; owner decision required.",
+        path: "assisted_evaluation",
         findings: [],
-        reviewerType: "genlayer_subjective",
+        reviewerType: "machine_assisted",
         createdAt: new Date().toISOString(),
       };
     },
   };
-  const service = new TaskMarketService(store, createRegistryServiceStub(store) as never, consensusEvaluator as never, new SafetyService(store));
+  const service = new TaskMarketService(store, createRegistryServiceStub(store) as never, advisoryEvaluator as never, new SafetyService(store));
 
   const created = service.createTaskDraft({
-    title: "Consensus task",
+    title: "Advisory task",
     description: "Return a structured competitive brief with explicit constraints.",
     category: "research",
     rewardAmount: 90,
@@ -635,7 +635,7 @@ test("assisted consensus review can move a task into unresolved instead of naive
     createTxHash: "tx_create",
     fundTxHash: "tx_fund",
     assignTxHash: "tx_assign",
-    onchainTaskRef: "onchain:consensus",
+    onchainTaskRef: "onchain:advisory",
     latestReceipt: {
       hash: "tx_assign",
       status: "ACCEPTED",
@@ -644,63 +644,53 @@ test("assisted consensus review can move a task into unresolved instead of naive
       createdAt: new Date().toISOString(),
     },
   });
-  await service.markSubmissionReceived(created.task.taskId, "agent_fast", "memory://result", "hash_consensus");
+  await service.markSubmissionReceived(created.task.taskId, "agent_fast", "memory://result", "hash_advisory");
   const reviewed = await service.reviewAssisted(created.task.taskId, "0xbuyer", service.getTask(created.task.taskId).latestSubmissionId!);
 
-  assert.equal(reviewed.task.status, "UNRESOLVED");
-  assert.equal(reviewed.task.resultStatus, "unresolved");
-  assert.equal(reviewed.task.reviewActions.includes("appeal"), true);
+  assert.equal(reviewed.task.status, "UNDER_REVIEW");
+  assert.equal(reviewed.task.resultStatus, "submitted");
+  assert.equal(reviewed.task.reviewActions.includes("approve"), true);
+  assert.equal(reviewed.task.reviewActions.includes("reject"), true);
+
+  const advisorySubmissionId = service.getTask(created.task.taskId).latestSubmissionId!;
+  const approved = await service.reviewWithUser(created.task.taskId, advisorySubmissionId, {
+    taskId: created.task.taskId,
+    submissionId: advisorySubmissionId,
+    reviewerWallet: "0xbuyer",
+    decision: "approve",
+    starRating: 5,
+    feedback: "The result is useful enough to approve.",
+  });
+  assert.equal(approved.task.status, "APPROVED");
+  assert.equal(service.getTask(created.task.taskId).settlementSummary?.canReleasePayment, true);
 });
 
 test("appeal reruns consensus and can resolve a previously disputed task into approval", async () => {
   const store = new InMemoryRegistryStore();
   seedAgents(store);
-  let consensusCalls = 0;
   const appealEvaluator = {
     ...evaluatorClient,
     async runConsensus() {
-      consensusCalls += 1;
-      return consensusCalls === 1
-        ? {
-            evaluationId: "eval_first",
-            taskId: "task_appeal",
-            winningSubmissionId: "submission_1",
-            scores: [],
-            summary: "Validator signals conflicted.",
-            reasoning: "Conflicting assessment.",
-            normalizedScore: 0.58,
-            overallScore: 58,
-            finalDecision: "needs_human_review",
-            finalOutcome: "disputed",
-            consensusScore: 58,
-            validatorAgreement: 0.33,
-            consensusConfidence: 0.55,
-            equivalenceSummary: "Conflicting equivalence judgment.",
-            path: "subjective_consensus",
-            findings: [],
-            reviewerType: "genlayer_subjective",
-            createdAt: new Date().toISOString(),
-          }
-        : {
-            evaluationId: "eval_appeal",
-            taskId: "task_appeal",
-            winningSubmissionId: "submission_1",
-            scores: [],
-            summary: "Appeal consensus now supports acceptance.",
-            reasoning: "Stricter review converged.",
-            normalizedScore: 0.84,
-            overallScore: 84,
-            finalDecision: "approve",
-            finalOutcome: "accepted",
-            consensusScore: 84,
-            validatorAgreement: 0.67,
-            consensusConfidence: 0.8,
-            equivalenceSummary: "Appeal validators found the result equivalent enough to accept.",
-            path: "subjective_consensus",
-            findings: [],
-            reviewerType: "genlayer_subjective",
-            createdAt: new Date().toISOString(),
-          };
+      return {
+        evaluationId: "eval_appeal",
+        taskId: "task_appeal",
+        winningSubmissionId: "submission_1",
+        scores: [],
+        summary: "Appeal review now supports acceptance.",
+        reasoning: "Escalated review converged.",
+        normalizedScore: 0.84,
+        overallScore: 84,
+        finalDecision: "approve",
+        finalOutcome: "accepted",
+        consensusScore: 84,
+        validatorAgreement: 0.67,
+        consensusConfidence: 0.8,
+        equivalenceSummary: "Appeal review found the result strong enough to accept.",
+        path: "subjective_consensus",
+        findings: [],
+        reviewerType: "genlayer_subjective",
+        createdAt: new Date().toISOString(),
+      };
     },
   };
   const service = new TaskMarketService(store, createRegistryServiceStub(store) as never, appealEvaluator as never, new SafetyService(store));
@@ -733,7 +723,18 @@ test("appeal reruns consensus and can resolve a previously disputed task into ap
     },
   });
   await service.markSubmissionReceived(created.task.taskId, "agent_fast", "memory://result", "hash_appeal");
-  await service.reviewAssisted(created.task.taskId, "0xbuyer", service.getTask(created.task.taskId).latestSubmissionId!);
+  service.markDisputeOpened(created.task.taskId, "0xbuyer", "Manual dispute opened for appeal test.", {
+    settlementId: "settlement_dispute",
+    taskId: created.task.taskId,
+    grossReward: 90,
+    platformFee: 0,
+    agentPayout: 0,
+    refundAmount: 0,
+    settlementTimestamp: new Date().toISOString(),
+    txReference: "arc:dispute",
+    settlementState: "disputed",
+    outcome: "paused",
+  });
   const appealed = await service.appealTask(created.task.taskId, "0xbuyer", "The result should be judged on usefulness, not wording.");
 
   assert.equal(appealed.task.status, "APPROVED");

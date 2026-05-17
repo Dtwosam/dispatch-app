@@ -248,16 +248,16 @@ export function renderTaskDetailPageView({
           <div class="task-summary">
             <div class="metric-card"><strong>${resultModel?.qualityScore ?? "N/A"}</strong><span>Quality Score</span></div>
             <div class="metric-card"><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong><span>Confidence</span></div>
-            <div class="metric-card"><strong>${resultModel?.validatorAgreement != null ? `${resultModel.validatorAgreement}%` : "N/A"}</strong><span>Validator Agreement</span></div>
+            <div class="metric-card"><strong>${resultModel?.reviewConfidence != null ? `${resultModel.reviewConfidence}%` : "N/A"}</strong><span>Review Confidence</span></div>
             <div class="metric-card"><strong>${escapeHtml(resultModel?.finalOutcome ? labelize(resultModel.finalOutcome) : (resultModel?.workerLabel || "Marketplace Agent"))}</strong><span>${resultModel?.finalOutcome ? "Result Status" : "Worker"}</span></div>
           </div>
-          ${resultModel?.consensusScore != null || resultModel?.consensusConfidence != null || resultModel?.equivalenceSummary ? `
+          ${resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote ? `
             <div class="status-banner info">
-              <strong>AI-backed verification</strong>
+              <strong>AI review guidance</strong>
               <p>
-                ${resultModel?.consensusScore != null ? `Consensus score ${resultModel.consensusScore}. ` : ""}
-                ${resultModel?.consensusConfidence != null ? `Consensus confidence ${resultModel.consensusConfidence}%. ` : ""}
-                ${escapeHtml(resultModel?.equivalenceSummary || "Different outputs can still be accepted when they solve the task equivalently.")}
+                ${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}
+                ${resultModel?.reviewConfidence != null ? `Review confidence ${resultModel.reviewConfidence}%. ` : ""}
+                ${escapeHtml(resultModel?.evaluationNote || "AI review is only guidance. The task owner makes the final approval decision.")}
               </p>
             </div>
           ` : ""}
@@ -314,6 +314,7 @@ export function renderTaskDetailPageView({
             </div>
             <div class="secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
+              ${resultModel?.improveAgainUnavailableReason ? `<p class="muted">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
               ${reviewModel.advancedActions.includes("dispute") ? `<button data-task-action="dispute" data-task-id="${task.taskId}">Open dispute</button>` : ""}

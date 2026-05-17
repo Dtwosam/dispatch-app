@@ -209,20 +209,20 @@ export function buildTaskLifecycleModel(task, options = {}) {
     },
     {
       key: "review",
-      label: approved ? "Approved" : rejected ? "Rejected" : disputed ? "Disputed" : unresolved ? "Needs appeal" : underReview ? "Under evaluator review" : submitted ? "Awaiting review" : "Review pending",
+      label: approved ? "Approved" : rejected ? "Rejected" : disputed ? "Disputed" : unresolved ? "Review paused" : underReview ? "Owner review" : submitted ? "Awaiting owner review" : "Review pending",
       status: approved ? "complete" : rejected || disputed || unresolved ? "warning" : underReview ? "current" : "pending",
       helper: approved
-        ? "Evaluator review accepted the output for settlement."
+        ? "The task owner approved the output for settlement."
         : rejected
           ? "The submitted output did not meet the payout bar."
           : disputed
-            ? "Review disagreement paused payout."
+            ? "A dispute paused payout."
             : unresolved
-              ? "Review confidence was too weak to finalize the result."
+              ? "Manual escalation is needed before payout can move."
               : underReview
-                ? "Evaluators are verifying the submitted work."
+                ? "AI review is guidance. The task owner makes the final approval decision."
                 : submitted
-                  ? "The output is waiting for review."
+                  ? "The output is waiting for owner review."
                   : "Review starts after submission.",
       timestamp: timelineByKind.get("review_started") || timelineByKind.get("result_verified") || null,
     },
@@ -402,11 +402,11 @@ export function buildReviewPanelModel(task) {
     headline: settlementReady
       ? "This task is ready for Arc Testnet USDC settlement."
       : finalOutcome === "disputed"
-        ? "Validator disagreement paused payout and opened a dispute-ready state."
+        ? "A dispute paused payout and opened an escalation path."
         : finalOutcome === "unresolved" || task?.status === "UNRESOLVED"
-          ? "Validator agreement was too weak to finalize this result. Appeal can trigger a stricter pass before payout moves."
+          ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths."
         : canReviewSubmittedResult
-          ? (hasEvaluation ? "Verified review is ready for your decision." : "Review decides whether USDC payout moves.")
+          ? (hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or reject." : "Review the submitted output and decide whether USDC payout moves.")
         : "Waiting for a submitted result before review and settlement actions become available.",
   };
 }
@@ -432,10 +432,14 @@ export function buildTaskResultModel(task, executionRuns = []) {
   const summary = finalOutput?.summary || task?.structuredNotes || "";
 
   const improveEligibleStatuses = new Set(["SUBMITTED", "UNDER_REVIEW", "REJECTED"]);
-  const canImproveAgain = Boolean(
+  const hasLiveOnchainAnchor = /^0x[a-f0-9]{40}:/i.test(String(task?.onchainTaskRef || ""));
+  const otherwiseImproveEligible = Boolean(
     latestRun?.endpointUrl?.startsWith("platform://")
       && improveEligibleStatuses.has(task?.status)
       && !["settled", "refunded", "disputed"].includes(task?.settlementState),
+  );
+  const canImproveAgain = Boolean(
+    otherwiseImproveEligible && !hasLiveOnchainAnchor,
   );
 
   return {
@@ -445,11 +449,10 @@ export function buildTaskResultModel(task, executionRuns = []) {
       ? sections.map((section) => `${section.heading}\n${(section.bullets || []).map((bullet) => `- ${bullet}`).join("\n")}`).join("\n\n")
       : String(summary || "").trim(),
     qualityScore: typeof trace?.score === "number" ? Math.round(trace.score) : typeof evaluation?.overall === "number" ? Math.round(evaluation.overall) : null,
-    consensusScore: typeof task?.latestEvaluation?.consensusScore === "number" ? Math.round(task.latestEvaluation.consensusScore) : null,
-    validatorAgreement: typeof task?.latestEvaluation?.validatorAgreement === "number" ? Math.round(task.latestEvaluation.validatorAgreement * 100) : null,
-    consensusConfidence: typeof task?.latestEvaluation?.consensusConfidence === "number" ? Math.round(task.latestEvaluation.consensusConfidence * 100) : null,
+    aiReviewScore: typeof task?.latestEvaluation?.consensusScore === "number" ? Math.round(task.latestEvaluation.consensusScore) : null,
+    reviewConfidence: typeof task?.latestEvaluation?.consensusConfidence === "number" ? Math.round(task.latestEvaluation.consensusConfidence * 100) : null,
     finalOutcome: task?.latestEvaluation?.finalOutcome || null,
-    equivalenceSummary: task?.latestEvaluation?.equivalenceSummary || null,
+    evaluationNote: task?.latestEvaluation?.equivalenceSummary || task?.latestEvaluation?.summary || null,
     confidence: trace?.confidence || finalOutput?.confidence || null,
     modeUsed: trace?.mode || null,
     workerLabel: latestRun?.endpointUrl?.startsWith("platform://") ? "Platform Agent" : null,
@@ -465,6 +468,9 @@ export function buildTaskResultModel(task, executionRuns = []) {
     stageTimingsMs,
     hasDraft: Boolean(draftOutput),
     canImproveAgain,
+    improveAgainUnavailableReason: !canImproveAgain && otherwiseImproveEligible && hasLiveOnchainAnchor
+      ? "Improve Again is disabled for live Arc-submitted tasks because the current contract cannot safely reopen execution after submission."
+      : null,
     latestRunId: latestRun?.runId || null,
   };
 }

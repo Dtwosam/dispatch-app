@@ -466,10 +466,10 @@ function evaluation(taskId: string, agentId: string, score: number, decision: "a
     validatorAgreement: decision === "needs_human_review" ? 0.5 : 0.67,
     consensusConfidence: decision === "needs_human_review" ? 0.58 : 0.78,
     equivalenceSummary: decision === "approve"
-      ? "Seed validators judged the seeded output equivalent to a successful task completion."
+      ? "Seed AI review judged the output useful enough to recommend approval."
       : decision === "reject"
-        ? "Seed validators judged the seeded output not equivalent to the requested outcome."
-        : "Seed validators kept the result unresolved because agreement remained weak.",
+        ? "Seed AI review judged the output below the requested outcome."
+        : "Seed AI review recommends owner inspection before final approval.",
     path,
     findings: [
       {

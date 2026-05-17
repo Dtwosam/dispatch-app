@@ -341,7 +341,7 @@ function renderArcDemo() {
     ["Task posted", "create_funded_task", "Buyer anchors the task spec hash and reward in the Intelligent Contract."],
     ["Agent assigned", "assign_task", "The Platform Agent is selected through the same marketplace path future agents use."],
     ["Result submitted", "submit_result", "The agent stores rich output offchain and anchors a result hash onchain."],
-    ["Review finalized", "finalize_review", "Three validator inputs are aggregated with equivalence-aware scoring."],
+    ["Owner review", "finalize_review", "AI evaluation gives guidance, but the task owner makes the payout decision."],
     ["Settlement ready", "settle_task", "Accepted work becomes payout-safe and updates agent reputation."],
   ];
   const current = Math.min(Number(demo.step || 0), steps.length - 1);
@@ -381,10 +381,10 @@ function renderArcDemo() {
     <section class="shell-section" data-reveal>
       <div class="section-head">
         <div>
-          <p class="mini-label">Optimistic Democracy</p>
-          <h2>Multi-validator review, not one model verdict.</h2>
+          <p class="mini-label">Assisted review</p>
+          <h2>AI review guides the owner decision.</h2>
         </div>
-        <span class="meta-pill">Equivalence-aware</span>
+        <span class="meta-pill">Owner decides</span>
       </div>
       <div class="steps-grid">
         ${steps
@@ -407,15 +407,15 @@ function renderArcDemo() {
         </div>
       </div>
       <div class="metrics-grid">
-        <article class="metric-card"><strong>${demo.consensusScore}%</strong><span>Consensus score</span></article>
-        <article class="metric-card"><strong>${demo.validatorAgreement}%</strong><span>Validator agreement</span></article>
-        <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Consensus confidence</span></article>
+        <article class="metric-card"><strong>${demo.consensusScore}%</strong><span>AI review score</span></article>
+        <article class="metric-card"><strong>${demo.validatorAgreement}%</strong><span>Review confidence</span></article>
+        <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Guidance confidence</span></article>
         <article class="metric-card"><strong>${current >= 4 ? "yes" : "no"}</strong><span>Settlement eligible</span></article>
       </div>
       <div class="status-banner ${current >= 4 ? "is-success" : "is-neutral"}">
         <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
         <p>${current >= 4
-          ? "The Intelligent Contract can settle because the result passed score, agreement, and confidence thresholds."
+          ? "Settlement can move because the task owner approved the result after AI review guidance."
           : "Advance the demo to see the task move from funded work to result review and settlement eligibility."}</p>
       </div>
     </section>
@@ -1059,13 +1059,13 @@ async function createTask() {
         message = "Funding completed, but the direct-hire assignment step did not finish. The task may still need one more wallet confirmation.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "create_task") {
         writeResult.createTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent create_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent create_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "fund_task") {
         writeResult.fundTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent fund_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent fund_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "assign_task") {
         writeResult.assignTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent assign_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent assign_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       }
     }
     if (taskId) {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildAgentIdentityBadges, buildRecentAgentWork, buildTaskLifecycleModel } from "./ui-models.js";
+import { buildAgentIdentityBadges, buildRecentAgentWork, buildTaskLifecycleModel, buildTaskResultModel } from "./ui-models.js";
 
 test("platform agents expose the Platform Agent badge for marketplace rendering", () => {
   const badges = buildAgentIdentityBadges({
@@ -209,4 +209,29 @@ test("task lifecycle prefers backend settlement summaries for refund-ready and d
   assert.equal(refundModel.settlementLabel, "Refund available");
   assert.equal(refundModel.settlementMessage, "Rejected. Refund available.");
   assert.equal(disputedModel.settlementMessage, "Disputed. Settlement paused.");
+});
+
+test("live Arc-submitted tasks disable Improve Again before it can hit submit_task", () => {
+  const model = buildTaskResultModel(
+    {
+      taskId: "task_arc",
+      status: "SUBMITTED",
+      settlementState: "reward_funded",
+      onchainTaskRef: "0xbd79cff0ff452b566f7c84ffc4dd4a2ee24c73eb:task_arc",
+      structuredNotes: "Submitted result",
+      selectedAgents: [{ originType: "platform" }],
+    },
+    [{
+      runId: "run_arc",
+      state: "completed",
+      endpointUrl: "platform://thread-writer",
+      updatedAt: "2026-04-03T10:00:00.000Z",
+      rawPayload: {
+        finalOutput: { summary: "Final", sections: [] },
+      },
+    }],
+  );
+
+  assert.equal(model.canImproveAgain, false);
+  assert.match(model.improveAgainUnavailableReason, /cannot safely reopen execution/);
 });

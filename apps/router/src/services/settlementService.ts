@@ -38,7 +38,7 @@ export class SettlementService {
       throw new Error("Open disputes must be resolved before payout");
     }
     if (["DISPUTED", "APPEALED", "UNRESOLVED"].includes(task.status) || ["disputed", "unresolved"].includes(task.settlementState)) {
-      throw new Error("Consensus review has not reached a payout-safe final state yet");
+      throw new Error("Dispute or appeal review has not reached a payout-safe final state yet");
     }
     if (task.status !== "APPROVED") {
       throw new Error("Task must be approved before settlement release.");

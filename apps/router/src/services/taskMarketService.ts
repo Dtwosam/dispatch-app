@@ -732,8 +732,9 @@ export class TaskMarketService {
     }
     const request = this.buildEvaluationRequest(task, submissionId, "user_review");
     const result = await this.evaluatorClient.submitUserReview(request, review);
+    const normalizedResult = this.normalizeEvaluationResult(task, submissionId, result);
     task.userReview = review;
-    task.latestEvaluation = result;
+    task.latestEvaluation = normalizedResult;
     task.timeline.push(this.timeline("review_started", "User review recorded", review.decision === "approve" ? "The buyer approved the submission." : "The buyer rejected the submission."));
     this.store.tasks.set(taskId, task);
     return review.decision === "approve"
@@ -749,8 +750,8 @@ export class TaskMarketService {
     if (!["SUBMITTED", "UNDER_REVIEW"].includes(task.status)) {
       throw new Error("Assisted evaluation requires a submitted result");
     }
-    const result = await this.runConsensusReview(task, submissionId, "assisted_evaluation");
-    return this.applyConsensusOutcome(taskId, actorWallet, submissionId, result, "Assisted evaluation");
+    const result = await this.runAdvisoryReview(task, submissionId, "assisted_evaluation");
+    return this.applyAdvisoryReview(taskId, actorWallet, submissionId, result, "Assisted evaluation");
   }
 
   async reviewHybrid(taskId: string, actorWallet: string, submissionId: string): Promise<TaskActionResponse> {
@@ -761,25 +762,8 @@ export class TaskMarketService {
     if (!["SUBMITTED", "UNDER_REVIEW"].includes(task.status)) {
       throw new Error("Hybrid review requires a submitted result");
     }
-    const result = await this.runConsensusReview(task, submissionId, "hybrid_review");
-    if (task.status === "SUBMITTED") {
-      this.transitionTask(task, "UNDER_REVIEW");
-      task.status = "UNDER_REVIEW";
-    }
-    task.latestEvaluation = result;
-    task.timeline.push(this.timeline("review_started", "Hybrid evaluation prepared", result.summary));
-    if (result.finalOutcome === "disputed" || result.finalOutcome === "unresolved") {
-      return this.applyConsensusOutcome(taskId, actorWallet, submissionId, result, "Hybrid evaluation");
-    }
-    this.store.tasks.set(taskId, task);
-    this.annotateLatestRun(taskId, {
-      reviewOutcome: this.toRunReviewOutcome(result),
-      consensusScore: result.consensusScore ?? result.overallScore ?? null,
-      validatorAgreement: result.validatorAgreement ?? null,
-      consensusConfidence: result.consensusConfidence ?? null,
-      finalOutcome: result.finalOutcome ?? null,
-    });
-    return taskActionResponseSchema.parse({ task });
+    const result = await this.runAdvisoryReview(task, submissionId, "hybrid_review");
+    return this.applyAdvisoryReview(taskId, actorWallet, submissionId, result, "Hybrid evaluation");
   }
 
   async confirmHybrid(taskId: string, actorWallet: string, evaluationId: string, confirmDecision: "approve" | "reject", feedback: string | null): Promise<TaskActionResponse> {
@@ -892,6 +876,9 @@ export class TaskMarketService {
     this.assertTaskFunded(task, "Task must be funded before execution.");
     if (!["SUBMITTED", "UNDER_REVIEW", "REJECTED"].includes(task.status)) {
       throw new Error("Improve Again is only available after a platform agent has submitted work and before final settlement");
+    }
+    if (/^0x[a-f0-9]{40}:/i.test(String((task as OnchainAwareTaskDetail).onchainTaskRef || ""))) {
+      throw new Error("Improve Again is disabled for live Arc-submitted tasks because the current contract cannot safely reopen execution after submission.");
     }
     if (!this.executionEngine?.requestImproveAgain) {
       throw new Error("Execution engine does not support Improve Again");
@@ -1298,6 +1285,54 @@ export class TaskMarketService {
       : this.evaluatorClient.runConsensus(request);
   }
 
+  private async runAdvisoryReview(
+    task: TaskDetailView,
+    submissionId: string,
+    path: "assisted_evaluation" | "hybrid_review",
+  ) {
+    const request = this.buildEvaluationRequest(task, submissionId, path);
+    return path === "hybrid_review"
+      ? this.evaluatorClient.runHybrid(request)
+      : this.evaluatorClient.runAssisted(request);
+  }
+
+  private applyAdvisoryReview(
+    taskId: string,
+    actorWallet: string,
+    submissionId: string,
+    result: EvaluationRunResponse,
+    stageLabel: string,
+  ): TaskActionResponse {
+    const task = this.requireCreatorTask(taskId, actorWallet) as OnchainAwareTaskDetail;
+    const normalizedResult = this.normalizeEvaluationResult(task, submissionId, result);
+    if (task.status === "SUBMITTED") {
+      this.transitionTask(task, "UNDER_REVIEW");
+      task.status = "UNDER_REVIEW";
+    }
+    task.resultStatus = "submitted";
+    task.latestEvaluation = normalizedResult;
+    task.reviewActions = ["approve", "reject", "dispute"];
+    task.updatedAt = new Date().toISOString();
+    task.timeline.push(
+      this.timeline(
+        "review_started",
+        `${stageLabel} completed`,
+        `${normalizedResult.summary} AI review is guidance only; the task owner decides final approval.`,
+      ),
+    );
+    this.store.tasks.set(taskId, task);
+    this.annotateLatestRun(taskId, {
+      reviewOutcome: "needs_human_review",
+      consensusScore: normalizedResult.consensusScore ?? normalizedResult.overallScore ?? null,
+      validatorAgreement: normalizedResult.validatorAgreement ?? null,
+      consensusConfidence: normalizedResult.consensusConfidence ?? null,
+      finalOutcome: normalizedResult.finalOutcome ?? null,
+      equivalenceSummary: normalizedResult.equivalenceSummary ?? null,
+      appealRound: normalizedResult.appealRound ?? task.appealRecord?.appealRound ?? 0,
+    });
+    return taskActionResponseSchema.parse({ task });
+  }
+
   private async applyConsensusOutcome(
     taskId: string,
     actorWallet: string,
@@ -1359,7 +1394,7 @@ export class TaskMarketService {
       task.resultStatus = "approved";
       task.settlementState = "pending_settlement";
       task.reviewActions = ["settle"];
-      task.timeline.push(this.timeline("result_verified", "Verified by AI review", "Validator consensus accepted the result and settlement can proceed."));
+      task.timeline.push(this.timeline("result_verified", "Appeal review accepted", "Escalated review accepted the result and settlement can proceed."));
     } else if (outcome === "rejected") {
       if (this.chainBridge && ["SUBMITTED", "UNDER_REVIEW"].includes(task.status)) {
         const chainReceipt = await this.chainBridge.rejectSubmission(task, submissionId);
@@ -1372,7 +1407,7 @@ export class TaskMarketService {
       task.resultStatus = "rejected";
       task.settlementState = "pending_settlement";
       task.reviewActions = ["refund", "dispute", "appeal"];
-      task.timeline.push(this.timeline("rejected", "Consensus rejected result", "Validator consensus found the result below acceptance threshold."));
+      task.timeline.push(this.timeline("rejected", "Appeal review rejected result", "Escalated review found the result below the acceptance threshold."));
     } else if (outcome === "disputed") {
       this.transitionTask(task, "DISPUTED", { allowDisputeBypass: task.status === "DISPUTED" });
       task.status = "DISPUTED";
@@ -1388,14 +1423,14 @@ export class TaskMarketService {
         resolvedAt: null,
         resolution: null,
       };
-      task.timeline.push(this.timeline("disputed", "Consensus flagged dispute", "Validator signals conflicted strongly enough to pause payout and require escalation."));
+      task.timeline.push(this.timeline("disputed", "Escalated review opened dispute", "Review signals conflicted strongly enough to pause payout and require escalation."));
     } else {
       this.transitionTask(task, "UNRESOLVED", { allowDisputeBypass: task.status === "DISPUTED" });
       task.status = "UNRESOLVED";
       task.resultStatus = "unresolved";
       task.settlementState = "unresolved";
       task.reviewActions = ["appeal"];
-      task.timeline.push(this.timeline("result_unresolved", "Consensus remained unresolved", "Validator agreement was too weak to approve or reject the result safely."));
+      task.timeline.push(this.timeline("result_unresolved", "Escalated review unresolved", "Appeal review could not approve or reject the result safely."));
     }
 
     task.updatedAt = new Date().toISOString();

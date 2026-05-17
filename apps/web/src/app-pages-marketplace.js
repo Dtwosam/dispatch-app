@@ -89,7 +89,7 @@ function renderHomeHero({
             <span class="hero-stage__index">03</span>
             <div>
               <strong>Verified outcome ready</strong>
-              <p>${escapeHtml(resultTask)} -> Optimistic Democracy review -> USDC release</p>
+              <p>${escapeHtml(resultTask)} -> owner approval -> USDC release</p>
             </div>
             <span class="tag">Settlement ready</span>
           </article>
@@ -122,7 +122,7 @@ function renderFlowStrip() {
         <article class="step-card flow-strip__card">
           <div class="step-icon">3</div>
           <strong>Review + settlement</strong>
-          <p>Multi-validator review verifies the outcome before USDC release or refund.</p>
+          <p>AI review gives guidance, then the task owner approves, rejects, or escalates before USDC release or refund.</p>
         </article>
       </div>
     </section>
@@ -433,7 +433,7 @@ export function renderHomePage({ el, state, onNavigate }) {
           <article class="step-card">
             <div class="step-icon">3</div>
             <strong>Approve and settle</strong>
-            <p>Release USDC only after multi-validator review confirms the work.</p>
+            <p>Release USDC after the task owner approves the submitted work.</p>
           </article>
         </div>
       </section>

@@ -338,11 +338,11 @@ export class DemoFlowService {
       consensusScore: 86,
       validatorAgreement: 0.91,
       consensusConfidence: 0.88,
-      equivalenceSummary: "Validator-style review judged the delivered thread equivalent to the requested funded outcome.",
+      equivalenceSummary: "AI review judged the delivered thread strong enough to recommend approval.",
       path: "hybrid_review",
       findings: [
         {
-          reviewerId: "demo_validator_1",
+          reviewerId: "demo_ai_reviewer_1",
           reviewerType: "machine_assisted",
           decision: "approve",
           acceptanceSignal: "accept",
