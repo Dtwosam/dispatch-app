@@ -1180,17 +1180,35 @@ small {
 
 .live-feed,
 .leaderboard,
-.task-rail {
+.task-rail,
+.work-history {
   display: grid;
   gap: 14px;
 }
 
 .feed-card,
 .leader-row,
-.task-row {
+.task-row,
+.work-history__item {
   display: grid;
   gap: 10px;
   padding: 18px 20px;
+}
+
+.work-history__item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.work-history__main,
+.work-history__meta {
+  display: grid;
+  gap: 4px;
+}
+
+.work-history__meta {
+  justify-items: end;
 }
 
 .feed-card {
@@ -1286,6 +1304,14 @@ small {
   gap: 14px;
 }
 
+.agent-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .agent-card__identity {
   grid-template-columns: auto 1fr;
   align-items: center;
@@ -1303,7 +1329,7 @@ small {
 }
 
 .agent-metrics {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .agent-metrics div {
@@ -1316,6 +1342,25 @@ small {
 
 .agent-metrics span {
   color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.agent-metrics strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.agent-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(101, 211, 197, 0.14);
+  color: var(--brand-strong);
+  font-weight: 700;
   font-size: 0.85rem;
 }
 

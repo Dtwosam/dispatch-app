@@ -45715,6 +45715,7 @@ function custom(provider, config = {}) {
 
 // node_modules/viem/_esm/index.js
 init_abis();
+init_formatUnits();
 
 // apps/web/src/browser-wallet.js
 function listInjectedProviders() {
@@ -45760,7 +45761,15 @@ async function connectInjectedWallet() {
   if (!provider?.request) {
     throw new Error("Rabby or another injected wallet was not detected in this browser.");
   }
-  const accounts = await provider.request({ method: "eth_requestAccounts" });
+  let accounts;
+  try {
+    accounts = await provider.request({ method: "eth_requestAccounts" });
+  } catch (error) {
+    if (error?.code === 4001) {
+      throw new Error("Wallet connection was rejected. Approve the connection request to fund tasks with testnet USDC.");
+    }
+    throw error;
+  }
   if (!Array.isArray(accounts) || !accounts[0]) {
     throw new Error("No browser wallet account was returned.");
   }
@@ -45861,6 +45870,9 @@ function validateAgentView(agent, label = "agent") {
   if (profile.skillCategories !== void 0) assertArray(profile.skillCategories, `${label}.profile.skillCategories`);
   assertObject(profile.expectedLatencyMsRange, `${label}.profile.expectedLatencyMsRange`);
   assertNumber(performanceSummary.tasksCompleted, `${label}.performanceSummary.tasksCompleted`);
+  assertNumber(performanceSummary.successRate, `${label}.performanceSummary.successRate`);
+  assertNumber(performanceSummary.averageResponseTimeMs, `${label}.performanceSummary.averageResponseTimeMs`);
+  assertNumber(performanceSummary.totalEarnings, `${label}.performanceSummary.totalEarnings`);
   return row;
 }
 function validateTaskSummary(task, label = "task") {
@@ -45990,6 +46002,9 @@ var marketplaceAbi = parseAbi([
   "function assign_task(string taskId, string agentId)"
 ]);
 var MAX_UINT256 = (1n << 256n) - 1n;
+var ARC_TESTNET_CHAIN_ID = 5042002;
+var ARC_TESTNET_USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
+var ARC_TESTNET_USDC_DECIMALS = 6;
 function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
   let browserContextPromise = null;
   async function getConfig() {
@@ -46001,7 +46016,7 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
   async function connectWallet() {
     const walletAddress = getWalletAddress()?.trim();
     if (!walletAddress) {
-      throw new Error("Connect a browser wallet before sending an Arc transaction.");
+      throw new Error("Connect a browser wallet before sending an Arc Testnet transaction.");
     }
     return { walletAddress };
   }
@@ -46021,8 +46036,9 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
       throw new Error("Arc writes are disabled in this environment.");
     }
     if (config.chainMode !== "browser_wallet") {
-      throw new Error("Task posting on Arc must be signed from the connected browser wallet.");
+      throw new Error(`Task posting on ${chainDisplayName(config)} must be signed from the connected browser wallet.`);
     }
+    assertBrowserFundingConfig(config);
     return createBrowserTaskLifecycle({
       config,
       taskId,
@@ -46046,10 +46062,11 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
     selectedAgentId,
     selectedAgentOnchainId
   }) {
+    assertBrowserFundingConfig(config);
     const walletAddress = getWalletAddress()?.trim();
     const providerLabel = getInjectedWalletProviderLabel();
     if (!walletAddress) {
-      throw new Error(`Connect ${providerLabel} before sending an Arc transaction.`);
+      throw new Error(`Connect ${providerLabel} before sending a ${chainDisplayName(config)} transaction.`);
     }
     const { publicClient, walletClient } = await getBrowserWriteContext(config);
     const rewardBaseUnits = toTokenBaseUnits(String(rewardAmount ?? ""), Number(config.paymentTokenDecimals ?? 6));
@@ -46176,7 +46193,7 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
       latestReceipt,
       onchainTaskRef: `${config.taskEscrowAddress}:${taskId}`,
       notes: [
-        `${providerLabel} browser signing is active on Arc.`,
+        `${providerLabel} browser signing is active on Arc Testnet.`,
         `${config.paymentTokenSymbol || "USDC"} approval may be required before escrow funding.`,
         `create_task status: ${createReceipt?.status || "PENDING"}`,
         `fund_task status: ${fundReceipt?.status || "PENDING"}`,
@@ -46254,12 +46271,88 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
     if (config.chainMode !== "browser_wallet") return null;
     return getBrowserWriteContext(config);
   }
+  async function getWalletNetworkSnapshot() {
+    const walletAddress = getWalletAddress()?.trim();
+    const config = await getConfig();
+    const provider = getInjectedWalletProvider();
+    if (!provider?.request) {
+      return {
+        walletAddress,
+        chainId: null,
+        expectedChainId: Number(config.chainId || ARC_TESTNET_CHAIN_ID),
+        isArcTestnet: false,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        tokenDecimals: Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS),
+        message: "No EVM browser wallet was detected."
+      };
+    }
+    const rawChainId = await provider.request({ method: "eth_chainId" }).catch(() => null);
+    const chainId = parseChainId(rawChainId);
+    const expectedChainId = Number(config.chainId || ARC_TESTNET_CHAIN_ID);
+    const isArcTestnet = chainId === expectedChainId;
+    if (!walletAddress || !isArcTestnet) {
+      return {
+        walletAddress,
+        chainId,
+        expectedChainId,
+        isArcTestnet,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        tokenDecimals: Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS),
+        message: !walletAddress ? "Connect a wallet to read Arc Testnet balances." : `Switch to Arc Testnet to fund tasks with testnet USDC.`
+      };
+    }
+    const chain = resolveArcChain(config);
+    const publicClient = createPublicClient({ chain, transport: custom(provider) });
+    const tokenAddress = config.paymentTokenAddress || ARC_TESTNET_USDC_ADDRESS;
+    const tokenDecimals = await publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: "decimals"
+    }).then((value) => Number(value)).catch(() => Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS));
+    const [tokenBalance, nativeGasBalance] = await Promise.all([
+      publicClient.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [walletAddress]
+      }).catch(() => null),
+      publicClient.getBalance({ address: walletAddress }).catch(() => null)
+    ]);
+    return {
+      walletAddress,
+      chainId,
+      expectedChainId,
+      isArcTestnet,
+      usdcBalance: tokenBalance == null ? null : formatUnits(BigInt(tokenBalance), tokenDecimals),
+      nativeGasBalance: nativeGasBalance == null ? null : formatUnits(BigInt(nativeGasBalance), Number(config.gasTokenDecimals ?? 18)),
+      tokenDecimals,
+      message: "Arc Testnet wallet is ready for testnet USDC funding."
+    };
+  }
+  async function switchWalletToArcTestnet() {
+    const config = await getConfig();
+    const provider = getInjectedWalletProvider();
+    if (!provider?.request) {
+      throw new Error("No EVM browser wallet was detected.");
+    }
+    await ensureProviderChain(provider, resolveArcChain(config));
+    browserContextPromise = null;
+    return getWalletNetworkSnapshot();
+  }
+  function resetBrowserContext() {
+    browserContextPromise = null;
+  }
   return {
     getConfig,
     getStatus,
     connectWallet,
     createTaskLifecycle,
     primeBrowserLifecycle,
+    getWalletNetworkSnapshot,
+    switchWalletToArcTestnet,
+    resetBrowserContext,
     pollReceipt,
     readContractState,
     readOnchainTask,
@@ -46285,7 +46378,10 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
           transport: custom(provider)
         });
         return { publicClient, walletClient };
-      })();
+      })().catch((error) => {
+        browserContextPromise = null;
+        throw error;
+      });
     }
     return browserContextPromise;
   }
@@ -46312,11 +46408,27 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
     }
   }
 }
+function assertBrowserFundingConfig(config) {
+  if (!config?.taskEscrowAddress) {
+    throw new Error("Arc marketplace contract address is not configured. Set ARC_TASK_MARKETPLACE_ADDRESS before wallet-funded task posting.");
+  }
+  if (!config?.paymentTokenAddress) {
+    throw new Error("Arc USDC token address is not configured. Set ARC_PAYMENT_TOKEN_ADDRESS to 0x3600000000000000000000000000000000000000.");
+  }
+}
 async function runWriteStep({ walletClient, publicClient, label, stepIndex, totalSteps, onStatus, request }) {
   const stepPrefix = totalSteps > 1 ? `Step ${stepIndex}/${totalSteps}: ` : "";
   onStatus?.("pending_wallet", `${stepPrefix}Confirm ${label} in your wallet.`);
-  const hash3 = await walletClient.writeContract(request);
-  onStatus?.("pending_chain", `${stepPrefix}${label} submitted. Waiting for Arc confirmation.`);
+  let hash3;
+  try {
+    hash3 = await walletClient.writeContract(request);
+  } catch (error) {
+    if (error?.code === 4001 || /user rejected|rejected/i.test(String(error?.message || ""))) {
+      throw new Error(`Transaction rejected. Confirm ${label} in your wallet to continue funding on Arc Testnet.`);
+    }
+    throw error;
+  }
+  onStatus?.("pending_chain", `${stepPrefix}${label} submitted. Waiting for Arc Testnet confirmation.`);
   const receipt = await publicClient.waitForTransactionReceipt({ hash: hash3 });
   if (String(receipt.status).toLowerCase() !== "success") {
     throw new Error(`${label} failed onchain.`);
@@ -46358,7 +46470,7 @@ async function assertSufficientBalances({
   }
   if (BigInt(gasBalance || 0n) === 0n) {
     throw new Error(
-      `${providerLabel} wallet has no ${gasTokenSymbol} available for Arc gas. Add a small gas balance before posting a task.`
+      `${providerLabel} wallet has no native ${gasTokenSymbol} available for Arc gas. Add a small gas balance before posting a task.`
     );
   }
   return {
@@ -46371,7 +46483,7 @@ async function assertSufficientBalances({
 }
 function resolveArcChain(config) {
   return {
-    id: Number(config.chainId || 5042002),
+    id: Number(config.chainId || ARC_TESTNET_CHAIN_ID),
     name: config.networkName || "Arc Testnet",
     nativeCurrency: {
       name: config.gasTokenSymbol || "USDC",
@@ -46385,7 +46497,7 @@ function resolveArcChain(config) {
     },
     blockExplorers: config.explorerBaseUrl ? {
       default: {
-        name: "Arcscan",
+        name: "Explorer",
         url: config.explorerBaseUrl
       }
     } : void 0
@@ -46437,6 +46549,19 @@ function toTokenBaseUnits(amount, decimals = 6) {
   }
   return parseUnits(source, decimals);
 }
+function chainDisplayName(config = {}) {
+  const raw = `${config.chainKey || ""} ${config.networkName || ""}`.toLowerCase();
+  return raw.includes("arc") ? "Arc Testnet" : "Connected EVM network";
+}
+function parseChainId(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
+  const text = String(value || "").trim();
+  if (!text) return null;
+  if (text.startsWith("0x")) return Number.parseInt(text, 16);
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 function formatBaseUnits(value, decimals = 6) {
   const negative = value < 0n;
   const absolute = negative ? -value : value;
@@ -46456,7 +46581,7 @@ function delay(ms) {
 
 // apps/web/src/app-config.js
 function readConfiguredApiBase() {
-  const hostedDefaultApiBase = "https://dispatch-router-production.up.railway.app";
+  const hostedDefaultApiBase = "";
   if (typeof window === "undefined") return "http://localhost:4020";
   const { hostname, origin } = window.location;
   const isLocalHost = ["localhost", "127.0.0.1"].includes(hostname);
@@ -46482,7 +46607,8 @@ var API_BASE = readConfiguredApiBase();
 var routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
-  ["/post-task", "Post Task"],
+  ["/post-task", "Post Funded Task"],
+  ["/arc-demo", "Arc Demo"],
   ["/create-agent", "Create Agent"],
   ["/connect-agent", "Connect Agent"],
   ["/dashboard", "Dashboard"]
@@ -46536,11 +46662,31 @@ function createInitialState() {
       state: "idle",
       message: "No transaction in progress."
     },
+    arcDemo: {
+      step: 0,
+      taskId: "dispatch_demo_research_001",
+      agentId: "platform-agent",
+      reward: 10,
+      consensusScore: 86,
+      validatorAgreement: 78,
+      consensusConfidence: 82
+    },
+    walletNetwork: {
+      loading: false,
+      error: "",
+      chainId: null,
+      expectedChainId: 5042002,
+      isArcTestnet: false,
+      usdcBalance: null,
+      nativeGasBalance: null,
+      tokenDecimals: 6,
+      message: ""
+    },
     task: null,
     history: { items: [] },
     mobileNavOpen: false,
     search: "",
-    filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "trending" },
+    filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
     dashboardTab: "my_tasks",
     wizardStep: 1,
     agentDraftMeta: {
@@ -46556,6 +46702,11 @@ function createInitialState() {
       category: "research",
       description: "External endpoint-backed agent for research, synthesis, and evidence-based task execution.",
       endpointUrl: "",
+      webhookUrl: "",
+      developerName: "",
+      adapterType: "erc8183_adapter",
+      outputSchema: "Structured JSON or markdown result suitable for evaluator review.",
+      payoutWallet: "",
       skills: ["research synthesis", "evidence gathering", "structured output"],
       pricingHint: "Bring your own endpoint",
       minLatencyMs: 1500,
@@ -46767,7 +46918,7 @@ function setChrome(el2, eyebrow, title, sidebarTitle, sidebarLead, progress) {
     <div class="brand-mark">D</div>
     <div class="brand-copy">
       <strong>Dispatch</strong>
-      <p>Hire AI agents that actually deliver.</p>
+      <p>USDC-funded AI work on Arc Testnet.</p>
     </div>
   `;
 }
@@ -46828,11 +46979,15 @@ function renderWalletSheet({
   walletProviderLabel,
   onClose,
   onConnectInjected,
-  onDisconnect
+  onDisconnect,
+  onSwitchNetwork
 }) {
   const providerLabel = walletProviderLabel || "Rabby";
+  const walletNetwork = state2.walletNetwork || {};
   const chainMode = state2.chainStatusError ? "Chain status unavailable" : !state2.chainConfig ? "Checking chain access" : state2.chainConfig.chainMode === "browser_wallet" ? "Browser signing" : state2.chainConfig.chainMode === "server_signer_proxy" ? "Server signer" : "Read only";
   el2.walletSheet.classList.toggle("open", true);
+  const networkLabel = walletNetwork.chainId ? walletNetwork.isArcTestnet ? "Arc Testnet" : `Wrong network (${walletNetwork.chainId})` : "Network not checked";
+  const balanceLabel = walletNetwork.usdcBalance == null ? "Connect on Arc Testnet to read balance" : `${Number(walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} testnet USDC`;
   el2.walletSheet.innerHTML = `
     <div class="wallet-sheet-backdrop" data-wallet="close"></div>
     <div class="wallet-sheet-panel">
@@ -46840,12 +46995,13 @@ function renderWalletSheet({
       <div class="wallet-sheet-hero">
         <div>
           <p class="mini-label">Wallet</p>
-          <h3>Connect and fund work in Dispatch</h3>
-          <p class="muted">Move from browsing to funded execution with a clear signing path, network confirmation, and wallet-owned final approval.</p>
+          <h3>Connect and fund AI work in Dispatch</h3>
+          <p class="muted">Move from browsing to funded execution with an Arc Testnet wallet path, advisory AI review, and owner-controlled payout approval.</p>
         </div>
         <div class="wallet-sheet-badges">
           <span class="meta-pill">${escapeHtml(providerLabel)}</span>
           <span class="meta-pill">${escapeHtml(chainMode)}</span>
+          <span class="meta-pill">${escapeHtml(networkLabel)}</span>
         </div>
       </div>
       <div class="wallet-flow-grid">
@@ -46857,24 +47013,30 @@ function renderWalletSheet({
         <article class="wallet-flow-card">
           <span class="wallet-flow-step">2</span>
           <strong>Switch network</strong>
-          <p>Confirm Arc Testnet so funding, escrow, and receipt tracking stay aligned.</p>
+          <p>Confirm Arc Testnet so funding, settlement, and receipt tracking stay aligned.</p>
         </article>
         <article class="wallet-flow-card">
           <span class="wallet-flow-step">3</span>
-          <strong>Sign task execution</strong>
-          <p>Approve only the exact action you want to fund or settle. The wallet stays in control.</p>
+          <strong>Sign funding and settlement</strong>
+          <p>Approve only the exact Arc Testnet action you want to fund or settle. The wallet stays in control.</p>
         </article>
       </div>
       <article class="wallet-session-card">
         <div>
           <p class="mini-label">Current session</p>
           <h3>${state2.wallet.trim() ? escapeHtml(shortWallet2(state2.wallet)) : "No wallet connected"}</h3>
-          <p class="muted">${state2.wallet.trim() ? `Connected from ${escapeHtml(providerLabel)} and ready for marketplace signing.` : "Connect once and keep the session ready for task funding, review, and settlement."}</p>
+          <p class="muted">${state2.wallet.trim() ? `Connected from ${escapeHtml(providerLabel)}. ${escapeHtml(walletNetwork.message || "Switch to Arc Testnet to fund with testnet USDC.")}` : "Connect once and keep the session ready for task funding, review, and Arc Testnet settlement."}</p>
+          <div class="agent-tags" style="margin-top:12px;">
+            <span class="tag">Network: ${escapeHtml(networkLabel)}</span>
+            <span class="tag">ERC-20 balance: ${escapeHtml(balanceLabel)}</span>
+            ${walletNetwork.nativeGasBalance == null ? "" : `<span class="tag">Native USDC gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(void 0, { maximumFractionDigits: 6 }))}</span>`}
+          </div>
         </div>
         <div class="wallet-session-actions">
           <button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>
             ${walletAvailable ? `${state2.wallet.trim() ? "Reconnect" : "Connect"} ${escapeHtml(providerLabel)}` : "No injected wallet detected"}
           </button>
+          ${state2.wallet.trim() && !walletNetwork.isArcTestnet ? `<button type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : ""}
           ${state2.wallet.trim() ? `<button type="button" id="disconnectWallet">Disconnect</button>` : ""}
           <button type="button" data-wallet="close">Close</button>
         </div>
@@ -46884,7 +47046,7 @@ function renderWalletSheet({
         <p>${state2.walletConnectionType === "injected" && state2.wallet.trim() ? `Connected from browser wallet: ${escapeHtml(shortWallet2(state2.wallet))}.` : "Connect once and the marketplace will keep this workspace ready for live task execution."}</p>
       </div>
       <div class="wallet-sheet-footer">
-        <small>Dispatch handles execution flow, but the final signature and payment decision stay in your wallet.</small>
+        <small>Dispatch handles execution flow, but each Arc Testnet signature and testnet USDC payment decision stays in your wallet. Testnet USDC has no financial value.</small>
       </div>
     </div>
   `;
@@ -46893,6 +47055,9 @@ function renderWalletSheet({
   });
   document.getElementById("disconnectWallet")?.addEventListener("click", () => {
     onDisconnect?.();
+  });
+  document.getElementById("switchArcNetwork")?.addEventListener("click", () => {
+    onSwitchNetwork?.();
   });
   document.querySelectorAll("[data-wallet='close']").forEach((node) => {
     node.addEventListener("click", onClose);
@@ -46918,30 +47083,39 @@ function setButtonLoading(button, loading, text = "") {
   }
 }
 function speedLabel(agent) {
-  const latency = agent.performanceSummary?.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
+  const latency = agent.performanceSummary?.averageResponseTimeMs || agent.performanceSummary?.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
   if (latency <= 12e3) return "Fast";
   if (latency <= 28e3) return "Balanced";
   return "Deep";
 }
 function trustScore(agent) {
-  return Math.round(agent.performanceSummary?.reliabilityScore || 0);
-}
-function trendWeight(agent) {
-  return agent.performanceSummary?.trend === "up" ? 2 : agent.performanceSummary?.trend === "flat" ? 1 : 0;
+  return Math.round(agent.performanceSummary?.rankScore || agent.performanceSummary?.reliabilityScore || 0);
 }
 function sortAgents(items, state2) {
   return [...items].sort((left, right) => {
-    if (state2.filters.sort === "highest_earning") {
+    if (state2.filters.sort === "top_earning") {
       return (right.performanceSummary.totalEarnings || 0) - (left.performanceSummary.totalEarnings || 0);
     }
-    if (state2.filters.sort === "best_rated") {
-      return (right.performanceSummary.averageScore || 0) - (left.performanceSummary.averageScore || 0);
+    if (state2.filters.sort === "highest_success") {
+      return (right.performanceSummary.successRate || 0) - (left.performanceSummary.successRate || 0) || (right.performanceSummary.approvalRate || 0) - (left.performanceSummary.approvalRate || 0) || (right.performanceSummary.tasksCompleted || 0) - (left.performanceSummary.tasksCompleted || 0);
     }
     if (state2.filters.sort === "fastest") {
-      return (left.performanceSummary.averageLatencyMs || left.profile.expectedLatencyMsRange.maxMs) - (right.performanceSummary.averageLatencyMs || right.profile.expectedLatencyMsRange.maxMs);
+      return (left.performanceSummary.averageResponseTimeMs || left.performanceSummary.averageLatencyMs || left.profile.expectedLatencyMsRange.maxMs) - (right.performanceSummary.averageResponseTimeMs || right.performanceSummary.averageLatencyMs || right.profile.expectedLatencyMsRange.maxMs);
     }
-    return trendWeight(right) - trendWeight(left) || trustScore(right) - trustScore(left);
+    return (right.performanceSummary.rankScore || 0) - (left.performanceSummary.rankScore || 0) || (right.performanceSummary.successRate || 0) - (left.performanceSummary.successRate || 0) || (right.performanceSummary.approvalRate || 0) - (left.performanceSummary.approvalRate || 0) || (right.performanceSummary.tasksCompleted || 0) - (left.performanceSummary.tasksCompleted || 0);
   });
+}
+function agentStatusLabel(agent) {
+  const status = agent.performanceSummary?.status || "new";
+  if (status === "active") return "Active";
+  if (status === "unavailable") return "Unavailable";
+  return "New";
+}
+function agentStatusTone(agent) {
+  const status = agent.performanceSummary?.status || "new";
+  if (status === "active") return "good";
+  if (status === "unavailable") return "warn";
+  return "pending";
 }
 function liveActivityEntries(state2) {
   const leaders = (state2.leaderboards?.buckets || []).flatMap((bucket) => bucket.items.slice(0, 2));
@@ -47047,14 +47221,118 @@ function shortWallet(wallet) {
   if (value.length <= 10) return value || "No wallet";
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
+function buildTaskLifecycleModel(task, options = {}) {
+  const onchainTask = options.onchainSnapshot?.onchainTask || null;
+  const onchainState = String(onchainTask?.state || "").toUpperCase();
+  const escrowLocked = readBigIntLike(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
+  const timelineByKind = new Map((task?.timeline || []).map((item) => [item.kind, item.createdAt]));
+  const settlementSummary = task?.settlementSummary || null;
+  const status = String(task?.status || "").toUpperCase();
+  const resultStatus = String(task?.resultStatus || "").toLowerCase();
+  const transactionState = String(task?.transactionState || "").toLowerCase();
+  const settlementState = String(task?.settlementState || "").toLowerCase();
+  const finalOutcome = String(task?.latestEvaluation?.finalOutcome || "").toLowerCase();
+  const assignedAgents = task?.selectedAgents || [];
+  const assignedAgent = assignedAgents[0] || null;
+  const participatingAgentIds = task?.participatingAgentIds || [];
+  const fundingConfirmed = Boolean(settlementSummary?.isFunded) || transactionState === "accepted" || Boolean(task?.onchainTaskRef) || escrowLocked > 0n || ["ESCROW_FUNDED", "OPEN", "ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status) || ["OPEN", "ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(onchainState);
+  const fundingPending = !fundingConfirmed && ["pending_wallet", "pending_chain"].includes(transactionState);
+  const fundingFailed = transactionState === "failed";
+  const assigned = Boolean(assignedAgent || task?.selectedAgentId || participatingAgentIds.length || ["ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status));
+  const executing = status === "EXECUTING" || resultStatus === "in_progress";
+  const submitted = ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status) || ["submitted", "approved", "rejected", "disputed", "appealed", "unresolved", "settled"].includes(resultStatus) || Boolean(task?.latestSubmissionId);
+  const underReview = status === "UNDER_REVIEW" || submitted && !["APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status) && Boolean(task?.latestEvaluation);
+  const rejected = status === "REJECTED" || resultStatus === "rejected" || finalOutcome === "rejected";
+  const approved = status === "APPROVED" || resultStatus === "approved" || finalOutcome === "accepted" || settlementState === "pending_settlement" && !rejected;
+  const disputed = status === "DISPUTED" || settlementState === "disputed" || finalOutcome === "disputed" || task?.disputeRecord?.status === "open";
+  const unresolved = status === "UNRESOLVED" || settlementState === "unresolved" || finalOutcome === "unresolved";
+  const refunded = status === "REFUNDED" || settlementState === "refunded" || task?.latestSettlement?.outcome === "refunded";
+  const settled = status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
+  const settlementReady = Boolean(settlementSummary?.canReleasePayment) || !settled && !refunded && approved && (settlementState === "pending_settlement" || (task?.reviewActions || []).includes("settle") || settlementState === "reward_funded");
+  const refundReady = Boolean(settlementSummary?.canRefund);
+  const needsRevision = rejected && !refunded;
+  const fundingLabel = fundingConfirmed ? "Funded" : fundingPending ? "Funding pending" : fundingFailed ? "Funding failed" : "Awaiting funding";
+  const evaluationLabel = settled ? "Approved" : refunded ? "Closed" : disputed ? "Disputed" : unresolved ? "Unresolved" : rejected ? "Rejected" : approved ? "Approved" : underReview ? "Under review" : submitted ? "Submitted" : executing ? "In progress" : "Awaiting output";
+  const settlementLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Settlement paused" : unresolved ? "Review unresolved" : settlementReady ? "Ready for settlement" : refundReady ? "Refund available" : fundingConfirmed ? "Settlement pending" : "Funding required";
+  const currentLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Disputed" : unresolved ? "Needs appeal" : settlementReady ? "Settlement ready" : approved ? "Approved" : underReview ? "Under review" : submitted ? "Output submitted" : executing ? "In progress" : assigned ? "Agent assigned" : fundingPending ? "Funding pending" : fundingConfirmed ? "Funded" : "Task posted";
+  const settlementMessage = settled ? "Payment released." : refunded ? "Reward refunded." : settlementSummary?.settlementReadinessLabel ? settlementSummary.settlementReadinessLabel : settlementReady ? "Approved. USDC release is ready." : needsRevision ? "Revision needed before payout." : rejected ? "Rejected. Payout not recommended." : disputed ? "Disputed. Payout stays paused." : unresolved ? "Review unresolved. Payout stays paused." : underReview ? "Under evaluator review." : submitted ? "Output submitted and waiting for review." : executing ? "Agent is executing now." : fundingPending ? "Funding is still being confirmed." : fundingConfirmed ? "Task is funded and waiting for the next step." : "Awaiting onchain funding.";
+  const reputationLabel = settled ? "Reputation updated" : refunded ? "Refund closed" : "Reputation pending";
+  const assignmentLabel = assignedAgent ? `${assignedAgent.displayName} (${assignedAgent.originType === "external" ? "External agent" : "Platform agent"})` : task?.selectedAgentId ? "Assigned agent selected" : participatingAgentIds.length ? `${participatingAgentIds.length} participating agent${participatingAgentIds.length === 1 ? "" : "s"}` : "No agent assigned yet";
+  const steps = [
+    {
+      key: "posted",
+      label: "Task posted",
+      status: "complete",
+      helper: "Dispatch recorded the task request and reward terms.",
+      timestamp: task?.createdAt || timelineByKind.get("task_created") || null
+    },
+    {
+      key: "funding",
+      label: fundingLabel,
+      status: fundingConfirmed ? "complete" : fundingFailed ? "failed" : fundingPending ? "current" : "pending",
+      helper: fundingConfirmed ? "Funding is confirmed and the task can move through the marketplace." : fundingFailed ? "The latest wallet or chain funding action failed." : fundingPending ? "Wallet signatures were captured and Arc Testnet funding confirmation is still syncing." : "The task needs onchain funding before assignment and execution.",
+      timestamp: timelineByKind.get("escrow_funded") || null
+    },
+    {
+      key: "assigned",
+      label: assigned ? "Agent assigned" : "Awaiting assignment",
+      status: assigned ? "complete" : fundingConfirmed ? "current" : "pending",
+      helper: assigned ? assignmentLabel : "An AI agent will be assigned once the USDC-funded task is ready to route.",
+      timestamp: timelineByKind.get("agent_accepted") || timelineByKind.get("agent_invited") || null
+    },
+    {
+      key: "submitted",
+      label: submitted ? "Output submitted" : executing ? "In progress" : "Execution pending",
+      status: submitted ? "complete" : executing ? "current" : "pending",
+      helper: submitted ? "A result is on the task and ready for owner review." : executing ? "The assigned worker is actively completing the task." : "Execution starts after assignment.",
+      timestamp: timelineByKind.get("submission_received") || null
+    },
+    {
+      key: "review",
+      label: approved ? "Approved" : rejected ? "Rejected" : disputed ? "Disputed" : unresolved ? "Review paused" : underReview ? "Owner review" : submitted ? "Awaiting owner review" : "Review pending",
+      status: approved ? "complete" : rejected || disputed || unresolved ? "warning" : underReview ? "current" : "pending",
+      helper: approved ? "The task owner approved the output for settlement." : rejected ? "The submitted output did not meet the payout bar." : disputed ? "A dispute paused payout." : unresolved ? "Manual escalation is needed before payout can move." : underReview ? "AI review is guidance. The task owner makes the final approval decision." : submitted ? "The output is waiting for owner review." : "Review starts after submission.",
+      timestamp: timelineByKind.get("review_started") || timelineByKind.get("result_verified") || null
+    },
+    {
+      key: "settlement",
+      label: settled ? "Payment released" : refunded ? "Reward refunded" : settlementReady ? "Settlement ready" : refundReady || rejected ? "Refund available" : disputed ? "Settlement paused" : "Settlement pending",
+      status: settled || refunded ? "complete" : rejected || disputed || unresolved ? "warning" : settlementReady ? "current" : "pending",
+      helper: settlementMessage,
+      timestamp: task?.latestSettlement?.settlementTimestamp || timelineByKind.get("settled") || timelineByKind.get("refund_completed") || null
+    },
+    {
+      key: "reputation",
+      label: reputationLabel,
+      status: settled || refunded ? "complete" : "pending",
+      helper: settled ? "Agent reputation can now reflect a paid, owner-approved funded outcome." : refunded ? "The task is closed and payout reputation stays unchanged or neutral." : "Reputation updates after owner approval and a terminal payout state.",
+      timestamp: task?.latestSettlement?.settlementTimestamp || null
+    }
+  ];
+  return {
+    steps,
+    currentLabel,
+    fundingLabel,
+    evaluationLabel,
+    settlementLabel,
+    settlementMessage,
+    assignmentLabel,
+    assignedAgent,
+    isSettled: settled,
+    isRefunded: refunded,
+    isRejected: rejected,
+    isDisputed: disputed,
+    isUnresolved: unresolved
+  };
+}
 function buildPostTaskChecklist(form, selectedAgent) {
   const isDirect = form.hiringMode === "direct_hire";
   return {
-    summary: isDirect ? selectedAgent ? `${selectedAgent.profile.publicName} is preselected for funded execution.` : "Select an agent before funding this direct hire." : `Open market task with up to ${Number(form.maxParticipants || 1)} participating agents.`,
+    summary: isDirect ? selectedAgent ? `${selectedAgent.profile.publicName} is preselected for this funded Arc task.` : "Select an agent before funding this direct hire." : `Open market funded task with up to ${Number(form.maxParticipants || 1)} participating agents.`,
     items: [
       {
         id: "scope",
-        label: "Task scope is clear",
+        label: "Funded task scope is clear",
         complete: String(form.title || "").trim().length >= 3 && String(form.description || "").trim().length >= 20
       },
       {
@@ -47064,7 +47342,7 @@ function buildPostTaskChecklist(form, selectedAgent) {
       },
       {
         id: "settlement",
-        label: "Review path chosen",
+        label: "Owner review and settlement path chosen",
         complete: Boolean(form.evaluationPreference)
       }
     ]
@@ -47075,10 +47353,64 @@ function buildAgentIdentityBadges(agent) {
   if (agent?.profile?.originType === "platform") {
     badges.push("Platform Agent");
   }
+  if (agent?.profile?.originType === "external") {
+    badges.push("External Agent");
+    badges.push("ERC-8183 compatible");
+  }
+  if ((agent?.performanceSummary?.rankPosition || 0) === 1 && (agent?.performanceSummary?.tasksAttempted || 0) > 0) {
+    badges.push("Top Agent");
+  }
+  if (agent?.performanceSummary?.status === "new") {
+    badges.push("New");
+  }
   if (agent?.profile?.skillCategories?.length) {
     badges.push(labelize(agent.profile.skillCategories[0]));
   }
   return badges;
+}
+function buildRecentAgentWork(agent, taskCollections = {}) {
+  const allTasks = [
+    ...taskCollections.completedTasks || [],
+    ...taskCollections.rejectedTasks || [],
+    ...taskCollections.disputedTasks || []
+  ];
+  return allTasks.filter((task) => task.participatingAgentIds?.includes(agent.profile.agentId) || task.selectedAgentId === agent.profile.agentId).filter((task, index2, items) => items.findIndex((candidate) => candidate.taskId === task.taskId) === index2).sort((left, right) => new Date(right.updatedAt || right.createdAt || 0).getTime() - new Date(left.updatedAt || left.createdAt || 0).getTime()).slice(0, 5).map((task) => ({
+    taskId: task.taskId,
+    title: buildSafeTaskSummary(task),
+    category: labelize(task.category),
+    status: labelize(task.status),
+    rewardAmount: Number(task.rewardAmount || 0),
+    evaluationScore: typeof task.latestEvaluation?.overallScore === "number" ? Math.round(task.latestEvaluation.overallScore) : null,
+    settlementStatus: task.settlementSummary?.settlementReadinessLabel || labelize(task.settlementState || task.status),
+    completedAt: task.latestSettlement?.settlementTimestamp || task.updatedAt || task.createdAt,
+    approvalIndicator: buildApprovalIndicator(task)
+  }));
+}
+function buildSafeTaskSummary(task) {
+  const raw = String(task?.title || "").trim();
+  if (!raw) return `${labelize(task?.category || "task")} task`;
+  return raw.length > 72 ? `${raw.slice(0, 69)}...` : raw;
+}
+function buildApprovalIndicator(task) {
+  const status = String(task?.status || "").toUpperCase();
+  if (status === "SETTLED") return "Paid";
+  if (status === "APPROVED") return "Approved";
+  if (status === "REFUNDED") return "Refunded";
+  if (status === "REJECTED") return "Rejected";
+  if (status === "DISPUTED") return "Disputed";
+  return labelize(task?.resultStatus || "completed");
+}
+function readBigIntLike(value) {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return BigInt(Math.trunc(value));
+  if (typeof value === "string" && value.trim()) {
+    try {
+      return BigInt(value);
+    } catch {
+      return 0n;
+    }
+  }
+  return 0n;
 }
 function buildReviewPanelModel(task) {
   const hasEvaluation = Boolean(task?.latestEvaluation);
@@ -47094,7 +47426,7 @@ function buildReviewPanelModel(task) {
       ...canDispute ? ["dispute"] : [],
       ...canAppeal ? ["appeal"] : []
     ],
-    headline: settlementReady ? "This task is ready for payout settlement." : finalOutcome === "disputed" ? "Validator disagreement paused payout and opened a dispute-ready state." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Validator agreement was too weak to finalize this result. Appeal can trigger a stricter pass." : canReviewSubmittedResult ? hasEvaluation ? "Result review is ready." : "Review decides whether payout moves." : "Waiting for a submitted result before review actions become available."
+    headline: settlementReady ? "This task is ready for Arc Testnet USDC settlement." : finalOutcome === "disputed" ? "A dispute paused payout and opened an escalation path." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths." : canReviewSubmittedResult ? hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or reject." : "Review the submitted output and decide whether USDC payout moves." : "Waiting for a submitted result before review and settlement actions become available."
   };
 }
 function buildTaskResultModel(task, executionRuns = []) {
@@ -47114,8 +47446,12 @@ function buildTaskResultModel(task, executionRuns = []) {
   const sections = Array.isArray(finalOutput?.sections) ? finalOutput.sections : [];
   const summary = finalOutput?.summary || task?.structuredNotes || "";
   const improveEligibleStatuses = /* @__PURE__ */ new Set(["SUBMITTED", "UNDER_REVIEW", "REJECTED"]);
-  const canImproveAgain = Boolean(
+  const hasLiveOnchainAnchor = /^0x[a-f0-9]{40}:/i.test(String(task?.onchainTaskRef || ""));
+  const otherwiseImproveEligible = Boolean(
     latestRun?.endpointUrl?.startsWith("platform://") && improveEligibleStatuses.has(task?.status) && !["settled", "refunded", "disputed"].includes(task?.settlementState)
+  );
+  const canImproveAgain = Boolean(
+    otherwiseImproveEligible && !hasLiveOnchainAnchor
   );
   return {
     title: summary,
@@ -47123,15 +47459,14 @@ function buildTaskResultModel(task, executionRuns = []) {
     finalOutputText: sections.length ? sections.map((section) => `${section.heading}
 ${(section.bullets || []).map((bullet) => `- ${bullet}`).join("\n")}`).join("\n\n") : String(summary || "").trim(),
     qualityScore: typeof trace?.score === "number" ? Math.round(trace.score) : typeof evaluation?.overall === "number" ? Math.round(evaluation.overall) : null,
-    consensusScore: typeof task?.latestEvaluation?.consensusScore === "number" ? Math.round(task.latestEvaluation.consensusScore) : null,
-    validatorAgreement: typeof task?.latestEvaluation?.validatorAgreement === "number" ? Math.round(task.latestEvaluation.validatorAgreement * 100) : null,
-    consensusConfidence: typeof task?.latestEvaluation?.consensusConfidence === "number" ? Math.round(task.latestEvaluation.consensusConfidence * 100) : null,
+    aiReviewScore: typeof task?.latestEvaluation?.consensusScore === "number" ? Math.round(task.latestEvaluation.consensusScore) : null,
+    reviewConfidence: typeof task?.latestEvaluation?.consensusConfidence === "number" ? Math.round(task.latestEvaluation.consensusConfidence * 100) : null,
     finalOutcome: task?.latestEvaluation?.finalOutcome || null,
-    equivalenceSummary: task?.latestEvaluation?.equivalenceSummary || null,
+    evaluationNote: task?.latestEvaluation?.equivalenceSummary || task?.latestEvaluation?.summary || null,
     confidence: trace?.confidence || finalOutput?.confidence || null,
     modeUsed: trace?.mode || null,
     workerLabel: latestRun?.endpointUrl?.startsWith("platform://") ? "Platform Agent" : null,
-    deliveryNote: task?.selectedAgents?.[0]?.originType === "platform" ? "This is a platform-run benchmark worker result inside the marketplace." : null,
+    deliveryNote: task?.selectedAgents?.[0]?.originType === "platform" ? "This is a platform-run benchmark worker result inside the same funded-task marketplace path." : null,
     draftText: draftOutput ? [draftOutput.summary, ...(draftOutput.sections || []).map((section) => `${section.heading}
 ${(section.bullets || []).map((bullet) => `- ${bullet}`).join("\n")}`)].join("\n\n") : null,
     structuredTask,
@@ -47140,6 +47475,7 @@ ${(section.bullets || []).map((bullet) => `- ${bullet}`).join("\n")}`)].join("\n
     stageTimingsMs,
     hasDraft: Boolean(draftOutput),
     canImproveAgain,
+    improveAgainUnavailableReason: !canImproveAgain && otherwiseImproveEligible && hasLiveOnchainAnchor ? "Improve Again is disabled for live Arc-submitted tasks because the current contract cannot safely reopen execution after submission." : null,
     latestRunId: latestRun?.runId || null
   };
 }
@@ -47163,17 +47499,17 @@ function renderHomeHero({
   return `
     <header class="home-hero reveal-on-scroll is-visible">
       <div class="home-hero__content">
-        <p class="mini-label">Execution-first AI marketplace</p>
-        <h1>Hire AI agents that actually deliver.</h1>
-        <p class="muted">Post a task, route it to the right worker, and move from execution to review without losing momentum.</p>
+        <p class="mini-label">AI work marketplace on Arc Testnet</p>
+        <h1>AI agents that work, earn, and build reputation.</h1>
+        <p class="muted">Dispatch lets users post USDC-funded tasks, assign AI agents, review completed work, and release payment after approval on Arc Testnet.</p>
         <div class="home-hero__command">
           <label class="home-hero__input">
             <span class="muted">Describe the outcome you want</span>
             <textarea id="heroSearch" rows="4" placeholder="Describe the task, expected output format, and any constraints."></textarea>
           </label>
           <div class="home-hero__actions">
-            <button class="hero-primary" data-route="/post-task">Post Task</button>
-            <button class="hero-secondary" id="heroBrowseAgents">Browse Agents</button>
+            <button class="hero-primary" data-route="/post-task">Post Funded Task</button>
+            <button class="hero-secondary" id="heroBrowseAgents">Explore Agents</button>
           </div>
         </div>
       </div>
@@ -47189,26 +47525,26 @@ function renderHomeHero({
           <article class="hero-stage hero-stage--task">
             <span class="hero-stage__index">01</span>
             <div>
-              <strong>Task created</strong>
+              <strong>Funded task posted</strong>
               <p>${escapeHtml(createdTask)}</p>
             </div>
-            <span class="tag">${formatCurrency(createdReward)}</span>
+            <span class="tag">${formatCurrency(createdReward)} reward</span>
           </article>
           <article class="hero-stage hero-stage--agent">
             <span class="hero-stage__index">02</span>
             <div>
               <strong>Agent picked</strong>
-              <p>${escapeHtml(agentName)} -> ${escapeHtml(latency)} -> ${escapeHtml(approval)} approval</p>
+              <p>${escapeHtml(agentName)} -> ${escapeHtml(latency)} -> ${escapeHtml(approval)} owner approval</p>
             </div>
             <span class="tag">Assigned</span>
           </article>
           <article class="hero-stage hero-stage--result">
             <span class="hero-stage__index">03</span>
             <div>
-              <strong>Result generated</strong>
-              <p>${escapeHtml(resultTask)} -> Review ready</p>
+              <strong>Owner review ready</strong>
+              <p>${escapeHtml(resultTask)} -> owner approval -> USDC release</p>
             </div>
-            <span class="tag">Ready</span>
+            <span class="tag">Settlement ready</span>
           </article>
         </div>
       </div>
@@ -47221,24 +47557,24 @@ function renderFlowStrip() {
       <div class="section-head">
         <div>
           <p class="mini-label">Execution flow</p>
-          <h2>Task to payout in one controlled loop</h2>
+          <h2>From funded task to paid agent reputation</h2>
         </div>
       </div>
       <div class="flow-strip__grid">
         <article class="step-card flow-strip__card">
           <div class="step-icon">1</div>
-          <strong>Post task</strong>
-          <p>Describe the output and fund the work.</p>
+          <strong>Post funded task</strong>
+          <p>Describe the job, set the USDC reward, and fund the task on Arc Testnet.</p>
         </article>
         <article class="step-card flow-strip__card">
           <div class="step-icon">2</div>
           <strong>Agent executes</strong>
-          <p>Dispatch routes the task to the right worker.</p>
+          <p>Built-in and external agents execute structured work through the same marketplace path.</p>
         </article>
         <article class="step-card flow-strip__card">
           <div class="step-icon">3</div>
-          <strong>Review + payout</strong>
-          <p>Approve only when the result is actually usable.</p>
+          <strong>Review + settlement</strong>
+          <p>AI review gives guidance, but the owner controls approval before USDC is released or refunded.</p>
         </article>
       </div>
     </section>
@@ -47251,7 +47587,7 @@ function renderActivityColumn(state2) {
       <div class="section-head">
         <div>
           <p class="mini-label">Live activity</p>
-          <h2>What the marketplace is doing now</h2>
+          <h2>What funded work is doing now</h2>
         </div>
       </div>
       <div class="activity-column__feed">
@@ -47279,7 +47615,7 @@ function renderPerformanceColumn(state2) {
       <div class="section-head">
         <div>
           <p class="mini-label">Leaderboard</p>
-          <h2>Top operators on the board</h2>
+          <h2>Top agents by approved USDC-funded work</h2>
         </div>
       </div>
       <div class="leaderboard">
@@ -47301,12 +47637,19 @@ function renderPerformanceColumn(state2) {
   `;
 }
 function renderAgentCard(agent) {
-  const approval = Math.round((agent.performanceSummary.approvalRate || 0) * 100);
-  const latency = agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
-  const completedJobs = agent.performanceSummary.tasksCompleted || 0;
+  const approvalRate = Math.round((agent.performanceSummary.approvalRate || 0) * 100);
+  const averageScore = Math.round(agent.performanceSummary.averageScore || 0);
+  const latency = agent.performanceSummary.averageResponseTimeMs || agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
+  const completedJobs = agent.performanceSummary.paidTasksCompleted ?? agent.performanceSummary.tasksCompleted ?? 0;
+  const totalEarnings = agent.performanceSummary.paidEarnings ?? agent.performanceSummary.totalEarnings ?? 0;
   const tagline = agent.profile.description.split(".")[0].slice(0, 92);
-  const tags = (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 2);
+  const tags = [.../* @__PURE__ */ new Set([...agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags, speedLabel(agent)])].slice(0, 4);
   const identityBadges = buildAgentIdentityBadges(agent);
+  const statusTone = agentStatusTone(agent);
+  const statusLabel = agentStatusLabel(agent);
+  const rankPosition = agent.performanceSummary.rankPosition;
+  const agentType = agent.profile.originType === "external" ? "External Agent" : "Built-in Agent";
+  const connectionLabel = agent.profile.originType === "external" ? labelize(agent.profile.connectionStatus || agent.healthStatus || "unknown") : "Dispatch managed";
   return `
     <article class="agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
       <div class="agent-card__top">
@@ -47317,38 +47660,59 @@ function renderAgentCard(agent) {
             <p class="agent-card__tagline">${escapeHtml(tagline)}</p>
           </div>
         </div>
-        <div class="agent-tags">
-          ${identityBadges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-          ${agent.performanceSummary?.trend === "up" ? '<span class="tag">Trending</span>' : ""}
+        <div class="agent-card__meta">
+          ${rankPosition ? `<span class="agent-rank">#${rankPosition}</span>` : ""}
+          <span class="status-chip ${statusTone}">${statusLabel}</span>
         </div>
+      </div>
+      <div class="agent-tags">
+          ${identityBadges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
+          <span class="tag">Type: ${escapeHtml(agentType)}</span>
+          <span class="tag">Connection: ${escapeHtml(connectionLabel)}</span>
       </div>
       <div class="agent-tags">
         ${tags.map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
       </div>
       <div class="agent-metrics">
-        <div><strong class="metric-success">${formatPercent(approval)}</strong><span>Success</span></div>
-        <div><strong>${completedJobs}</strong><span>Completed</span></div>
-        <div><strong>${speedLabel(agent)}</strong><span>${formatLatency(latency)}</span></div>
+        <div><strong>${formatCurrency(totalEarnings)}</strong><span>Earned from settled USDC work</span></div>
+        <div><strong>${completedJobs}</strong><span>Paid funded tasks</span></div>
+        <div><strong class="metric-success">${formatPercent(approvalRate)}</strong><span>Approval rate</span></div>
+        <div><strong>${averageScore || "--"}</strong><span>Avg evaluation score</span></div>
+        <div><strong>${rankPosition ? `#${rankPosition}` : "--"}</strong><span>Marketplace rank</span></div>
+        <div><strong>${formatLatency(latency)}</strong><span>Avg response</span></div>
       </div>
+      ${agent.profile.originType === "external" ? `<p class="muted agent-card__trust">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || agent.profile.ownerWallet))}</p>` : ""}
+      <p class="muted agent-card__trust">Reputation comes from funded task completions, owner-approved outcomes, settlement history, and reliability over time.</p>
       <footer>
         <button class="hero-primary" data-direct="${agent.profile.agentId}">Hire Agent</button>
       </footer>
     </article>
   `;
 }
-function renderTaskRow(task) {
-  const secondaryState = task.transactionState && !["accepted", "settled"].includes(task.transactionState) ? ` | ${labelize(task.transactionState)}` : "";
+function renderTaskRow(task, agentRegistry = /* @__PURE__ */ new Map()) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  const selectedAgentId = task.selectedAgentId || task.participatingAgentIds?.[0] || null;
+  const selectedAgent = selectedAgentId ? agentRegistry.get(selectedAgentId) : null;
+  const assignmentLabel = selectedAgent ? `${selectedAgent.profile.publicName} (${selectedAgent.profile.originType === "external" ? "External" : "Platform"})` : lifecycle.assignmentLabel;
   return `
     <article class="task-row task-row--${taskStatusTone(task.status)}">
       <strong>${escapeHtml(task.title)}</strong>
-      <p>${formatCurrency(task.rewardAmount)} | ${escapeHtml(labelize(task.status))}${escapeHtml(secondaryState)}</p>
+      <p>${formatCurrency(task.rewardAmount)} reward</p>
+      <div class="agent-tags" style="margin-top:10px;">
+        <span class="tag">${escapeHtml(lifecycle.currentLabel)}</span>
+        <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
+        <span class="tag">${escapeHtml(lifecycle.evaluationLabel)}</span>
+        <span class="tag">${escapeHtml(lifecycle.settlementLabel)}</span>
+      </div>
+      <p style="margin-top:10px;">${escapeHtml(assignmentLabel)}</p>
+      <p class="muted" style="margin-top:8px;">${escapeHtml(lifecycle.settlementMessage)}</p>
       <footer>
         <button data-route="/tasks/${task.taskId}">Open Task</button>
       </footer>
     </article>
   `;
 }
-function renderTaskRail({ eyebrow, title, tasks, emptyMessage }) {
+function renderTaskRail({ eyebrow, title, tasks, emptyMessage, renderTask = renderTaskRow }) {
   return `
     <article class="shell-section">
       <div class="section-head">
@@ -47359,12 +47723,13 @@ function renderTaskRail({ eyebrow, title, tasks, emptyMessage }) {
         <span class="meta-pill">${tasks.length} visible</span>
       </div>
       <div class="task-rail">
-        ${tasks.map(renderTaskRow).join("") || emptyState(emptyMessage)}
+        ${tasks.map((task) => renderTask(task)).join("") || emptyState(emptyMessage)}
       </div>
     </article>
   `;
 }
 function renderHomePage({ el: el2, state: state2, onNavigate }) {
+  const agentRegistry = new Map(state2.agents.map((agent) => [agent.profile.agentId, agent]));
   const agents = sortAgents(state2.agents, state2).slice(0, 6);
   const myPostedTasks = state2.tasks?.myPostedTasks || [];
   const openTasks = state2.tasks?.allOpenTasks || [];
@@ -47387,8 +47752,8 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
   })}
 
       <section class="stats-grid stats-grid--hero reveal-on-scroll">
-        ${countMarkup(completedTasks.length, "Completed Tasks", "metric-card metric-card--strong")}
-        ${countMarkup(fundedTaskPool.length, "Funded Now", "metric-card metric-card--strong")}
+        ${countMarkup(completedTasks.length, "Approved Outcomes", "metric-card metric-card--strong")}
+        ${countMarkup(fundedTaskPool.length, "Funded Tasks Live", "metric-card metric-card--strong")}
         ${countMarkup(state2.agents.length, "Active Agents", "metric-card metric-card--strong")}
         ${countMarkup(successRate, "Approval Rate", "metric-card metric-card--strong")}
       </section>
@@ -47403,10 +47768,11 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
       ${pendingTasks.length ? `
         <section class="reveal-on-scroll">
           ${renderTaskRail({
-    eyebrow: "Pending Tasks",
-    title: "Your newly posted work waiting on funding or chain confirmation",
+    eyebrow: "Funding Queue",
+    title: "Your funded tasks waiting on wallet or Arc confirmation",
     tasks: pendingTasks,
-    emptyMessage: "No pending tasks."
+    emptyMessage: "No pending funded tasks.",
+    renderTask: (task) => renderTaskRow(task, agentRegistry)
   })}
         </section>
       ` : ""}
@@ -47415,11 +47781,11 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
         <div class="section-head">
           <div>
             <p class="mini-label">Trending agents</p>
-            <h2>Fast operators earning real demand</h2>
+            <h2>Workers earning from approved funded outcomes</h2>
           </div>
         </div>
         <div class="agent-carousel">
-          ${agents.map(renderAgentCard).join("") || emptyState("No agents yet - deploy one to start earning.")}
+          ${agents.map(renderAgentCard).join("") || emptyState("No agents are visible yet. Platform agents and external adapters can join to execute funded work.")}
         </div>
       </section>
 
@@ -47427,24 +47793,24 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
         <div class="section-head">
           <div>
             <p class="mini-label">How it works</p>
-            <h2>Where buyers and agents stay in sync</h2>
+            <h2>Where funded work, owner approval, and settlement stay in sync</h2>
           </div>
         </div>
         <div class="steps-grid">
           <article class="step-card">
             <div class="step-icon">1</div>
-            <strong>Post task</strong>
-            <p>Describe the outcome and fund the reward.</p>
+            <strong>Post funded task</strong>
+            <p>Describe the outcome, set the USDC reward, and fund the task on Arc Testnet.</p>
           </article>
           <article class="step-card">
             <div class="step-icon">2</div>
             <strong>Agents execute</strong>
-            <p>Direct hire a specialist or open it to the market.</p>
+            <p>Direct hire a specialist, use a platform agent, or let external agents compete through adapter/ERC-8183-style workflows.</p>
           </article>
           <article class="step-card">
             <div class="step-icon">3</div>
-            <strong>Approve and pay</strong>
-            <p>Release payout only when the result works.</p>
+            <strong>Approve and settle</strong>
+            <p>Release USDC after the task owner approves the submitted work.</p>
           </article>
         </div>
       </section>
@@ -47452,21 +47818,24 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
       <section class="task-market-grid reveal-on-scroll">
         ${renderTaskRail({
     eyebrow: "Available Tasks",
-    title: "Open work agents can pick up",
+    title: "Open funded work agents can pick up",
     tasks: availableTasks,
-    emptyMessage: "No open tasks yet."
+    emptyMessage: "No open funded tasks yet.",
+    renderTask: (task) => renderTaskRow(task, agentRegistry)
   })}
         ${renderTaskRail({
     eyebrow: "Funded Tasks",
-    title: "Escrow-backed work already in motion",
+    title: "USDC-backed work already in motion",
     tasks: fundedTasks,
-    emptyMessage: "No funded tasks yet."
+    emptyMessage: "No funded work in motion yet.",
+    renderTask: (task) => renderTaskRow(task, agentRegistry)
   })}
         ${renderTaskRail({
     eyebrow: "Completed Tasks",
-    title: "Recently finished marketplace work",
+    title: "Recently approved marketplace outcomes",
     tasks: recentCompletedTasks,
-    emptyMessage: "No completed tasks yet."
+    emptyMessage: "No approved outcomes yet. Completed funded tasks will appear here after owner approval and settlement.",
+    renderTask: (task) => renderTaskRow(task, agentRegistry)
   })}
       </section>
     </section>
@@ -47506,8 +47875,8 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
     <section data-structure="agent-market">
       <header class="reveal-on-scroll is-visible">
         <p class="mini-label">Agent market</p>
-        <h1>Choose the right agent with confidence.</h1>
-        <p class="muted">Compare trust, speed, skills, and delivered work before you hire.</p>
+        <h1>Choose the right AI worker for USDC-funded tasks.</h1>
+        <p class="muted">Compare trust, response time, paid earnings, and recent work before assigning a funded task.</p>
       </header>
       <section class="shell-section reveal-on-scroll">
         <div class="form-grid">
@@ -47529,11 +47898,20 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
               ${skills.map((skill) => `<option value="${skill}" ${state2.filters.skill === skill ? "selected" : ""}>${labelize(skill)}</option>`).join("")}
             </select>
           </label>
+          <label class="field-stack">
+            <span class="muted">Sort</span>
+            <select id="sortFilter">
+              <option value="best_overall" ${state2.filters.sort === "best_overall" ? "selected" : ""}>Best overall</option>
+              <option value="fastest" ${state2.filters.sort === "fastest" ? "selected" : ""}>Fastest</option>
+              <option value="highest_success" ${state2.filters.sort === "highest_success" ? "selected" : ""}>Highest success rate</option>
+              <option value="top_earning" ${state2.filters.sort === "top_earning" ? "selected" : ""}>Top earning</option>
+            </select>
+          </label>
         </div>
       </section>
       <section class="shell-section reveal-on-scroll">
         <div class="steps-grid">
-          ${filtered.map(renderAgentCard).join("") || emptyState("No agents yet - deploy one to start earning.")}
+          ${filtered.map(renderAgentCard).join("") || emptyState("No agents match yet. Platform agents provide day-one execution, and external agents can join through adapter-compatible workflows.")}
         </div>
       </section>
     </section>
@@ -47548,6 +47926,10 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
   });
   document.getElementById("skillFilter")?.addEventListener("input", (event) => {
     state2.filters.skill = event.target.value;
+    rerender();
+  });
+  document.getElementById("sortFilter")?.addEventListener("input", (event) => {
+    state2.filters.sort = event.target.value;
     rerender();
   });
   document.querySelectorAll("[data-direct]").forEach((node) => {
@@ -47566,7 +47948,18 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
     return;
   }
   const bestFor = (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 4).map((item) => labelize(item));
-  const recentExecutions = [...state2.tasks?.completedTasks || [], ...state2.tasks?.activeTasks || []].filter((task) => task.participatingAgentIds.includes(agent.profile.agentId)).slice(0, 4);
+  const recentWork = buildRecentAgentWork(agent, {
+    completedTasks: state2.tasks?.completedTasks || [],
+    rejectedTasks: state2.tasks?.rejectedTasks || [],
+    disputedTasks: state2.tasks?.disputedTasks || []
+  });
+  const paidTasksCompleted = agent.performanceSummary.paidTasksCompleted ?? agent.performanceSummary.tasksCompleted ?? 0;
+  const paidEarnings = agent.performanceSummary.paidEarnings ?? agent.performanceSummary.totalEarnings ?? 0;
+  const pendingEarnings = agent.performanceSummary.pendingEarnings ?? 0;
+  const averageScore = Math.round(agent.performanceSummary.averageScore || 0);
+  const agentType = agent.profile.originType === "external" ? "External Agent" : "Built-in Agent";
+  const payoutWallet = agent.profile.ownerWallet || null;
+  const connectionLabel = agent.profile.originType === "external" ? labelize(agent.profile.connectionStatus || agent.healthStatus || "unknown") : "Dispatch managed";
   el2.appRoot.innerHTML = `
     <section data-structure="agent-profile">
       <header class="reveal-on-scroll is-visible">
@@ -47584,13 +47977,22 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
           </div>
           <div class="agent-tags">
             ${buildAgentIdentityBadges(agent).map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
+            <span class="tag">Type: ${escapeHtml(agentType)}</span>
+            ${agent.profile.originType === "external" ? '<span class="tag">Adapter compatible</span>' : ""}
+            <span class="tag">Connection: ${escapeHtml(connectionLabel)}</span>
+            <span class="status-chip ${agentStatusTone(agent)}">${agentStatusLabel(agent)}</span>
           </div>
           <div class="task-summary">
-            <div class="metric-card"><strong>${formatPercent(Math.round((agent.performanceSummary.approvalRate || 0) * 100))}</strong><span>Success</span></div>
-            <div class="metric-card"><strong>${Math.round(agent.performanceSummary.averageScore || 0)}</strong><span>Score</span></div>
-            <div class="metric-card"><strong>${formatLatency(agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs)}</strong><span>Latency</span></div>
-            <div class="metric-card"><strong>${agent.performanceSummary.tasksCompleted || 0}</strong><span>Completed jobs</span></div>
+            <div class="metric-card"><strong>${formatCurrency(paidEarnings)}</strong><span>Paid earnings</span></div>
+            <div class="metric-card"><strong>${formatCurrency(pendingEarnings)}</strong><span>Pending approved reward</span></div>
+            <div class="metric-card"><strong>${paidTasksCompleted}</strong><span>Paid funded tasks</span></div>
+            <div class="metric-card"><strong>${formatPercent(Math.round((agent.performanceSummary.approvalRate || 0) * 100))}</strong><span>Approval rate</span></div>
+            <div class="metric-card"><strong>${averageScore || "--"}</strong><span>Avg evaluation score</span></div>
+            <div class="metric-card"><strong>${formatLatency(agent.performanceSummary.averageResponseTimeMs || agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs)}</strong><span>Avg response</span></div>
+            <div class="metric-card"><strong>${agent.performanceSummary.rankPosition ? `#${agent.performanceSummary.rankPosition}` : "--"}</strong><span>Marketplace rank</span></div>
+            <div class="metric-card"><strong>${agent.performanceSummary.disputeCount || 0}</strong><span>Disputes</span></div>
           </div>
+          <p class="muted">Reputation is calculated from funded task completions, owner-approved outcomes, settlement receipts, review quality, and reliability over time on Arc Testnet.</p>
           <div class="agent-tags">
             ${(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 6).map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
           </div>
@@ -47599,16 +48001,20 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
           <article class="shell-panel">
             <p class="mini-label">Best for</p>
             <h3>Where this agent fits best</h3>
-            <p class="muted">Use this worker when the job closely matches these strengths.</p>
+            <p class="muted">Use this worker when you want structured output, clear review, and payout accountability after approval.</p>
             <div class="agent-tags">
               ${bestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("") || '<span class="muted">General-purpose marketplace work.</span>'}
             </div>
+            <p class="muted" style="margin-top:12px;">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || payoutWallet))}</p>
+            ${agent.profile.developerName ? `<p class="muted">Developer: ${escapeHtml(agent.profile.developerName)}</p>` : ""}
+            ${agent.profile.endpointUrl ? `<p class="muted">Endpoint: ${escapeHtml(agent.profile.endpointUrl)}</p>` : ""}
+            ${agent.profile.outputSchema ? `<p class="muted">Output schema: ${escapeHtml(typeof agent.profile.outputSchema === "string" ? agent.profile.outputSchema : "Structured object schema")}</p>` : ""}
           </article>
           <article class="shell-panel">
             <p class="mini-label">Hire flow</p>
-            <h3>${agent.profile.originType === "platform" ? "Start with the platform default agent" : "Start a task with this agent"}</h3>
+            <h3>${agent.profile.originType === "platform" ? "Start with the platform default worker" : "Start funded work with this agent"}</h3>
             <textarea id="quickTaskIdea" rows="5" placeholder="Describe the outcome you want from this agent."></textarea>
-            ${agent.profile.originType === "platform" ? '<p class="muted">This worker ships with the marketplace and acts as the launch benchmark for future external agents.</p>' : ""}
+            ${agent.profile.originType === "platform" ? '<p class="muted">This worker ships with Dispatch as the launch benchmark. It earns reputation through the same funded-task, review, and settlement loop as future external agents.</p>' : '<p class="muted">External workers can integrate through Dispatch adapters, receive funded job envelopes, submit outputs, and earn after owner approval.</p>'}
             <footer>
               <button class="hero-primary" id="hireAgentButton">Hire Agent</button>
             </footer>
@@ -47618,12 +48024,24 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
       <section class="shell-section reveal-on-scroll">
         <div class="section-head">
           <div>
-            <p class="mini-label">Recent executions</p>
-            <h2>Work this agent has touched</h2>
+            <p class="mini-label">Recent work</p>
+            <h2>What this agent has recently completed</h2>
           </div>
         </div>
-        <div class="steps-grid">
-          ${recentExecutions.map(renderTaskRow).join("") || emptyState("No recent executions yet.")}
+        <div class="work-history">
+          ${recentWork.map((item) => `
+            <article class="work-history__item">
+              <div class="work-history__main">
+                <strong>${escapeHtml(item.title)}</strong>
+                <p>${escapeHtml(item.category)} | ${formatCurrency(item.rewardAmount)} reward | ${item.evaluationScore === null ? "No score yet" : `${item.evaluationScore} score`}</p>
+                <p class="muted">${escapeHtml(item.settlementStatus)}</p>
+              </div>
+              <div class="work-history__meta">
+                <span class="tag">${escapeHtml(item.approvalIndicator)}</span>
+                <small>${escapeHtml(new Date(item.completedAt).toLocaleDateString())}</small>
+              </div>
+            </article>
+          `).join("") || emptyState("No completed work history yet.")}
         </div>
       </section>
     </section>
@@ -47643,6 +48061,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
   revealSections(el2.appRoot);
 }
 function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
+  const agentRegistry = new Map(state2.agents.map((agent) => [agent.profile.agentId, agent]));
   const myTasks = state2.tasks?.myPostedTasks || [];
   const myAgents = state2.agents.filter((agent) => agent.profile.ownerWallet === state2.wallet);
   const earnings = myAgents.reduce((sum, agent) => sum + (agent.performanceSummary.totalEarnings || 0), 0);
@@ -47652,15 +48071,15 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
     <section data-structure="dashboard">
       <header class="reveal-on-scroll is-visible">
         <p class="mini-label">Dashboard</p>
-        <h1>Run your work in Dispatch.</h1>
-        <p class="muted">Track tasks, agents, payouts, and momentum from one operator view.</p>
+        <h1>Run funded AI work in Dispatch.</h1>
+        <p class="muted">Track funded tasks, owner-approved outcomes, Arc Testnet settlement, and agent momentum from one operator view.</p>
       </header>
       <section class="shell-section reveal-on-scroll">
         <div class="task-summary">
-          <div class="metric-card"><strong data-count="${Math.round(earnings)}" data-format="currency">${formatCurrency(earnings)}</strong><span>Earnings</span></div>
-          <div class="metric-card"><strong data-count="${successRate}">${successRate}</strong><span>Success rate</span></div>
-          <div class="metric-card"><strong data-count="${tasksCompleted}">${tasksCompleted}</strong><span>Tasks completed</span></div>
-          <div class="metric-card"><strong data-count="${myTasks.length}">${myTasks.length}</strong><span>My tasks</span></div>
+          <div class="metric-card"><strong data-count="${Math.round(earnings)}" data-format="currency">${formatCurrency(earnings)}</strong><span>Approved earnings</span></div>
+          <div class="metric-card"><strong data-count="${successRate}">${successRate}</strong><span>Approval rate</span></div>
+          <div class="metric-card"><strong data-count="${tasksCompleted}">${tasksCompleted}</strong><span>Funded work completed</span></div>
+          <div class="metric-card"><strong data-count="${myTasks.length}">${myTasks.length}</strong><span>Posted funded tasks</span></div>
         </div>
       </section>
       <section class="shell-section reveal-on-scroll">
@@ -47672,7 +48091,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
       </section>
       <section class="shell-section reveal-on-scroll">
         <div class="steps-grid">
-          ${state2.dashboardTab === "my_agents" ? myAgents.map((agent) => renderAgentCard(agent)).join("") : state2.dashboardTab === "earnings" ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned</p></article>`).join("") : myTasks.map(renderTaskRow).join("") || emptyState("Nothing here yet.")}
+          ${state2.dashboardTab === "my_agents" ? myAgents.map((agent) => renderAgentCard(agent)).join("") : state2.dashboardTab === "earnings" ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned from approved funded work</p></article>`).join("") : myTasks.map((task) => renderTaskRow(task, agentRegistry)).join("") || emptyState("No funded work here yet.")}
         </div>
       </section>
     </section>
@@ -47709,7 +48128,7 @@ function renderResultMarkup(resultModel) {
   if (sectionMarkup) return sectionMarkup;
   return source.split(/\n{2,}/).map((section) => section.trim()).filter(Boolean).slice(0, 6).map((section) => `<div class="result-block"><p>${escapeHtml(section)}</p></div>`).join("");
 }
-function readBigIntLike(value) {
+function readBigIntLike2(value) {
   if (typeof value === "bigint") return value;
   if (typeof value === "number" && Number.isFinite(value)) return BigInt(Math.trunc(value));
   if (typeof value === "string" && value.trim()) {
@@ -47720,6 +48139,11 @@ function readBigIntLike(value) {
     }
   }
   return 0n;
+}
+function arcTxLink(hash3) {
+  const value = String(hash3 || "").trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(value)) return null;
+  return `https://testnet.arcscan.app/tx/${value}`;
 }
 function renderTaskDetailPageView({
   el: el2,
@@ -47741,9 +48165,10 @@ function renderTaskDetailPageView({
     task.latestFundTxHash ? { label: "Fund", hash: task.latestFundTxHash } : null,
     task.latestAssignTxHash ? { label: "Assign", hash: task.latestAssignTxHash } : null
   ].filter(Boolean);
+  const latestSettlementTx = arcTxLink(task.latestSettlement?.txReference);
   const onchainTask = onchainSnapshot?.onchainTask || null;
   const onchainState = String(onchainTask?.state || "").toUpperCase();
-  const escrowLocked = readBigIntLike(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
+  const escrowLocked = readBigIntLike2(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
   const onchainFundingConfirmed = escrowLocked > 0n && [
     "OPEN",
     "ASSIGNED",
@@ -47757,6 +48182,10 @@ function renderTaskDetailPageView({
     "REFUNDED"
   ].includes(onchainState);
   const fundingConfirmed = task.transactionState === "accepted" && Boolean(task.onchainTaskRef) || onchainFundingConfirmed;
+  const isDemoTask = task.onchainTaskRef?.startsWith("demo:") && task.title === "Write a launch thread for a new stablecoin payment app";
+  const demoCanAdvance = isDemoTask && !["SETTLED", "REFUNDED", "CANCELLED"].includes(task.status);
+  const demoNextLabel = task.status === "APPROVED" ? "Release Demo USDC" : task.status === "SUBMITTED" || task.status === "UNDER_REVIEW" ? "Run Demo Evaluator" : task.status === "EXECUTING" ? "Submit Demo Output" : "Advance Demo Step";
+  const lifecycle = buildTaskLifecycleModel(task, { onchainSnapshot });
   const settlementLabel = fundingConfirmed ? labelize(task.settlementState || "reward_funded") : browserTxHashes.length ? "Funding Syncing" : "Awaiting Funding";
   const executionHeadline = task.status === "EXECUTING" ? "Agent is actively working and this task surface is waiting for the next result update." : task.status === "SUBMITTED" ? "Execution finished and the result is ready for a review decision." : fundingConfirmed ? "The task is staged and waiting for the next execution event." : browserTxHashes.length ? "Signed wallet transactions were captured and the marketplace is syncing the latest onchain state." : "This task has not been funded onchain yet.";
   const nextStepSummary = task.status === "SUBMITTED" ? "Review the output, then approve and settle if it looks good." : task.status === "EXECUTING" ? "The assigned agent is still working. This page will update as execution moves." : fundingConfirmed ? "This task is waiting for the next marketplace action." : browserTxHashes.length ? "The wallet signing flow completed and the marketplace is finalizing funding and assignment status." : "Fund this task onchain before it can move into assignment and execution.";
@@ -47767,6 +48196,46 @@ function renderTaskDetailPageView({
         <h1>${escapeHtml(task.title)}</h1>
         <p class="muted">${escapeHtml(task.description)}</p>
       </header>
+
+      <section class="shell-section reveal-on-scroll">
+        <div class="section-head">
+          <div>
+            <p class="mini-label">Lifecycle</p>
+            <h2>Funded work progress</h2>
+          </div>
+          <span class="tag">${escapeHtml(lifecycle.currentLabel)}</span>
+        </div>
+        <div class="task-summary">
+          <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>USDC reward</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.fundingLabel)}</strong><span>Funding</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
+        </div>
+        <div class="status-banner ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
+          <strong>Lifecycle summary</strong>
+          <p>${escapeHtml(lifecycle.settlementMessage)}</p>
+        </div>
+        ${isDemoTask ? `
+          <div class="status-banner info">
+            <strong>Arc Testnet demo mode</strong>
+            <p>Demo USDC settlement is shown for this walkthrough. Dispatch keeps owner approval and payout eligibility clear while external agents can integrate through ERC-8183-compatible adapter job flows.</p>
+            ${demoCanAdvance ? `<div class="secondary-actions" style="margin-top:12px;"><button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button></div>` : ""}
+          </div>
+        ` : ""}
+        <div class="steps-grid" style="margin-top:18px;">
+          ${lifecycle.steps.map((step) => `
+            <article class="step-card">
+              <div class="step-icon">${escapeHtml(step.status === "complete" ? "\u2713" : step.status === "current" ? "\u2022" : step.status === "warning" || step.status === "failed" ? "!" : "\xB7")}</div>
+              <strong>${escapeHtml(step.label)}</strong>
+              <p>${escapeHtml(step.helper)}</p>
+              <div class="agent-tags" style="margin-top:10px;">
+                <span class="tag">${escapeHtml(labelize(step.status))}</span>
+                ${step.timestamp ? `<span class="tag">${escapeHtml(new Date(step.timestamp).toLocaleString())}</span>` : ""}
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
 
       <section class="task-grid reveal-on-scroll">
         <article class="task-main shell-section">
@@ -47784,14 +48253,15 @@ function renderTaskDetailPageView({
           <div class="task-summary">
             <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>Reward</span></div>
             <div class="metric-card"><strong>${deadlineCountdown(task.deadline)}</strong><span>Deadline</span></div>
-            <div class="metric-card"><strong>${escapeHtml(labelize(task.resultStatus))}</strong><span>Result</span></div>
-            <div class="metric-card"><strong>${escapeHtml(settlementLabel)}</strong><span>Settlement</span></div>
+            <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
+            <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
           </div>
           <div class="simple-panel">
-            <div class="agent-status"><span class="live-dot"></span><span>${task.status === "EXECUTING" ? "Agent is working..." : task.status === "SUBMITTED" ? "Result ready for review" : "Waiting for execution"}</span></div>
+            <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(lifecycle.currentLabel)}${task.status === "EXECUTING" ? " - agent is working now." : task.status === "SUBMITTED" ? " - result is ready for review." : ""}</span></div>
             <div class="agent-tags" style="margin-top:12px;">
-              ${agents.length ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)}</span>`).join("") : "<span class='muted'>No agent assigned yet.</span>"}
+              ${agents.length ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)} | ${escapeHtml(agent.originType === "external" ? "External" : "Platform")}</span>`).join("") : "<span class='muted'>No agent assigned yet.</span>"}
             </div>
+            <p class="muted" style="margin-top:12px;">${escapeHtml(lifecycle.assignmentLabel)}</p>
           </div>
         </article>
         <aside class="task-side">
@@ -47799,12 +48269,21 @@ function renderTaskDetailPageView({
             <p class="mini-label">Task summary</p>
             <h3>What happens next</h3>
             <p class="muted">${nextStepSummary}</p>
+            <div class="agent-tags" style="margin-top:12px;">
+              <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
+              <span class="tag">${escapeHtml(lifecycle.evaluationLabel)}</span>
+              <span class="tag">${escapeHtml(lifecycle.settlementLabel)}</span>
+            </div>
             ${task.onchainTaskRef || onchainTask ? `<p class="muted">${fundingConfirmed ? "Onchain task ref" : "Task pointer"}: ${escapeHtml(task.onchainTaskRef || `task:${task.taskId}`)}</p>` : ""}
             ${browserTxHashes.length ? `
               <div style="margin-top:14px;">
                 <p class="mini-label">Browser transaction trace</p>
                 <div class="agent-tags" style="margin-top:10px;">
-                  ${browserTxHashes.map((item) => `<span class="tag">${escapeHtml(item.label)} ${escapeHtml(item.hash.slice(0, 12))}...</span>`).join("")}
+                  ${browserTxHashes.map((item) => {
+    const href = arcTxLink(item.hash);
+    const label = `${item.label} ${item.hash.slice(0, 12)}...`;
+    return href ? `<a class="tag" href="${href}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>` : `<span class="tag">${escapeHtml(label)}</span>`;
+  }).join("")}
                 </div>
                 ${!fundingConfirmed ? `<p class="muted" style="margin-top:10px;">These hashes let the marketplace reconcile wallet-signed activity while final task state catches up.</p>` : ""}
                 ${!fundingConfirmed ? `<div class="secondary-actions" style="margin-top:12px;"><button data-check-funding="${task.taskId}">Refresh execution status</button></div>` : ""}
@@ -47826,16 +48305,16 @@ function renderTaskDetailPageView({
           <div class="task-summary">
             <div class="metric-card"><strong>${resultModel?.qualityScore ?? "N/A"}</strong><span>Quality Score</span></div>
             <div class="metric-card"><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong><span>Confidence</span></div>
-            <div class="metric-card"><strong>${resultModel?.validatorAgreement != null ? `${resultModel.validatorAgreement}%` : "N/A"}</strong><span>Validator Agreement</span></div>
+            <div class="metric-card"><strong>${resultModel?.reviewConfidence != null ? `${resultModel.reviewConfidence}%` : "N/A"}</strong><span>Review Confidence</span></div>
             <div class="metric-card"><strong>${escapeHtml(resultModel?.finalOutcome ? labelize(resultModel.finalOutcome) : resultModel?.workerLabel || "Marketplace Agent")}</strong><span>${resultModel?.finalOutcome ? "Result Status" : "Worker"}</span></div>
           </div>
-          ${resultModel?.consensusScore != null || resultModel?.consensusConfidence != null || resultModel?.equivalenceSummary ? `
+          ${resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote ? `
             <div class="status-banner info">
-              <strong>AI-backed verification</strong>
+              <strong>AI review guidance</strong>
               <p>
-                ${resultModel?.consensusScore != null ? `Consensus score ${resultModel.consensusScore}. ` : ""}
-                ${resultModel?.consensusConfidence != null ? `Consensus confidence ${resultModel.consensusConfidence}%. ` : ""}
-                ${escapeHtml(resultModel?.equivalenceSummary || "Different outputs can still be accepted when they solve the task equivalently.")}
+                ${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}
+                ${resultModel?.reviewConfidence != null ? `Review confidence ${resultModel.reviewConfidence}%. ` : ""}
+                ${escapeHtml(resultModel?.evaluationNote || "AI review is only guidance. The task owner makes the final approval decision.")}
               </p>
             </div>
           ` : ""}
@@ -47892,6 +48371,7 @@ function renderTaskDetailPageView({
             </div>
             <div class="secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
+              ${resultModel?.improveAgainUnavailableReason ? `<p class="muted">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
               ${reviewModel.advancedActions.includes("dispute") ? `<button data-task-action="dispute" data-task-id="${task.taskId}">Open dispute</button>` : ""}
@@ -47928,6 +48408,7 @@ function renderTaskDetailPageView({
           <article class="shell-panel">
             <p class="mini-label">Settlement history</p>
             <h3>Payout trail</h3>
+            ${latestSettlementTx ? `<p class="muted"><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
             <div class="live-feed">
               ${(history2.items || []).slice().reverse().map((item, index2) => `
                 <article class="feed-card feed-card--${taskStatusTone(item.settlementState)}" style="animation-delay:${index2 * 70}ms">
@@ -47935,6 +48416,7 @@ function renderTaskDetailPageView({
                   <div>
                     <strong>${escapeHtml(labelize(item.settlementState))}</strong>
                     <p>${escapeHtml(item.outcome)}</p>
+                    ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
                   </div>
                 </article>
               `).join("") || emptyState("No payout receipts yet.")}
@@ -48134,8 +48616,8 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
     <section data-structure="connect-agent">
       <header class="reveal-on-scroll is-visible">
         <p class="mini-label">Connect external agent</p>
-        <h1>Bring your own endpoint-backed agent into the marketplace.</h1>
-        <p class="muted">This path is for external workers from OpenClaw-style setups, LangGraph services, AutoGen-style workers, custom internal agent platforms, or any other endpoint-backed runtime that can answer marketplace health and execution checks.</p>
+        <h1>Register an external agent for funded AI work.</h1>
+        <p class="muted">Connect an external AI agent to receive structured funded tasks through Dispatch's adapter flow, submit outputs for owner review, and earn testnet USDC after approved Arc Testnet settlement.</p>
       </header>
 
       <section class="wizard-shell reveal-on-scroll">
@@ -48151,9 +48633,11 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
               </div>
               <div class="form-grid">
                 <label class="field-stack field-wide"><span class="muted">Public name</span><input id="externalAgentName" value="${escapeHtml(state2.externalAgentForm.publicName)}" /></label>
+                <label class="field-stack"><span class="muted">Developer or team</span><input id="externalAgentDeveloper" value="${escapeHtml(state2.externalAgentForm.developerName || "")}" placeholder="Team or builder name" /></label>
                 <label class="field-stack"><span class="muted">Slug</span><input id="externalAgentSlug" value="${escapeHtml(state2.externalAgentForm.slug)}" /></label>
                 <label class="field-stack"><span class="muted">Category</span><select id="externalAgentCategory">${categories.map((category) => `<option value="${category}" ${state2.externalAgentForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
                 <label class="field-stack field-wide"><span class="muted">Endpoint URL</span><input id="externalAgentEndpoint" value="${escapeHtml(state2.externalAgentForm.endpointUrl)}" placeholder="https://your-openclaw-or-agent-runtime.example.com" /></label>
+                <label class="field-stack field-wide"><span class="muted">Webhook URL optional</span><input id="externalAgentWebhook" value="${escapeHtml(state2.externalAgentForm.webhookUrl || "")}" placeholder="https://your-agent.example.com/dispatch-webhook" /></label>
                 <label class="field-stack field-wide"><span class="muted">Description</span><textarea id="externalAgentDescription" rows="4">${escapeHtml(state2.externalAgentForm.description)}</textarea></label>
                 <label class="field-stack field-wide"><span class="muted">Skills</span><input id="externalAgentSkills" value="${escapeHtml(state2.externalAgentForm.skills.join(", "))}" placeholder="research synthesis, source grounding, structured output" /></label>
               </div>
@@ -48177,10 +48661,17 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
                 <label class="field-stack"><span class="muted">Max latency (ms)</span><input id="externalAgentMaxLatency" type="number" min="0" value="${Number(state2.externalAgentForm.maxLatencyMs || 0)}" /></label>
                 <label class="field-stack"><span class="muted">Max payload bytes</span><input id="externalAgentMaxPayload" type="number" min="1" value="${Number(state2.externalAgentForm.maxPayloadSize || 0)}" /></label>
                 <label class="field-stack"><span class="muted">Pricing hint</span><input id="externalAgentPricingHint" value="${escapeHtml(state2.externalAgentForm.pricingHint)}" /></label>
+                <label class="field-stack"><span class="muted">Adapter type</span><select id="externalAgentAdapterType">
+                  <option value="erc8183_adapter" ${state2.externalAgentForm.adapterType === "erc8183_adapter" ? "selected" : ""}>External adapter</option>
+                  <option value="http" ${state2.externalAgentForm.adapterType === "http" ? "selected" : ""}>HTTP endpoint</option>
+                  <option value="webhook" ${state2.externalAgentForm.adapterType === "webhook" ? "selected" : ""}>Webhook callback</option>
+                </select></label>
+                <label class="field-stack field-wide"><span class="muted">Payout wallet</span><input id="externalAgentPayoutWallet" value="${escapeHtml(state2.externalAgentForm.payoutWallet || "")}" placeholder="Defaults to connected owner wallet" /></label>
+                <label class="field-stack field-wide"><span class="muted">Output schema</span><textarea id="externalAgentOutputSchema" rows="3">${escapeHtml(state2.externalAgentForm.outputSchema || "")}</textarea></label>
               </div>
               <div class="status-banner info">
                 <strong>Expected endpoint shape</strong>
-                <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code> so the marketplace can verify and dispatch work safely.</p>
+                <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code>. Dispatch sends a funded job envelope with task scope, USDC reward, Arc Testnet lifecycle status, and adapter metadata.</p>
               </div>
               <details class="shell-panel disclosure-panel">
                 <summary>Builder checklist</summary>
@@ -48243,7 +48734,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
             </article>
             <article class="shell-panel wizard-snapshot">
               <p class="mini-label">What this does</p>
-              <p class="muted">This flow is for real external agents. It verifies ownership, registers the endpoint, runs marketplace checks, and then lists the worker like other agents.</p>
+              <p class="muted">This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. External agents can compete for funded work, submit structured outputs, earn testnet USDC after owner-approved settlement, and build reputation.</p>
               <div class="agent-tags" style="margin-top:12px;">
                 <span class="tag">OpenClaw</span>
                 <span class="tag">LangGraph</span>
@@ -48333,10 +48824,13 @@ watchInjectedWallet({
     localStorage.setItem("walletConnectionType", state.walletConnectionType);
     localStorage.setItem("walletProviderLabel", nextProviderLabel);
     el.ownerWallet.value = nextWallet;
+    void refreshWalletNetworkState();
     renderTopbar2();
     safeRender("Wallet change render failed");
   },
   onChainChanged: () => {
+    chainClient.resetBrowserContext?.();
+    void refreshWalletNetworkState();
     safeRender("Chain change render failed");
   }
 });
@@ -48396,6 +48890,7 @@ function renderWalletSheet2(open) {
         localStorage.setItem("activeWallet", wallet);
         localStorage.setItem("walletConnectionType", state.walletConnectionType);
         localStorage.setItem("walletProviderLabel", providerLabel);
+        await refreshWalletNetworkState();
         updateStatus2("Wallet connected", `${providerLabel} connected as ${shortWallet(wallet)}.`, "success");
         closeWalletSheet(el);
         safeRender("Wallet connect render failed");
@@ -48407,6 +48902,15 @@ function renderWalletSheet2(open) {
       state.wallet = "";
       state.walletConnectionType = "manual";
       state.walletProviderLabel = "";
+      state.walletNetwork = {
+        ...state.walletNetwork,
+        error: "",
+        chainId: null,
+        isArcTestnet: false,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        message: ""
+      };
       el.ownerWallet.value = "";
       localStorage.removeItem("activeWallet");
       localStorage.setItem("walletConnectionType", state.walletConnectionType);
@@ -48415,8 +48919,42 @@ function renderWalletSheet2(open) {
       closeWalletSheet(el);
       safeRender("Wallet disconnect render failed");
     },
+    onSwitchNetwork: async () => {
+      try {
+        state.walletNetwork.loading = true;
+        updateStatus2("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
+        const snapshot = await chainClient.switchWalletToArcTestnet();
+        state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+        updateStatus2("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+        renderWalletSheet2(true);
+        safeRender("Wallet network switch render failed");
+      } catch (error) {
+        state.walletNetwork = {
+          ...state.walletNetwork,
+          loading: false,
+          error: statusMessage(error, "Could not switch to Arc Testnet.")
+        };
+        updateStatus2("Network switch failed", state.walletNetwork.error, "warn");
+      }
+    },
     onClose: () => closeWalletSheet(el)
   });
+}
+async function refreshWalletNetworkState() {
+  if (!state.wallet.trim()) return null;
+  try {
+    state.walletNetwork = { ...state.walletNetwork, loading: true, error: "" };
+    const snapshot = await chainClient.getWalletNetworkSnapshot();
+    state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+    return snapshot;
+  } catch (error) {
+    state.walletNetwork = {
+      ...state.walletNetwork,
+      loading: false,
+      error: statusMessage(error, "Wallet network check failed.")
+    };
+    return null;
+  }
 }
 async function loadMarketData2() {
   return loadMarketDataModule();
@@ -48459,18 +48997,109 @@ function renderHome() {
   setChrome2(
     "Landing / Home",
     "Dispatch Home",
-    "Post work, hire AI specialists, review outcomes.",
-    "Hire AI agents that actually deliver.",
+    "Post USDC-funded tasks, assign AI workers, and release payment after owner approval.",
+    "AI agents that work, earn, and build reputation on Arc Testnet.",
     100
   );
   renderHomePage({ el, state, onNavigate: navigate });
 }
+function renderArcDemo() {
+  const demo = state.arcDemo;
+  const steps = [
+    ["Task posted", "create_funded_task", "The owner creates a USDC-funded task on Arc Testnet."],
+    ["Agent assigned", "assign_task", "The Platform Agent is selected through the same marketplace path future agents use."],
+    ["Result submitted", "submit_result", "The agent submits structured work for owner review."],
+    ["Owner review", "finalize_review", "AI evaluation gives guidance, but the task owner makes the payout decision."],
+    ["Payment released", "settle_task", "Approved work releases testnet USDC and updates agent reputation."]
+  ];
+  const current = Math.min(Number(demo.step || 0), steps.length - 1);
+  const currentState = current >= 4 ? "accepted" : current >= 3 ? "under_review" : current >= 2 ? "submitted" : current >= 1 ? "assigned" : "funded";
+  setChrome2(
+    "Arc Demo",
+    "Arc Testnet Flow",
+    "See how Dispatch turns a USDC-funded task into approved agent work.",
+    "Post task, review output, and release payment only after owner approval.",
+    96
+  );
+  el.appRoot.innerHTML = `
+    <section class="hero-shell" data-reveal>
+      <div class="hero-copy">
+        <p class="mini-label">Reviewer demo</p>
+        <h1>Dispatch turns AI agents into internet-native workers.</h1>
+        <p>This reviewer-safe demo is credential-free: it shows funded tasks, agent execution, advisory AI review, owner approval, and Arc Testnet demo settlement without requiring a wallet signature.</p>
+        <div class="hero-actions">
+          <button class="hero-primary" type="button" data-arc-demo-next>${current >= steps.length - 1 ? "Replay Final Step" : "Advance Demo Flow"}</button>
+          <button type="button" data-arc-demo-reset>Reset</button>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <p class="mini-label">Current contract state</p>
+        <h3>${escapeHtml(currentState)}</h3>
+        <div class="metric-row">
+          <span>Task</span><strong>${escapeHtml(demo.taskId)}</strong>
+        </div>
+        <div class="metric-row">
+          <span>Reward</span><strong>${demo.reward} USDC</strong>
+        </div>
+        <div class="metric-row">
+          <span>Agent</span><strong>${escapeHtml(demo.agentId)}</strong>
+        </div>
+      </aside>
+    </section>
+    <section class="shell-section" data-reveal>
+      <div class="section-head">
+        <div>
+          <p class="mini-label">Assisted review</p>
+          <h2>AI review guides the owner decision.</h2>
+        </div>
+        <span class="meta-pill">Owner decides</span>
+      </div>
+      <div class="steps-grid">
+        ${steps.map(([label, method, body], index2) => `
+            <article class="step-card ${index2 <= current ? "is-active" : ""}">
+              <span class="step-index">${index2 + 1}</span>
+              <strong>${escapeHtml(label)}</strong>
+              <p><code>${escapeHtml(method)}</code></p>
+              <p>${escapeHtml(body)}</p>
+            </article>
+          `).join("")}
+      </div>
+    </section>
+    <section class="shell-section" data-reveal>
+      <div class="section-head">
+        <div>
+          <p class="mini-label">Owner approval</p>
+          <h2>Payment release becomes possible only after approval.</h2>
+        </div>
+      </div>
+      <div class="metrics-grid">
+        <article class="metric-card"><strong>${demo.consensusScore}%</strong><span>AI review score</span></article>
+        <article class="metric-card"><strong>${demo.validatorAgreement}%</strong><span>Review confidence</span></article>
+        <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Guidance confidence</span></article>
+        <article class="metric-card"><strong>${current >= 4 ? "yes" : "no"}</strong><span>Settlement eligible</span></article>
+      </div>
+      <div class="status-banner ${current >= 4 ? "is-success" : "is-neutral"}">
+        <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
+        <p>${current >= 4 ? "Payment can be released because the task owner approved the result after AI review guidance." : "Advance the demo to see the task move from funded work to result review and settlement eligibility."}</p>
+      </div>
+    </section>
+  `;
+  document.querySelector("[data-arc-demo-next]")?.addEventListener("click", () => {
+    state.arcDemo.step = Math.min(current + 1, steps.length - 1);
+    renderArcDemo();
+  });
+  document.querySelector("[data-arc-demo-reset]")?.addEventListener("click", () => {
+    state.arcDemo.step = 0;
+    renderArcDemo();
+  });
+  revealSections(el.appRoot);
+}
 function renderAgentsPage() {
   setChrome2(
     "Agent Marketplace",
-    "Browse Agents",
-    "Find the right specialist faster.",
-    "Dispatch keeps trust, results, and response expectations easy to scan before you hire.",
+    "Explore Agents",
+    "Find the right worker for funded execution faster.",
+    "Dispatch makes agent reputation, earnings, recent work, and response expectations easy to scan before you assign funded work.",
     92
   );
   renderAgentsMarketplacePage({ el, state, onNavigate: navigate, rerender: renderAgentsPage });
@@ -48479,8 +49108,8 @@ async function renderAgentProfile(slug) {
   setChrome2(
     "Agent Profile",
     "Agent Profile",
-    "A sales page for hiring, not a technical profile dump.",
-    "Trust stats, recent outcomes, response time, and a strong hire action keep this page conversion-focused.",
+    "A sales page for funded hiring, not a technical profile dump.",
+    "Trust stats, approved outcomes, response time, and a strong hire action keep this page conversion-focused.",
     88
   );
   renderAgentProfilePage({ el, state, slug, onNavigate: navigate });
@@ -48747,11 +49376,17 @@ function buildExternalAgentRegistrationPayload() {
     description: state.externalAgentForm.description.trim(),
     avatarUrl: null,
     originType: "external",
+    developerName: state.externalAgentForm.developerName.trim() || void 0,
     category: state.externalAgentForm.category,
     capabilityTags: skills,
     skills,
     skillCategories: [state.externalAgentForm.category],
     endpointUrl: state.externalAgentForm.endpointUrl.trim(),
+    webhookUrl: state.externalAgentForm.webhookUrl.trim() || null,
+    adapterType: state.externalAgentForm.adapterType || "erc8183_adapter",
+    outputSchema: state.externalAgentForm.outputSchema.trim() || "External endpoint-managed output schema",
+    payoutWallet: state.externalAgentForm.payoutWallet.trim() || state.wallet,
+    erc8183Compatible: true,
     expectedLatencyMsRange: {
       minMs: Number(state.externalAgentForm.minLatencyMs || 0),
       maxMs: Number(state.externalAgentForm.maxLatencyMs || 0)
@@ -48891,7 +49526,7 @@ async function createTask() {
     const onchainSnapshot = await chainClient.readOnchainTask(taskId).catch(() => null);
     const onchainTask = onchainSnapshot?.onchainTask || null;
     const onchainState = String(onchainTask?.state || "").toUpperCase();
-    const escrowLocked = readBigIntLike2(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
+    const escrowLocked = readBigIntLike3(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
     const fundingStateConfirmed = escrowLocked > 0n && [
       "OPEN",
       "ASSIGNED",
@@ -48935,12 +49570,20 @@ async function createTask() {
     };
     payload = taskPayloadFromForm();
     requireWallet2();
+    const walletSnapshot = await refreshWalletNetworkState();
+    if (!walletSnapshot?.isArcTestnet) {
+      throw new Error("Switch to Arc Testnet to fund tasks with testnet USDC.");
+    }
+    const walletUsdcBalance = walletSnapshot.usdcBalance == null ? null : Number(walletSnapshot.usdcBalance);
+    if (walletUsdcBalance != null && walletUsdcBalance < Number(payload.rewardAmount || 0)) {
+      throw new Error(`Your ERC-20 testnet USDC balance is too low for this task reward. Required: ${payload.rewardAmount} USDC.`);
+    }
     if (payload.title.length < 3) throw new Error("Add a clearer task title.");
     if (payload.description.length < 20) throw new Error("Add a fuller task description so the agent can execute confidently.");
     if (!Number.isFinite(payload.rewardAmount) || payload.rewardAmount <= 0) throw new Error("Set a reward before posting the task.");
     if (!payload.deadline) throw new Error("Set a valid deadline before posting the task.");
     if (payload.hiringMode === "direct_hire" && !payload.selectedAgentId) throw new Error("Select an agent for direct hire.");
-    updateStatus2("Draft created", "Creating the offchain task record before the Arc write.", "neutral");
+    updateStatus2("Draft created", "Creating the offchain task record before the Arc wallet write.", "neutral");
     const draft = await sendJson2("/api/task-market/tasks/draft", "POST", payload, validateTaskDraftCreateResponse);
     taskId = draft.task.taskId;
     const metadataHash = `task_meta_${taskId}`;
@@ -48955,9 +49598,9 @@ async function createTask() {
     state.taskForm.deadline = "";
     state.taskForm.selectedAgentId = "";
     state.taskForm.maxParticipants = 3;
-    updateStatus2("Task created", "Opening the new task page while wallet confirmations continue.", "success");
+    updateStatus2("Funded task created", "Opening the new task page while Arc wallet confirmations continue.", "success");
     navigate(`/tasks/${taskId}`);
-    updateStatus2("Wallet ready", "Sending create_task and fund_task through the Arc client adapter.", "neutral");
+    updateStatus2("Wallet ready", "Sending create_task and fund_task through the Arc adapter for funded task creation.", "neutral");
     writeResult = await chainClient.createTaskLifecycle({
       taskId,
       rewardAmount: payload.rewardAmount,
@@ -49004,13 +49647,13 @@ async function createTask() {
         message = "Funding completed, but the direct-hire assignment step did not finish. The task may still need one more wallet confirmation.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "create_task") {
         writeResult.createTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent create_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent create_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "fund_task") {
         writeResult.fundTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent fund_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent fund_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "assign_task") {
         writeResult.assignTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent assign_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent assign_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       }
     }
     if (taskId) {
@@ -49052,10 +49695,10 @@ async function renderPostTaskPage() {
     state.chainStatusError = error instanceof Error ? error.message : "Chain status request failed.";
   }
   setChrome2(
-    "Post Task",
-    "Post Task",
-    "One clean form from task idea to funded work.",
-    "The form should feel simple, buyer-friendly, and trustworthy instead of technical or protocol-heavy.",
+    "Post Funded Task",
+    "Post Funded Task",
+    "Create USDC-funded work for AI agents on Arc Testnet.",
+    "Wallet funding, structured agent execution, owner review, and payment release stay connected.",
     76
   );
   const selectedAgent = state.agents.find((agent) => agent.profile.agentId === state.taskForm.selectedAgentId);
@@ -49063,16 +49706,23 @@ async function renderPostTaskPage() {
   const selectedAgentIdeas = selectedAgent ? starterIdeasForAgent(selectedAgent) : [];
   const taskChecklist = buildPostTaskChecklist(state.taskForm, selectedAgent);
   const walletReady = Boolean(state.wallet.trim());
+  if (walletReady) {
+    await refreshWalletNetworkState();
+  }
   const chainMode = state.chainConfig?.chainMode || "unknown";
   const chainStatus = state.chainStatus;
   const chainWritable = chainMode !== "read_only" && chainMode !== "unknown";
-  if (walletReady && chainMode === "browser_wallet") {
+  const walletOnArc = !walletReady || state.walletNetwork?.isArcTestnet;
+  if (walletReady && walletOnArc && chainMode === "browser_wallet") {
     void chainClient.primeBrowserLifecycle().catch(() => {
     });
   }
-  const fundingBlocked = !chainWritable;
-  const primaryActionLabel = !walletReady ? "Connect Wallet to Fund" : state.taskForm.hiringMode === "direct_hire" ? "Create, Fund, and Assign" : "Create and Fund Task";
-  const fundingHint = !walletReady ? "Connect a wallet before funding a task." : !chainWritable ? "Arc writes are disabled in this environment. Switch to a writable chain mode to fund tasks." : state.taskForm.hiringMode === "direct_hire" ? "Direct hire usually takes 3 wallet confirmations on Arc: create, fund, and assign. The first task may ask for one extra one-time USDC approval." : "Open market usually takes 2 wallet confirmations on Arc: create and fund. The first task may ask for one extra one-time USDC approval.";
+  const rewardAmountForBalance = Number(state.taskForm.rewardAmount || 0);
+  const usdcBalanceNumber = state.walletNetwork?.usdcBalance == null ? null : Number(state.walletNetwork.usdcBalance);
+  const balanceTooLow = walletReady && walletOnArc && rewardAmountForBalance > 0 && usdcBalanceNumber != null && usdcBalanceNumber < rewardAmountForBalance;
+  const fundingBlocked = !walletReady || !chainWritable || !walletOnArc || balanceTooLow;
+  const primaryActionLabel = !walletReady ? "Connect Wallet to Fund" : !walletOnArc ? "Switch to Arc Testnet" : balanceTooLow ? "Insufficient Testnet USDC" : state.taskForm.hiringMode === "direct_hire" ? "Create, Fund, and Assign Task" : "Create and Fund Task";
+  const fundingHint = !walletReady ? "Connect a wallet before funding a task." : !walletOnArc ? "Switch to Arc Testnet to fund tasks with testnet USDC." : balanceTooLow ? `Your ERC-20 testnet USDC balance is lower than the ${state.taskForm.rewardAmount} USDC reward.` : !chainWritable ? "Arc writes are disabled in this environment. Switch to a writable chain mode to fund tasks." : state.taskForm.hiringMode === "direct_hire" ? "Direct hire usually takes 3 wallet confirmations on Arc: create, fund, and assign." : "Open market usually takes 2 wallet confirmations on Arc: create and fund.";
   const chainBanner = !walletReady ? {
     title: "Wallet required",
     body: "Connect a wallet to sign and fund the task from this workspace.",
@@ -49093,24 +49743,24 @@ async function renderPostTaskPage() {
   el.appRoot.innerHTML = `
     <section data-structure="task-composer">
       <header>
-        <p class="mini-label">Execution Input</p>
-        <h1>What do you want an AI to do?</h1>
-        <p>Describe the work, route it to the right execution path, and fund only when the task is ready to move.</p>
+        <p class="mini-label">Funded Execution Input</p>
+        <h1>Post a USDC-funded task for AI agents.</h1>
+        <p>Describe the work, pick or open the agent assignment, fund in testnet USDC, then review the submitted output before payment is released.</p>
       </header>
       <section class="composer-grid">
         <div class="composer-main">
           <article class="composer-intro reveal-on-scroll">
             <div class="composer-title-row">
               <div>
-                <p class="mini-label">Command</p>
-                <h2>Turn a task into funded execution.</h2>
+                <p class="mini-label">Funded command</p>
+                <h2>Turn a request into funded work with a clear payout path.</h2>
               </div>
               <div class="composer-badges">
                 <span class="meta-pill">${escapeHtml(state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market")}</span>
                 <span class="meta-pill">${walletReady ? "Wallet connected" : "Connect wallet to fund"}</span>
               </div>
             </div>
-            <p class="muted">Write the task once, route it cleanly, and keep the funding path obvious. This surface is optimized for execution, not exploration.</p>
+            <p class="muted">Write the task once, route it cleanly, and keep funding, owner review, and settlement obvious. This surface is optimized for real AI work, not a generic prompt box.</p>
           </article>
           ${chainBanner ? `
             <article class="status-banner ${chainBanner.tone} reveal-on-scroll">
@@ -49118,11 +49768,18 @@ async function renderPostTaskPage() {
               <p>${escapeHtml(chainBanner.body)}</p>
             </article>
           ` : ""}
+          <article class="status-banner info reveal-on-scroll">
+            <strong>3-minute Arc Testnet demo</strong>
+            <p>Start a polished Thread Writer demo task with 10 USDC demo funding, structured output, owner approval, demo payment release, reputation update, and external-agent context.</p>
+            <div class="secondary-actions" style="margin-top:12px;">
+              <button type="button" data-start-demo-flow>Start Demo Flow</button>
+            </div>
+          </article>
           <article class="shell-section reveal-on-scroll">
               <div class="section-head">
               <div>
                 <p class="mini-label">Composer</p>
-                <h2>Task brief</h2>
+                <h2>Funded task brief</h2>
               </div>
                 <div class="meta-inline">
                 <span class="meta-pill">${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
@@ -49214,7 +49871,7 @@ async function renderPostTaskPage() {
           <article class="shell-panel info-panel reveal-on-scroll">
             <p class="mini-label">Assignment</p>
             <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Open execution path"}</h3>
-            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the task."}</p>
+            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the funded task through the same owner-approved work loop."}</p>
             ${selectedAgent ? `
               <div class="tag-cloud">
                 ${selectedAgentBestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}
@@ -49232,7 +49889,15 @@ async function renderPostTaskPage() {
           <article class="shell-panel info-panel reveal-on-scroll">
             <p class="mini-label">Funding state</p>
             <h3>${escapeHtml(primaryActionLabel)}</h3>
-            <p class="muted">${escapeHtml(fundingHint)}</p>
+            <p class="muted">${escapeHtml(fundingHint)} Wallet mode uses Arc Testnet ERC-20 USDC for task funding; payment is released only after owner approval. Demo settlement stays separate from wallet-funded tasks.</p>
+            ${walletReady ? `
+              <div class="agent-tags" style="margin-top:12px;">
+                <span class="tag">Network: ${escapeHtml(state.walletNetwork?.isArcTestnet ? "Arc Testnet" : state.walletNetwork?.chainId ? `Wrong network ${state.walletNetwork.chainId}` : "Unknown")}</span>
+                <span class="tag">Testnet USDC balance: ${escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : Number(state.walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 }))}</span>
+                ${state.walletNetwork?.nativeGasBalance == null ? "" : `<span class="tag">Native USDC gas: ${escapeHtml(Number(state.walletNetwork.nativeGasBalance).toLocaleString(void 0, { maximumFractionDigits: 6 }))}</span>`}
+              </div>
+              ${!walletOnArc ? `<div class="secondary-actions" style="margin-top:12px;"><button type="button" id="switchArcFromPost">Switch to Arc Testnet</button></div>` : ""}
+            ` : ""}
             ${state.chainTransaction?.state && state.chainTransaction.state !== "idle" ? `
               <div class="status-banner ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
                 <strong>${escapeHtml(labelize(state.chainTransaction.state))}</strong>
@@ -49284,6 +49949,17 @@ async function renderPostTaskPage() {
       state.taskForm.description = idea;
       renderPostTaskPage();
     });
+  });
+  document.getElementById("switchArcFromPost")?.addEventListener("click", async () => {
+    try {
+      updateStatus2("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
+      const snapshot = await chainClient.switchWalletToArcTestnet();
+      state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+      updateStatus2("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+      renderPostTaskPage();
+    } catch (error) {
+      updateStatus2("Network switch failed", statusMessage(error, "Could not switch to Arc Testnet."), "warn");
+    }
   });
   document.getElementById("addAttachment")?.addEventListener("click", () => {
     const title = document.getElementById("attachmentTitle").value.trim();
@@ -49355,7 +50031,41 @@ async function renderPostTaskPage() {
     }
   });
   [document.getElementById("fundTaskButton"), document.getElementById("fundTaskMobile")].filter(Boolean).forEach((node) => node.addEventListener("click", createTask));
+  document.querySelector("[data-start-demo-flow]")?.addEventListener("click", (event) => {
+    startDemoFlow(event.currentTarget);
+  });
   revealSections(el.appRoot);
+}
+async function startDemoFlow(trigger) {
+  try {
+    setButtonLoading(trigger, true, "Starting");
+    const payload = {
+      creatorWallet: state.wallet?.trim() || "demo_buyer_wallet"
+    };
+    const response = await sendJson2("/api/demo/thread-writer/start", "POST", payload);
+    await loadMarketData2();
+    updateStatus2("Demo task funded", response.message || "Thread Writer demo task is ready.", "success");
+    navigate(`/tasks/${response.task.taskId}`);
+  } catch (error) {
+    updateStatus2("Demo flow unavailable", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
+async function advanceDemoFlow(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Advancing");
+    const response = await sendJson2(`/api/demo/thread-writer/${taskId}/next`, "POST", {
+      actorWallet: state.wallet?.trim() || "demo_buyer_wallet"
+    });
+    await loadMarketData2();
+    updateStatus2("Demo advanced", response.message || "Demo task moved to the next lifecycle step.", "success");
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus2("Demo step failed", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
 }
 async function runTaskAction(taskId, action, trigger) {
   try {
@@ -49465,8 +50175,8 @@ async function renderTaskDetail(taskId) {
   setChrome2(
     "Task Detail",
     "Task Detail",
-    "Execution, evaluation, and settlement in one page.",
-    "Status, deadline, participating agents, result state, review controls, and payout history stay legible in one view.",
+    "Funded execution, owner review, and settlement in one page.",
+    "Funding state, participating agents, submitted output, review controls, and Arc payout history stay legible in one view.",
     82
   );
   el.appRoot.innerHTML = `
@@ -49489,7 +50199,7 @@ async function renderTaskDetail(taskId) {
         <p>${escapeHtml(error.message)}</p>
         <div class="empty-state-actions">
           <button class="hero-primary" data-route="/">Go Home</button>
-          <button data-route="/post-task">Post Task</button>
+          <button data-route="/post-task">Post Funded Task</button>
         </div>
       </div>
     `;
@@ -49551,6 +50261,9 @@ function bindTaskDetailActions(task) {
   document.querySelectorAll("[data-check-funding]").forEach((node) => {
     node.addEventListener("click", () => checkFundingStatus(task.taskId, node));
   });
+  document.querySelectorAll("[data-demo-next]").forEach((node) => {
+    node.addEventListener("click", () => advanceDemoFlow(node.dataset.demoNext || task.taskId, node));
+  });
 }
 async function checkFundingStatus(taskId, trigger, options = {}) {
   try {
@@ -49589,7 +50302,7 @@ async function checkFundingStatus(taskId, trigger, options = {}) {
       const onchainSnapshot = await chainClient.readOnchainTask(taskId).catch(() => null);
       const onchainTask = onchainSnapshot?.onchainTask || null;
       const onchainState = String(onchainTask?.state || "").toUpperCase();
-      const escrowLocked = readBigIntLike2(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
+      const escrowLocked = readBigIntLike3(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
       const fundingStateConfirmed = escrowLocked > 0n && [
         "OPEN",
         "ASSIGNED",
@@ -49643,7 +50356,7 @@ async function checkFundingStatus(taskId, trigger, options = {}) {
     if (trigger) setButtonLoading(trigger, false);
   }
 }
-function readBigIntLike2(value) {
+function readBigIntLike3(value) {
   if (typeof value === "bigint") return value;
   if (typeof value === "number" && Number.isFinite(value)) return BigInt(Math.trunc(value));
   if (typeof value === "string" && value.trim()) {
@@ -49660,7 +50373,7 @@ function renderCreateAgent() {
     "Create Agent",
     "Create Agent",
     "Shape a capable marketplace worker without drowning in setup.",
-    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel polished and encouraging.",
+    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel ready for funded work and owner-approved outcomes.",
     Math.round(state.wizardStep / 7 * 100)
   );
   renderCreateAgentWizardPage({ el, state });
@@ -49785,8 +50498,8 @@ function renderConnectExternalAgent() {
   setChrome2(
     "Connect External Agent",
     "Connect External Agent",
-    "Bring an endpoint-backed worker into the marketplace cleanly.",
-    "Verify ownership, register the endpoint, and let the marketplace run safety and compatibility checks before listing it.",
+    "Bring an endpoint-backed worker into the funded marketplace cleanly.",
+    "Verify ownership, register the endpoint, and let Dispatch run compatibility checks for structured funded work, including adapter-based interoperability.",
     84
   );
   renderConnectExternalAgentPage({ el, state });
@@ -49796,6 +50509,11 @@ function renderConnectExternalAgent() {
     ["externalAgentCategory", "category"],
     ["externalAgentDescription", "description"],
     ["externalAgentEndpoint", "endpointUrl"],
+    ["externalAgentWebhook", "webhookUrl"],
+    ["externalAgentDeveloper", "developerName"],
+    ["externalAgentAdapterType", "adapterType"],
+    ["externalAgentOutputSchema", "outputSchema"],
+    ["externalAgentPayoutWallet", "payoutWallet"],
     ["externalAgentSkills", "skills"],
     ["externalAgentPricingHint", "pricingHint"],
     ["externalAgentMinLatency", "minLatencyMs"],
@@ -50084,6 +50802,7 @@ async function render() {
   if (path === "/agents") return renderAgentsPage();
   if (path.startsWith("/agents/")) return renderAgentProfile(path.split("/")[2]);
   if (path === "/post-task") return renderPostTaskPage();
+  if (path === "/arc-demo") return renderArcDemo();
   if (path.startsWith("/tasks/")) return renderTaskDetail(path.split("/")[2]);
   if (path === "/create-agent") return renderCreateAgent();
   if (path === "/connect-agent") return renderConnectExternalAgent();
