@@ -183,7 +183,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
         : fundingFailed
           ? "The latest wallet or chain funding action failed."
           : fundingPending
-            ? "Wallet signatures were captured and Arc Testnet confirmation is still syncing."
+            ? "Wallet signatures were captured and Arc Testnet funding confirmation is still syncing."
             : "The task needs onchain funding before assignment and execution.",
       timestamp: timelineByKind.get("escrow_funded") || null,
     },
@@ -193,7 +193,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
       status: assigned ? "complete" : fundingConfirmed ? "current" : "pending",
       helper: assigned
         ? assignmentLabel
-        : "An agent will be assigned once the funded task is ready to route.",
+        : "An AI agent will be assigned once the USDC-funded task is ready to route.",
       timestamp: timelineByKind.get("agent_accepted") || timelineByKind.get("agent_invited") || null,
     },
     {
@@ -201,7 +201,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
       label: submitted ? "Output submitted" : executing ? "In progress" : "Execution pending",
       status: submitted ? "complete" : executing ? "current" : "pending",
       helper: submitted
-        ? "A result is on the task and ready for verification."
+        ? "A result is on the task and ready for owner review."
         : executing
           ? "The assigned worker is actively completing the task."
           : "Execution starts after assignment.",
@@ -238,10 +238,10 @@ export function buildTaskLifecycleModel(task, options = {}) {
       label: reputationLabel,
       status: settled || refunded ? "complete" : "pending",
       helper: settled
-        ? "Agent reputation can now reflect a completed funded outcome."
+        ? "Agent reputation can now reflect a paid, owner-approved funded outcome."
         : refunded
           ? "The task is closed and payout reputation stays unchanged or neutral."
-          : "Reputation updates after the funded task reaches a terminal payout state.",
+          : "Reputation updates after owner approval and a terminal payout state.",
       timestamp: task?.latestSettlement?.settlementTimestamp || null,
     },
   ];
@@ -282,7 +282,7 @@ export function buildPostTaskChecklist(form, selectedAgent) {
       },
       {
         id: "settlement",
-        label: "Review and settlement path chosen",
+        label: "Owner review and settlement path chosen",
         complete: Boolean(form.evaluationPreference),
       },
     ],

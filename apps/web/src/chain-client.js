@@ -624,7 +624,7 @@ function toTokenBaseUnits(amount, decimals = 6) {
 
 function chainDisplayName(config = {}) {
   const raw = `${config.chainKey || ""} ${config.networkName || ""}`.toLowerCase();
-  return raw.includes("arc") ? "Arc Testnet" : "GenLayer";
+  return raw.includes("arc") ? "Arc Testnet" : "Connected EVM network";
 }
 
 function parseChainId(value) {

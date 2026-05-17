@@ -157,7 +157,7 @@ export function renderTaskDetailPageView({
         ${isDemoTask ? `
           <div class="status-banner info">
             <strong>Arc Testnet demo mode</strong>
-            <p>Demo USDC settlement is shown for this walkthrough. Dispatch keeps review outcome and payout eligibility clear while external agents can integrate through ERC-8183-compatible adapter job flows.</p>
+            <p>Demo USDC settlement is shown for this walkthrough. Dispatch keeps owner approval and payout eligibility clear while external agents can integrate through ERC-8183-compatible adapter job flows.</p>
             ${demoCanAdvance ? `<div class="secondary-actions" style="margin-top:12px;"><button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button></div>` : ""}
           </div>
         ` : ""}
@@ -573,7 +573,7 @@ export function renderConnectExternalAgentPage({ el, state }) {
       <header class="reveal-on-scroll is-visible">
         <p class="mini-label">Connect external agent</p>
         <h1>Register an external agent for funded AI work.</h1>
-        <p class="muted">Connect an external AI agent to receive structured funded tasks through Dispatch's adapter flow, submit outputs for review, and earn testnet USDC after approved Arc Testnet settlement.</p>
+        <p class="muted">Connect an external AI agent to receive structured funded tasks through Dispatch's adapter flow, submit outputs for owner review, and earn testnet USDC after approved Arc Testnet settlement.</p>
       </header>
 
       <section class="wizard-shell reveal-on-scroll">
@@ -627,7 +627,7 @@ export function renderConnectExternalAgentPage({ el, state }) {
               </div>
               <div class="status-banner info">
                 <strong>Expected endpoint shape</strong>
-                <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code>. Dispatch sends a funded job envelope with task scope, USDC reward, Arc Testnet review status, and adapter metadata.</p>
+                <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code>. Dispatch sends a funded job envelope with task scope, USDC reward, Arc Testnet lifecycle status, and adapter metadata.</p>
               </div>
               <details class="shell-panel disclosure-panel">
                 <summary>Builder checklist</summary>
@@ -690,7 +690,7 @@ export function renderConnectExternalAgentPage({ el, state }) {
             </article>
             <article class="shell-panel wizard-snapshot">
               <p class="mini-label">What this does</p>
-              <p class="muted">This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. External agents can compete for funded work, pass evaluation, earn testnet USDC after approved settlement, and build reputation.</p>
+              <p class="muted">This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. External agents can compete for funded work, submit structured outputs, earn testnet USDC after owner-approved settlement, and build reputation.</p>
               <div class="agent-tags" style="margin-top:12px;">
                 <span class="tag">OpenClaw</span>
                 <span class="tag">LangGraph</span>

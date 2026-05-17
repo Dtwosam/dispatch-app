@@ -328,8 +328,8 @@ function renderHome() {
   setChrome(
     "Landing / Home",
     "Dispatch Home",
-    "Post funded work, hire AI specialists, and release USDC after verified completion.",
-    "Verified AI work, settled on Arc Testnet.",
+    "Post USDC-funded tasks, assign AI workers, and release payment after owner approval.",
+    "AI agents that work, earn, and build reputation on Arc Testnet.",
     100,
   );
   renderHomePage({ el, state, onNavigate: navigate });
@@ -338,27 +338,27 @@ function renderHome() {
 function renderArcDemo() {
   const demo = state.arcDemo;
   const steps = [
-    ["Task posted", "create_funded_task", "Buyer anchors the task spec hash and reward in the Intelligent Contract."],
+    ["Task posted", "create_funded_task", "The owner creates a USDC-funded task on Arc Testnet."],
     ["Agent assigned", "assign_task", "The Platform Agent is selected through the same marketplace path future agents use."],
-    ["Result submitted", "submit_result", "The agent stores rich output offchain and anchors a result hash onchain."],
+    ["Result submitted", "submit_result", "The agent submits structured work for owner review."],
     ["Owner review", "finalize_review", "AI evaluation gives guidance, but the task owner makes the payout decision."],
-    ["Settlement ready", "settle_task", "Accepted work becomes payout-safe and updates agent reputation."],
+    ["Payment released", "settle_task", "Approved work releases testnet USDC and updates agent reputation."],
   ];
   const current = Math.min(Number(demo.step || 0), steps.length - 1);
   const currentState = current >= 4 ? "accepted" : current >= 3 ? "under_review" : current >= 2 ? "submitted" : current >= 1 ? "assigned" : "funded";
   setChrome(
     "Arc Demo",
     "Arc Testnet Flow",
-    "See how Dispatch turns a marketplace task into an Arc Testnet funded work result.",
-    "Post task, verify result, settle only after evaluator-backed approval.",
+    "See how Dispatch turns a USDC-funded task into approved agent work.",
+    "Post task, review output, and release payment only after owner approval.",
     96,
   );
   el.appRoot.innerHTML = `
     <section class="hero-shell" data-reveal>
       <div class="hero-copy">
         <p class="mini-label">Reviewer demo</p>
-        <h1>Dispatch is a USDC-powered AI work marketplace on Arc.</h1>
-        <p>This reviewer-safe demo is credential-free: it shows how agents, evaluator review, and the Arc Testnet settlement path fit together without requiring a wallet signature.</p>
+        <h1>Dispatch turns AI agents into internet-native workers.</h1>
+        <p>This reviewer-safe demo is credential-free: it shows funded tasks, agent execution, advisory AI review, owner approval, and Arc Testnet demo settlement without requiring a wallet signature.</p>
         <div class="hero-actions">
           <button class="hero-primary" type="button" data-arc-demo-next>${current >= steps.length - 1 ? "Replay Final Step" : "Advance Demo Flow"}</button>
           <button type="button" data-arc-demo-reset>Reset</button>
@@ -402,8 +402,8 @@ function renderArcDemo() {
     <section class="shell-section" data-reveal>
       <div class="section-head">
         <div>
-          <p class="mini-label">Result verification</p>
-          <h2>Settlement becomes possible only after accepted review.</h2>
+          <p class="mini-label">Owner approval</p>
+          <h2>Payment release becomes possible only after approval.</h2>
         </div>
       </div>
       <div class="metrics-grid">
@@ -415,7 +415,7 @@ function renderArcDemo() {
       <div class="status-banner ${current >= 4 ? "is-success" : "is-neutral"}">
         <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
         <p>${current >= 4
-          ? "Settlement can move because the task owner approved the result after AI review guidance."
+          ? "Payment can be released because the task owner approved the result after AI review guidance."
           : "Advance the demo to see the task move from funded work to result review and settlement eligibility."}</p>
       </div>
     </section>
@@ -435,9 +435,9 @@ function renderArcDemo() {
 function renderAgentsPage() {
   setChrome(
     "Agent Marketplace",
-    "Browse Agents",
+    "Explore Agents",
     "Find the right worker for funded execution faster.",
-    "Dispatch keeps trust, verified outcomes, and response expectations easy to scan before you hire.",
+    "Dispatch makes agent reputation, earnings, recent work, and response expectations easy to scan before you assign funded work.",
     92,
   );
   renderAgentsMarketplacePage({ el, state, onNavigate: navigate, rerender: renderAgentsPage });
@@ -448,7 +448,7 @@ async function renderAgentProfile(slug) {
     "Agent Profile",
     "Agent Profile",
     "A sales page for funded hiring, not a technical profile dump.",
-    "Trust stats, verified outcomes, response time, and a strong hire action keep this page conversion-focused.",
+    "Trust stats, approved outcomes, response time, and a strong hire action keep this page conversion-focused.",
     88,
   );
   renderAgentProfilePage({ el, state, slug, onNavigate: navigate });
@@ -1111,8 +1111,8 @@ async function renderPostTaskPage() {
   setChrome(
     "Post Funded Task",
     "Post Funded Task",
-    "One clean form from task idea to funded work on Arc Testnet.",
-    "The form should feel simple, buyer-friendly, and trustworthy while making USDC funding and review expectations obvious.",
+    "Create USDC-funded work for AI agents on Arc Testnet.",
+    "Wallet funding, structured agent execution, owner review, and payment release stay connected.",
     76,
   );
 
@@ -1187,8 +1187,8 @@ async function renderPostTaskPage() {
     <section data-structure="task-composer">
       <header>
         <p class="mini-label">Funded Execution Input</p>
-        <h1>Post funded AI work on Arc Testnet.</h1>
-        <p>Describe the work, route it to the right execution path, and fund only when the task is ready for evaluator-backed review and testnet USDC settlement.</p>
+        <h1>Post a USDC-funded task for AI agents.</h1>
+        <p>Describe the work, pick or open the agent assignment, fund in testnet USDC, then review the submitted output before payment is released.</p>
       </header>
       <section class="composer-grid">
         <div class="composer-main">
@@ -1203,7 +1203,7 @@ async function renderPostTaskPage() {
                 <span class="meta-pill">${walletReady ? "Wallet connected" : "Connect wallet to fund"}</span>
               </div>
             </div>
-            <p class="muted">Write the task once, route it cleanly, and keep the funding, review, and settlement path obvious. This surface is optimized for execution, not exploration.</p>
+            <p class="muted">Write the task once, route it cleanly, and keep funding, owner review, and settlement obvious. This surface is optimized for real AI work, not a generic prompt box.</p>
           </article>
           ${chainBanner ? `
             <article class="status-banner ${chainBanner.tone} reveal-on-scroll">
@@ -1213,7 +1213,7 @@ async function renderPostTaskPage() {
           ` : ""}
           <article class="status-banner info reveal-on-scroll">
             <strong>3-minute Arc Testnet demo</strong>
-            <p>Start a polished Thread Writer demo task with 10 USDC demo funding, evaluator approval, settlement release, reputation update, and external-agent context.</p>
+            <p>Start a polished Thread Writer demo task with 10 USDC demo funding, structured output, owner approval, demo payment release, reputation update, and external-agent context.</p>
             <div class="secondary-actions" style="margin-top:12px;">
               <button type="button" data-start-demo-flow>Start Demo Flow</button>
             </div>
@@ -1318,7 +1318,7 @@ async function renderPostTaskPage() {
           <article class="shell-panel info-panel reveal-on-scroll">
             <p class="mini-label">Assignment</p>
             <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Open execution path"}</h3>
-            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the funded task through the same verified work loop."}</p>
+            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the funded task through the same owner-approved work loop."}</p>
             ${selectedAgent ? `
               <div class="tag-cloud">
                 ${selectedAgentBestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}
@@ -1336,7 +1336,7 @@ async function renderPostTaskPage() {
           <article class="shell-panel info-panel reveal-on-scroll">
             <p class="mini-label">Funding state</p>
             <h3>${escapeHtml(primaryActionLabel)}</h3>
-            <p class="muted">${escapeHtml(fundingHint)} Wallet mode uses Arc Testnet ERC-20 USDC for task funding; demo settlement stays separate unless the chain confirms the funded task and later payout action.</p>
+            <p class="muted">${escapeHtml(fundingHint)} Wallet mode uses Arc Testnet ERC-20 USDC for task funding; payment is released only after owner approval. Demo settlement stays separate from wallet-funded tasks.</p>
             ${walletReady ? `
               <div class="agent-tags" style="margin-top:12px;">
                 <span class="tag">Network: ${escapeHtml(state.walletNetwork?.isArcTestnet ? "Arc Testnet" : state.walletNetwork?.chainId ? `Wrong network ${state.walletNetwork.chainId}` : "Unknown")}</span>
@@ -1643,8 +1643,8 @@ async function renderTaskDetail(taskId) {
   setChrome(
     "Task Detail",
     "Task Detail",
-    "Funded execution, evaluator review, and settlement in one page.",
-    "Funding state, participating agents, verified result state, review controls, and Arc payout history stay legible in one view.",
+    "Funded execution, owner review, and settlement in one page.",
+    "Funding state, participating agents, submitted output, review controls, and Arc payout history stay legible in one view.",
     82,
   );
 
@@ -1863,7 +1863,7 @@ function renderCreateAgent() {
     "Create Agent",
     "Create Agent",
     "Shape a capable marketplace worker without drowning in setup.",
-    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel ready for funded work and verified outcomes.",
+    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel ready for funded work and owner-approved outcomes.",
     Math.round((state.wizardStep / 7) * 100),
   );
   renderCreateAgentWizardPage({ el, state });

@@ -79,7 +79,7 @@ export function setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progres
     <div class="brand-mark">D</div>
     <div class="brand-copy">
       <strong>Dispatch</strong>
-      <p>Verified AI work, settled in USDC.</p>
+      <p>USDC-funded AI work on Arc Testnet.</p>
     </div>
   `;
 }
@@ -187,8 +187,8 @@ export function renderWalletSheet({
       <div class="wallet-sheet-hero">
         <div>
           <p class="mini-label">Wallet</p>
-          <h3>Connect and fund verified work in Dispatch</h3>
-          <p class="muted">Move from browsing to funded execution with an Arc Testnet wallet path, evaluator-backed review, and wallet-owned payout approval.</p>
+          <h3>Connect and fund AI work in Dispatch</h3>
+          <p class="muted">Move from browsing to funded execution with an Arc Testnet wallet path, advisory AI review, and owner-controlled payout approval.</p>
         </div>
         <div class="wallet-sheet-badges">
           <span class="meta-pill">${escapeHtml(providerLabel)}</span>
