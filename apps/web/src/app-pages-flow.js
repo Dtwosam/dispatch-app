@@ -8,7 +8,7 @@ import {
   revealSections,
   taskStatusTone,
 } from "./app-ui.js";
-import { buildTaskLifecycleModel } from "./ui-models.js";
+import { buildArcTransactionLink, buildTaskLifecycleModel } from "./ui-models.js";
 
 function renderResultMarkup(resultModel) {
   const sectionMarkup = Array.isArray(resultModel?.sections) && resultModel.sections.length
@@ -51,9 +51,7 @@ function readBigIntLike(value) {
 }
 
 function arcTxLink(hash) {
-  const value = String(hash || "").trim();
-  if (!/^0x[a-fA-F0-9]{64}$/.test(value)) return null;
-  return `https://testnet.arcscan.app/tx/${value}`;
+  return buildArcTransactionLink(hash);
 }
 
 export function renderTaskDetailPageView({
@@ -63,6 +61,7 @@ export function renderTaskDetailPageView({
   onchainSnapshot,
   reviewModel,
   resultModel,
+  revisionModel,
 }) {
   const agents = task.selectedAgents || [];
   const reviewActions = task.reviewActions || [];
@@ -127,6 +126,13 @@ export function renderTaskDetailPageView({
         : browserTxHashes.length
           ? "The wallet signing flow completed and the marketplace is finalizing funding and assignment status."
           : "Fund this task onchain before it can move into assignment and execution.";
+  const payment = lifecycle.paymentDisplay;
+  const taskStatus = lifecycle.statusDisplay;
+  const paymentBannerTone = payment.variant === "success"
+    ? "success"
+    : payment.variant === "warning"
+      ? "warning"
+      : "info";
 
   el.appRoot.innerHTML = `
     <section data-structure="task-detail">
@@ -142,17 +148,20 @@ export function renderTaskDetailPageView({
             <p class="mini-label">Lifecycle</p>
             <h2>Funded work progress</h2>
           </div>
-          <span class="tag">${escapeHtml(lifecycle.currentLabel)}</span>
+          <span class="tag">${escapeHtml(taskStatus.label)}</span>
         </div>
         <div class="task-summary">
           <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>USDC reward</span></div>
+          <div class="metric-card"><strong>${escapeHtml(taskStatus.label)}</strong><span>Current status</span></div>
           <div class="metric-card"><strong>${escapeHtml(lifecycle.fundingLabel)}</strong><span>Funding</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.reviewStateLabel)}</strong><span>Review</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.nextActor)}</strong><span>Who acts next</span></div>
         </div>
         <div class="status-banner ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
-          <strong>Lifecycle summary</strong>
-          <p>${escapeHtml(lifecycle.settlementMessage)}</p>
+          <strong>${escapeHtml(taskStatus.label)}</strong>
+          <p>${escapeHtml(taskStatus.description)}</p>
+          <p><strong>Next required action:</strong> ${escapeHtml(taskStatus.nextActionText)} | ${escapeHtml(taskStatus.whoActsNext)}</p>
         </div>
         ${isDemoTask ? `
           <div class="status-banner info">
@@ -164,7 +173,7 @@ export function renderTaskDetailPageView({
         <div class="steps-grid" style="margin-top:18px;">
           ${lifecycle.steps.map((step) => `
             <article class="step-card">
-              <div class="step-icon">${escapeHtml(step.status === "complete" ? "✓" : step.status === "current" ? "•" : step.status === "warning" || step.status === "failed" ? "!" : "·")}</div>
+              <div class="step-icon">${escapeHtml(step.status === "complete" ? "OK" : step.status === "current" ? "Now" : step.status === "warning" || step.status === "failed" ? "!" : ".")}</div>
               <strong>${escapeHtml(step.label)}</strong>
               <p>${escapeHtml(step.helper)}</p>
               <div class="agent-tags" style="margin-top:10px;">
@@ -176,6 +185,30 @@ export function renderTaskDetailPageView({
         </div>
       </section>
 
+      <section class="shell-section reveal-on-scroll">
+        <div class="section-head">
+          <div>
+            <p class="mini-label">USDC payment</p>
+            <h2>Payment state</h2>
+          </div>
+          <span class="tag">${escapeHtml(payment.label)}</span>
+        </div>
+        <div class="task-summary">
+          <div class="metric-card"><strong>${escapeHtml(payment.amountDisplay)}</strong><span>Task reward</span></div>
+          <div class="metric-card"><strong>${escapeHtml(payment.label)}</strong><span>Payment status</span></div>
+          <div class="metric-card"><strong>${escapeHtml(payment.nextPaymentAction)}</strong><span>Next payment action</span></div>
+          <div class="metric-card"><strong>${escapeHtml(payment.networkDisplay)}</strong><span>Network</span></div>
+        </div>
+        <div class="status-banner ${paymentBannerTone}">
+          <strong>${escapeHtml(payment.label)}</strong>
+          <p>${escapeHtml(payment.description)}</p>
+        </div>
+        <div class="agent-tags" style="margin-top:12px;">
+          ${payment.fundingTxLink ? `<a class="tag" href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tag">Funding tx: Not available yet</span>`}
+          ${payment.settlementTxLink ? `<a class="tag" href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tag">Release tx: Not available yet</span>`}
+        </div>
+      </section>
+
       <section class="task-grid reveal-on-scroll">
         <article class="task-main shell-section">
           <div class="section-head">
@@ -183,7 +216,7 @@ export function renderTaskDetailPageView({
               <p class="mini-label">Execution</p>
               <h2>Live task status</h2>
             </div>
-            <span class="tag">${escapeHtml(labelize(task.status))}</span>
+            <span class="tag">${escapeHtml(taskStatus.label)}</span>
           </div>
           <div class="status-banner info">
             <strong>Execution rail</strong>
@@ -192,11 +225,11 @@ export function renderTaskDetailPageView({
           <div class="task-summary">
             <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>Reward</span></div>
             <div class="metric-card"><strong>${deadlineCountdown(task.deadline)}</strong><span>Deadline</span></div>
-            <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
-            <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
+            <div class="metric-card"><strong>${escapeHtml(lifecycle.reviewStateLabel)}</strong><span>Review</span></div>
+            <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
           </div>
           <div class="simple-panel">
-            <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(lifecycle.currentLabel)}${task.status === "EXECUTING" ? " - agent is working now." : task.status === "SUBMITTED" ? " - result is ready for review." : ""}</span></div>
+            <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(taskStatus.label)} - ${escapeHtml(taskStatus.description)}</span></div>
             <div class="agent-tags" style="margin-top:12px;">
               ${agents.length
                 ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)} | ${escapeHtml(agent.originType === "external" ? "External" : "Platform")}</span>`).join("")
@@ -210,10 +243,14 @@ export function renderTaskDetailPageView({
             <p class="mini-label">Task summary</p>
             <h3>What happens next</h3>
             <p class="muted">${nextStepSummary}</p>
+            <div class="status-banner info" style="margin-top:12px;">
+              <strong>${escapeHtml(taskStatus.primaryCtaText)}</strong>
+              <p>${escapeHtml(lifecycle.nextActionHelper)}</p>
+            </div>
             <div class="agent-tags" style="margin-top:12px;">
               <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
-              <span class="tag">${escapeHtml(lifecycle.evaluationLabel)}</span>
-              <span class="tag">${escapeHtml(lifecycle.settlementLabel)}</span>
+              <span class="tag">${escapeHtml(lifecycle.reviewStateLabel)}</span>
+              <span class="tag">${escapeHtml(lifecycle.paymentStateLabel)}</span>
             </div>
             ${(task.onchainTaskRef || onchainTask) ? `<p class="muted">${fundingConfirmed ? "Onchain task ref" : "Task pointer"}: ${escapeHtml(task.onchainTaskRef || `task:${task.taskId}`)}</p>` : ""}
             ${browserTxHashes.length ? `
@@ -305,13 +342,24 @@ export function renderTaskDetailPageView({
         <aside class="task-side">
           <article class="shell-panel">
             <p class="mini-label">Actions</p>
-            <h3>Review and settle</h3>
+            <h3>${escapeHtml(taskStatus.primaryCtaText)}</h3>
             <p class="muted">${escapeHtml(reviewModel.headline)}</p>
             <div class="review-actions">
-              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve</button>' : ""}
-              ${reviewModel.primaryActions.includes("reject") ? '<button data-user-review="reject">Reject</button>' : ""}
-              ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Approve & Pay</button>` : ""}
+              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve work</button>' : ""}
+              ${reviewModel.primaryActions.includes("request_revision") ? '<button data-request-revision-toggle>Request revision</button>' : ""}
+              ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>` : ""}
+              ${reviewModel.primaryActions.length === 0 ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
+            ${reviewModel.primaryActions.includes("request_revision") ? `
+              <div class="simple-panel" data-revision-form style="margin-top:14px;">
+                <strong>Request changes</strong>
+                <p class="muted">This records revision guidance without releasing payment. USDC stays funded and locked until approval.</p>
+                <label class="field-stack" style="margin-top:12px;"><span class="muted">What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
+                <label class="field-stack"><span class="muted">What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
+                <label class="field-stack"><span class="muted">Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
+                <button data-request-revision="${task.taskId}">Save revision request</button>
+              </div>
+            ` : ""}
             <div class="secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
               ${resultModel?.improveAgainUnavailableReason ? `<p class="muted">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
@@ -323,6 +371,46 @@ export function renderTaskDetailPageView({
             <div class="secondary-actions">
               ${additionalReviewActions.map((action) => `<button data-task-action="${action}" data-task-id="${task.taskId}">${escapeHtml(labelize(action))}</button>`).join("")}
             </div>
+          </article>
+        </aside>
+      </section>
+
+      <section class="task-grid reveal-on-scroll">
+        <article class="task-main shell-section">
+          <div class="section-head">
+            <div>
+              <p class="mini-label">Revision history</p>
+              <h2>Requested changes</h2>
+            </div>
+            <span class="tag">${escapeHtml(revisionModel?.headline || "No revision requested")}</span>
+          </div>
+          <div class="status-banner ${revisionModel?.hasRevisionRequested ? "warning" : "info"}">
+            <strong>${escapeHtml(revisionModel?.headline || "No revision requested")}</strong>
+            <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
+          </div>
+          <div class="live-feed" style="margin-top:16px;">
+            ${(revisionModel?.items || []).map((item, index) => `
+              <article class="feed-card feed-card--warning" style="animation-delay:${index * 70}ms">
+                <span class="feed-card__pulse"></span>
+                <div>
+                  <strong>${escapeHtml(item.changeRequest)}</strong>
+                  <p>Missing: ${escapeHtml(item.missingDetails)}</p>
+                  ${item.extraInstruction ? `<p>Extra instruction: ${escapeHtml(item.extraInstruction)}</p>` : ""}
+                  <div class="agent-tags" style="margin-top:10px;">
+                    <span class="tag">${escapeHtml(item.requestedBy)}</span>
+                    ${item.requestedAt ? `<span class="tag">${escapeHtml(new Date(item.requestedAt).toLocaleString())}</span>` : ""}
+                    ${item.resubmissionNote ? `<span class="tag">${escapeHtml(item.resubmissionNote)}</span>` : ""}
+                  </div>
+                </div>
+              </article>
+            `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.")}
+          </div>
+        </article>
+        <aside class="task-side">
+          <article class="shell-panel">
+            <p class="mini-label">Revision payment rule</p>
+            <h3>Approval still controls release</h3>
+            <p class="muted">Requesting a revision does not settle the task, create a payout transaction, or mark work complete. Payment remains funded and locked until the owner approves.</p>
           </article>
         </aside>
       </section>
@@ -344,7 +432,7 @@ export function renderTaskDetailPageView({
                   <p>${escapeHtml(item.description)}</p>
                 </div>
               </article>
-            `).join("") || emptyState("No timeline items yet.")}
+            `).join("") || emptyState("No timeline yet. Waiting for update.")}
           </div>
         </article>
         <aside class="task-side">
@@ -362,7 +450,7 @@ export function renderTaskDetailPageView({
                     ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
                   </div>
                 </article>
-              `).join("") || emptyState("No payout receipts yet.")}
+              `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.")}
             </div>
           </article>
         </aside>

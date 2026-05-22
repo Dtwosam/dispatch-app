@@ -46603,6 +46603,17 @@ function readConfiguredApiBase() {
   if (globalApiBase) return globalApiBase;
   return isLocalHost ? "http://localhost:4020" : hostedDefaultApiBase || origin;
 }
+function readJsonStorage(key, fallback) {
+  if (typeof localStorage === "undefined") return fallback;
+  try {
+    const value = localStorage.getItem(key);
+    if (!value) return fallback;
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
 var API_BASE = readConfiguredApiBase();
 var routes = [
   ["/", "Explore"],
@@ -46684,6 +46695,7 @@ function createInitialState() {
     },
     task: null,
     history: { items: [] },
+    revisionRequests: readJsonStorage("dispatchRevisionRequests", {}),
     mobileNavOpen: false,
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
@@ -46726,6 +46738,9 @@ function createInitialState() {
     taskForm: {
       title: "",
       description: "",
+      templateId: "custom_task",
+      templateFields: {},
+      templateMessage: "",
       category: "research",
       rewardAmount: "",
       deadline: "",
@@ -46867,12 +46882,6 @@ function formatCurrency(value) {
 function formatPercent(value) {
   const numeric = Number(value || 0);
   return `${Math.round(numeric)}%`;
-}
-function formatLatency(value) {
-  const numeric = Number(value || 0);
-  if (!numeric) return "0ms";
-  if (numeric < 1e3) return `${Math.round(numeric)}ms`;
-  return `${(numeric / 1e3).toFixed(1).replace(/\.0$/, "")}s`;
 }
 function icon(name, size5 = 16) {
   const icons = {
@@ -47216,6 +47225,11 @@ function deadlineCountdown(isoTimestamp) {
 }
 
 // apps/web/src/ui-models.js
+function buildArcTransactionLink(hash3) {
+  const value = String(hash3 || "").trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(value)) return null;
+  return `https://testnet.arcscan.app/tx/${value}`;
+}
 function shortWallet(wallet) {
   const value = String(wallet || "").trim();
   if (value.length <= 10) return value || "No wallet";
@@ -47232,9 +47246,14 @@ function buildTaskLifecycleModel(task, options = {}) {
   const transactionState = String(task?.transactionState || "").toLowerCase();
   const settlementState = String(task?.settlementState || "").toLowerCase();
   const finalOutcome = String(task?.latestEvaluation?.finalOutcome || "").toLowerCase();
+  const revisionRequests = [
+    ...Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
+    ...Array.isArray(options.revisionRequests) ? options.revisionRequests : []
+  ];
   const assignedAgents = task?.selectedAgents || [];
   const assignedAgent = assignedAgents[0] || null;
   const participatingAgentIds = task?.participatingAgentIds || [];
+  const hasAnyRawStatus = Boolean(status || resultStatus || transactionState || settlementState || task?.onchainTaskRef || task?.latestSettlement);
   const fundingConfirmed = Boolean(settlementSummary?.isFunded) || transactionState === "accepted" || Boolean(task?.onchainTaskRef) || escrowLocked > 0n || ["ESCROW_FUNDED", "OPEN", "ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status) || ["OPEN", "ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(onchainState);
   const fundingPending = !fundingConfirmed && ["pending_wallet", "pending_chain"].includes(transactionState);
   const fundingFailed = transactionState === "failed";
@@ -47246,64 +47265,123 @@ function buildTaskLifecycleModel(task, options = {}) {
   const approved = status === "APPROVED" || resultStatus === "approved" || finalOutcome === "accepted" || settlementState === "pending_settlement" && !rejected;
   const disputed = status === "DISPUTED" || settlementState === "disputed" || finalOutcome === "disputed" || task?.disputeRecord?.status === "open";
   const unresolved = status === "UNRESOLVED" || settlementState === "unresolved" || finalOutcome === "unresolved";
+  const cancelled = ["CANCELLED", "CANCELED", "CANCELLED_BY_OWNER", "CANCELED_BY_OWNER"].includes(status) || ["cancelled", "canceled"].includes(resultStatus) || ["cancelled", "canceled"].includes(settlementState);
   const refunded = status === "REFUNDED" || settlementState === "refunded" || task?.latestSettlement?.outcome === "refunded";
   const settled = status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
+  const completed = status === "COMPLETED" || resultStatus === "completed";
   const settlementReady = Boolean(settlementSummary?.canReleasePayment) || !settled && !refunded && approved && (settlementState === "pending_settlement" || (task?.reviewActions || []).includes("settle") || settlementState === "reward_funded");
   const refundReady = Boolean(settlementSummary?.canRefund);
-  const needsRevision = rejected && !refunded;
+  const revisionRequested = Boolean(revisionRequests.length) || resultStatus === "needs_revision" || task?.userReview?.decision === "needs_human_review" || rejected && !refunded && !disputed && !unresolved;
+  const needsRevision = revisionRequested && !refunded;
+  const noSubmission = !submitted;
   const fundingLabel = fundingConfirmed ? "Funded" : fundingPending ? "Funding pending" : fundingFailed ? "Funding failed" : "Awaiting funding";
-  const evaluationLabel = settled ? "Approved" : refunded ? "Closed" : disputed ? "Disputed" : unresolved ? "Unresolved" : rejected ? "Rejected" : approved ? "Approved" : underReview ? "Under review" : submitted ? "Submitted" : executing ? "In progress" : "Awaiting output";
+  const evaluationLabel = settled ? "Approved" : refunded ? "Closed" : disputed ? "Disputed" : unresolved ? "Unresolved" : revisionRequested ? "Revision requested" : rejected ? "Rejected" : approved ? "Approved" : underReview ? "Under review" : submitted ? "Submitted" : executing ? "In progress" : "Awaiting output";
   const settlementLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Settlement paused" : unresolved ? "Review unresolved" : settlementReady ? "Ready for settlement" : refundReady ? "Refund available" : fundingConfirmed ? "Settlement pending" : "Funding required";
-  const currentLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Disputed" : unresolved ? "Needs appeal" : settlementReady ? "Settlement ready" : approved ? "Approved" : underReview ? "Under review" : submitted ? "Output submitted" : executing ? "In progress" : assigned ? "Agent assigned" : fundingPending ? "Funding pending" : fundingConfirmed ? "Funded" : "Task posted";
-  const settlementMessage = settled ? "Payment released." : refunded ? "Reward refunded." : settlementSummary?.settlementReadinessLabel ? settlementSummary.settlementReadinessLabel : settlementReady ? "Approved. USDC release is ready." : needsRevision ? "Revision needed before payout." : rejected ? "Rejected. Payout not recommended." : disputed ? "Disputed. Payout stays paused." : unresolved ? "Review unresolved. Payout stays paused." : underReview ? "Under evaluator review." : submitted ? "Output submitted and waiting for review." : executing ? "Agent is executing now." : fundingPending ? "Funding is still being confirmed." : fundingConfirmed ? "Task is funded and waiting for the next step." : "Awaiting onchain funding.";
+  const currentLabel = settled ? "Payment Released" : completed ? "Completed" : refunded || cancelled ? "Cancelled" : disputed || unresolved ? "Disputed" : settlementReady ? "Approved" : approved ? "Approved" : revisionRequested ? "Revision Requested" : rejected ? "Revision Requested" : underReview ? "In Review" : submitted ? "Submitted" : executing ? "In Progress" : assigned ? "Agent Assigned" : fundingPending ? "Waiting for Funding" : fundingConfirmed ? "Funded" : hasAnyRawStatus ? "Draft" : "Unknown";
+  const settlementMessage = settled ? "Payment released." : refunded ? "Reward refunded." : settlementSummary?.settlementReadinessLabel ? settlementSummary.settlementReadinessLabel : settlementReady ? "Approved. USDC release is ready." : needsRevision ? "Revision requested before payout." : rejected ? "Rejected. Payout not recommended." : disputed ? "Disputed. Payout stays paused." : unresolved ? "Review unresolved. Payout stays paused." : underReview ? "Under evaluator review." : submitted ? "Output submitted and waiting for review." : executing ? "Agent is executing now." : fundingPending ? "Funding is still being confirmed." : fundingConfirmed ? "Task is funded and waiting for the next step." : "Awaiting onchain funding.";
+  const amountDisplay = Number.isFinite(Number(task?.rewardAmount)) ? `${Number(task.rewardAmount).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Not available yet";
+  const fundingTxLink = buildArcTransactionLink(task?.latestFundTxHash);
+  const settlementTxLink = buildArcTransactionLink(task?.latestSettlement?.txReference);
+  const releasePending = Boolean(settlementTxLink) && !settled && !refunded;
+  const paymentStateLabel = settled ? "Payment released" : refunded ? "Reward refunded" : settlementReady ? "Payment ready" : refundReady ? "Refund ready" : fundingConfirmed ? "USDC funded" : fundingPending ? "Funding syncing" : "Funding required";
+  const reviewStateLabel = approved ? "Owner approved" : revisionRequested ? "Revision requested" : rejected ? "Owner rejected" : disputed ? "Disputed" : underReview ? "AI guidance attached" : submitted ? "Needs owner review" : noSubmission ? "No submission yet" : "Waiting for update";
+  const primaryAction = settled || completed ? { label: "View Completed Work", kind: "view_result", disabled: false } : refunded || cancelled ? { label: "View Task", kind: "view_result", disabled: false } : disputed || unresolved ? { label: "View Dispute", kind: "dispute", disabled: false } : settlementReady ? { label: "Release Payment", kind: "settle", disabled: false } : revisionRequested ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : rejected ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : submitted || underReview ? { label: "Review Submission", kind: "review", disabled: false } : executing ? { label: "Waiting for Agent", kind: "wait", disabled: true } : assigned ? { label: "Waiting for Agent", kind: "wait", disabled: true } : fundingConfirmed ? { label: "Assign Agent", kind: "assign", disabled: false } : fundingPending ? { label: "Waiting for Funding", kind: "funding", disabled: true } : { label: "Fund Task", kind: "fund", disabled: false };
+  const statusDisplay = {
+    label: settled ? "Payment Released" : completed ? "Completed" : refunded || cancelled ? "Cancelled" : disputed || unresolved ? "Disputed" : settlementReady || approved ? "Approved" : revisionRequested || rejected ? "Revision Requested" : underReview ? "In Review" : submitted ? "Submitted" : executing ? "In Progress" : assigned ? "Agent Assigned" : fundingPending ? "Waiting for Funding" : fundingConfirmed ? "Funded" : hasAnyRawStatus ? "Draft" : "Unknown",
+    description: settled ? "Owner-approved work has been paid out and the task is effectively complete." : completed ? "The task is complete and ready to view as finished work." : refunded || cancelled ? "The task is closed and no normal payment release is available." : disputed || unresolved ? "The task needs dispute or appeal handling before payment can move." : settlementReady || approved ? "The owner approval step is complete and payment release is the next major action." : revisionRequested || rejected ? "The owner requested changes. Payment remains funded and locked until approved." : underReview ? "A submitted result is being reviewed. AI guidance is advisory; the owner decides." : submitted ? "The agent submitted output and the owner needs to review it." : executing ? "The assigned agent is actively working on the funded task." : assigned ? "An agent is assigned and execution is the next step." : fundingPending ? "Funding was started and Dispatch is waiting for Arc Testnet confirmation." : fundingConfirmed ? "The task is funded and ready for assignment or execution." : hasAnyRawStatus ? "The task exists but needs funding before marketplace execution." : "Dispatch cannot determine the current task state yet.",
+    nextActionText: primaryAction.label,
+    whoActsNext: settled || completed || refunded || cancelled ? "No action needed" : revisionRequested || rejected ? "Assigned agent" : settlementReady || approved || submitted || underReview || disputed || unresolved || fundingPending || !fundingConfirmed ? "Task owner" : executing || assigned ? "Assigned agent" : "Marketplace",
+    primaryCtaText: primaryAction.label,
+    variant: settled || completed ? "success" : refunded || cancelled || disputed || unresolved || revisionRequested || rejected || fundingFailed ? "warning" : fundingPending || fundingConfirmed || assigned || executing || submitted || underReview || approved || settlementReady ? "info" : "neutral",
+    lifecycleStepAlignment: settled ? "payment" : completed ? "completed" : refunded || cancelled ? "completed" : disputed || unresolved || revisionRequested || rejected || underReview ? "review" : settlementReady || approved ? "approved" : submitted ? "submitted" : executing ? "in_progress" : assigned ? "assigned" : fundingPending || fundingConfirmed ? "funding" : "posted",
+    actionableBy: settled || completed || refunded || cancelled ? "none" : executing || assigned ? "agent" : fundingConfirmed && !assigned ? "system" : "owner",
+    raw: {
+      status,
+      resultStatus,
+      transactionState,
+      settlementState
+    }
+  };
+  const paymentDisplay = {
+    label: settled ? "Released" : refunded ? "Refunded" : disputed || unresolved ? "Disputed" : releasePending ? "Release Pending" : settlementReady ? "Ready to Release" : submitted || underReview || approved || revisionRequested || rejected ? "Locked Until Approval" : fundingConfirmed ? "Funded" : fundingPending ? "Funding Pending" : fundingFailed ? "Unknown" : task ? "Not Funded" : "Unknown",
+    description: settled ? "Payment has been released to the agent after owner approval." : refunded ? "The task reward has been refunded instead of released." : disputed || unresolved ? "Payment is paused while the task is disputed or unresolved." : releasePending ? "Transaction submitted. Waiting for confirmation." : settlementReady ? "Work has been approved. Payment is ready to release." : revisionRequested || rejected ? "Payment is funded and locked while the requested changes are pending. Approval is still required before release." : submitted || underReview ? "Payment is funded but locked. The owner must review the submitted work before release." : approved ? "Owner approval is recorded. Payment can move to release." : fundingConfirmed ? "Payment is funded but not released yet." : fundingPending ? "Funding transaction is being confirmed on Arc Testnet." : fundingFailed ? "Funding status is unclear after a failed wallet or chain update." : task ? "This task has not been funded yet." : "Payment state is not available yet.",
+    nextPaymentAction: settled ? "No payment action needed." : refunded ? "No release action is available after refund." : disputed || unresolved ? "Resolve the dispute before payment can move." : releasePending ? "Wait for Arc Testnet confirmation." : settlementReady ? "Release payment." : revisionRequested || rejected ? "Wait for revised output before approval." : submitted || underReview ? "Review the submitted work." : approved ? "Prepare payment release." : fundingConfirmed ? "Wait for output and owner approval." : fundingPending ? "Wait for funding confirmation." : "Fund the task with testnet USDC.",
+    variant: settled ? "success" : refunded || disputed || unresolved || fundingFailed ? "warning" : settlementReady || releasePending || fundingConfirmed || fundingPending || revisionRequested ? "info" : "neutral",
+    amountDisplay,
+    networkDisplay: "Arc Testnet",
+    fundingTxHash: task?.latestFundTxHash || null,
+    fundingTxLink,
+    settlementTxHash: task?.latestSettlement?.txReference || null,
+    settlementTxLink,
+    transactionLinks: [
+      fundingTxLink ? { label: "Funding transaction", href: fundingTxLink, hash: task.latestFundTxHash } : null,
+      settlementTxLink ? { label: "Release transaction", href: settlementTxLink, hash: task.latestSettlement.txReference } : null
+    ].filter(Boolean)
+  };
+  const nextActor = statusDisplay.whoActsNext;
+  const nextActionHelper = settled ? "The task is complete. Review the delivered work and payout trail." : completed ? "The task is complete. View the delivered work and final status." : refunded ? "The task is closed and the reward has been refunded." : cancelled ? "The task is closed and no normal marketplace action is available." : disputed || unresolved ? "Open the dispute or appeal view before payment can move." : settlementReady ? "Release USDC payment now that the output is approved." : revisionRequested || rejected ? "Waiting for revised output. Payment remains funded and locked until owner approval." : submitted || underReview ? "Review the submitted output. AI review is guidance; owner approval controls payout." : executing ? "The agent is working. Wait for the submitted output before reviewing." : assigned ? "An agent is assigned. Execution will produce a submitted output next." : fundingConfirmed ? "The task is funded. Dispatch can route it to an agent for execution." : fundingPending ? "Wallet activity was captured. Wait for Arc Testnet confirmation." : "Fund the task with testnet USDC before assignment or execution can begin.";
   const reputationLabel = settled ? "Reputation updated" : refunded ? "Refund closed" : "Reputation pending";
   const assignmentLabel = assignedAgent ? `${assignedAgent.displayName} (${assignedAgent.originType === "external" ? "External agent" : "Platform agent"})` : task?.selectedAgentId ? "Assigned agent selected" : participatingAgentIds.length ? `${participatingAgentIds.length} participating agent${participatingAgentIds.length === 1 ? "" : "s"}` : "No agent assigned yet";
   const steps = [
     {
       key: "posted",
-      label: "Task posted",
+      label: "Task Created",
       status: "complete",
       helper: "Dispatch recorded the task request and reward terms.",
       timestamp: task?.createdAt || timelineByKind.get("task_created") || null
     },
     {
       key: "funding",
-      label: fundingLabel,
+      label: "Funded",
       status: fundingConfirmed ? "complete" : fundingFailed ? "failed" : fundingPending ? "current" : "pending",
       helper: fundingConfirmed ? "Funding is confirmed and the task can move through the marketplace." : fundingFailed ? "The latest wallet or chain funding action failed." : fundingPending ? "Wallet signatures were captured and Arc Testnet funding confirmation is still syncing." : "The task needs onchain funding before assignment and execution.",
       timestamp: timelineByKind.get("escrow_funded") || null
     },
     {
       key: "assigned",
-      label: assigned ? "Agent assigned" : "Awaiting assignment",
+      label: "Agent Assigned",
       status: assigned ? "complete" : fundingConfirmed ? "current" : "pending",
       helper: assigned ? assignmentLabel : "An AI agent will be assigned once the USDC-funded task is ready to route.",
       timestamp: timelineByKind.get("agent_accepted") || timelineByKind.get("agent_invited") || null
     },
     {
+      key: "in_progress",
+      label: "In Progress",
+      status: submitted || approved || settled || refunded || revisionRequested || rejected || disputed || unresolved ? "complete" : executing ? "current" : assigned ? "pending" : "pending",
+      helper: executing ? "The assigned worker is actively completing the task." : submitted ? "Execution finished and a result was submitted." : assigned ? "Execution starts after the agent begins work." : "Waiting for an assigned agent before work can start.",
+      timestamp: timelineByKind.get("execution_started") || null
+    },
+    {
       key: "submitted",
-      label: submitted ? "Output submitted" : executing ? "In progress" : "Execution pending",
-      status: submitted ? "complete" : executing ? "current" : "pending",
-      helper: submitted ? "A result is on the task and ready for owner review." : executing ? "The assigned worker is actively completing the task." : "Execution starts after assignment.",
+      label: "Submitted",
+      status: submitted ? "complete" : executing ? "pending" : "pending",
+      helper: submitted ? "A result is on the task and ready for owner review." : "No submission yet.",
       timestamp: timelineByKind.get("submission_received") || null
     },
     {
       key: "review",
-      label: approved ? "Approved" : rejected ? "Rejected" : disputed ? "Disputed" : unresolved ? "Review paused" : underReview ? "Owner review" : submitted ? "Awaiting owner review" : "Review pending",
-      status: approved ? "complete" : rejected || disputed || unresolved ? "warning" : underReview ? "current" : "pending",
-      helper: approved ? "The task owner approved the output for settlement." : rejected ? "The submitted output did not meet the payout bar." : disputed ? "A dispute paused payout." : unresolved ? "Manual escalation is needed before payout can move." : underReview ? "AI review is guidance. The task owner makes the final approval decision." : submitted ? "The output is waiting for owner review." : "Review starts after submission.",
+      label: "Review",
+      status: approved ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : underReview || submitted ? "current" : "pending",
+      helper: approved ? "The task owner approved the output for settlement." : revisionRequested || rejected ? "The owner requested changes. Payment stays locked until approval." : disputed ? "A dispute paused payout." : unresolved ? "Manual escalation is needed before payout can move." : underReview ? "AI review is guidance. The task owner makes the final approval decision." : submitted ? "The output is waiting for owner review." : "Review starts after submission.",
       timestamp: timelineByKind.get("review_started") || timelineByKind.get("result_verified") || null
     },
     {
-      key: "settlement",
-      label: settled ? "Payment released" : refunded ? "Reward refunded" : settlementReady ? "Settlement ready" : refundReady || rejected ? "Refund available" : disputed ? "Settlement paused" : "Settlement pending",
-      status: settled || refunded ? "complete" : rejected || disputed || unresolved ? "warning" : settlementReady ? "current" : "pending",
+      key: "approved",
+      label: "Approved",
+      status: approved || settled ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : submitted || underReview ? "pending" : "pending",
+      helper: approved || settled ? "Owner approval is recorded and payment can move." : revisionRequested || rejected ? "Approval is still required before payment can be released." : "Owner approval happens after reviewing a submitted output.",
+      timestamp: timelineByKind.get("approved") || timelineByKind.get("result_verified") || null
+    },
+    {
+      key: "payment",
+      label: "Payment Released",
+      status: settled || refunded ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : settlementReady ? "current" : "pending",
       helper: settlementMessage,
       timestamp: task?.latestSettlement?.settlementTimestamp || timelineByKind.get("settled") || timelineByKind.get("refund_completed") || null
     },
     {
       key: "reputation",
-      label: reputationLabel,
+      label: "Completed",
       status: settled || refunded ? "complete" : "pending",
       helper: settled ? "Agent reputation can now reflect a paid, owner-approved funded outcome." : refunded ? "The task is closed and payout reputation stays unchanged or neutral." : "Reputation updates after owner approval and a terminal payout state.",
       timestamp: task?.latestSettlement?.settlementTimestamp || null
@@ -47312,21 +47390,177 @@ function buildTaskLifecycleModel(task, options = {}) {
   return {
     steps,
     currentLabel,
+    statusDisplay,
     fundingLabel,
     evaluationLabel,
     settlementLabel,
     settlementMessage,
+    paymentStateLabel,
+    paymentDisplay,
+    reviewStateLabel,
+    primaryAction,
+    nextActor,
+    nextActionHelper,
     assignmentLabel,
     assignedAgent,
     isSettled: settled,
     isRefunded: refunded,
     isRejected: rejected,
+    isRevisionRequested: revisionRequested,
     isDisputed: disputed,
-    isUnresolved: unresolved
+    isUnresolved: unresolved,
+    isCancelled: cancelled
+  };
+}
+function buildTaskRevisionDisplayModel(task, options = {}) {
+  const sourceItems = [
+    ...Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
+    ...Array.isArray(options.revisionRequests) ? options.revisionRequests : []
+  ];
+  const normalizedItems = sourceItems.filter(Boolean).map((item, index2) => {
+    const changeRequest = String(item.changeRequest || item.note || item.reason || "").trim();
+    const missingDetails = String(item.missingDetails || item.missing || "").trim();
+    const extraInstruction = String(item.extraInstruction || item.instruction || "").trim();
+    return {
+      id: item.id || `revision_${index2 + 1}`,
+      changeRequest: changeRequest || "Revision details were not provided.",
+      missingDetails: missingDetails || "Not specified.",
+      extraInstruction: extraInstruction || "",
+      requestedAt: item.requestedAt || item.createdAt || null,
+      requestedBy: item.requestedBy || item.actorWallet || "Task owner",
+      resubmissionNote: item.resubmissionNote || null
+    };
+  }).sort((left, right) => new Date(right.requestedAt || 0).getTime() - new Date(left.requestedAt || 0).getTime());
+  const hasRevisionRequested = normalizedItems.length > 0 || String(task?.resultStatus || "").toLowerCase() === "needs_revision" || task?.userReview?.decision === "needs_human_review";
+  return {
+    hasRevisionRequested,
+    items: normalizedItems,
+    latestRequest: normalizedItems[0] || null,
+    headline: hasRevisionRequested ? "Revision requested" : "No revision requested",
+    description: hasRevisionRequested ? "Payment remains funded and locked until the owner approves revised work." : "Revision history will appear here after changes are requested.",
+    emptyMessage: "No revision requested. Review actions appear after the agent submits work."
+  };
+}
+var taskBriefTemplates = [
+  {
+    id: "write_x_thread",
+    name: "Write X Thread",
+    category: "writing",
+    description: "Turn a topic, links, or notes into a polished X thread.",
+    expectedOutput: "A polished X thread based on the details above.",
+    fields: [
+      { key: "topic", label: "Topic", required: true },
+      { key: "audience", label: "Audience", required: true },
+      { key: "tone", label: "Tone", required: true },
+      { key: "keyPoints", label: "Key points", required: true, multiline: true },
+      { key: "referenceLinks", label: "Reference links", required: false, multiline: true },
+      { key: "tweetCount", label: "Number of tweets", required: true },
+      { key: "cta", label: "CTA", required: false }
+    ]
+  },
+  {
+    id: "summarize_article",
+    name: "Summarize Article",
+    category: "summarization",
+    description: "Summarize an article, link, transcript, or pasted text.",
+    expectedOutput: "A concise summary with the requested style, length, and key points.",
+    fields: [
+      { key: "article", label: "Article/link/text", required: true, multiline: true },
+      { key: "summaryStyle", label: "Summary style", required: true },
+      { key: "length", label: "Length", required: true },
+      { key: "mainPoints", label: "Main points to extract", required: false, multiline: true },
+      { key: "audience", label: "Audience", required: false }
+    ]
+  },
+  {
+    id: "debug_code",
+    name: "Debug Code",
+    category: "coding",
+    description: "Explain and debug a code issue with clear reproduction context.",
+    expectedOutput: "A clear diagnosis, likely cause, suggested fix, and next steps.",
+    fields: [
+      { key: "techStack", label: "Tech stack", required: true },
+      { key: "errorMessage", label: "Error message", required: true, multiline: true },
+      { key: "expectedBehavior", label: "Expected behavior", required: true, multiline: true },
+      { key: "actualBehavior", label: "Actual behavior", required: true, multiline: true },
+      { key: "codeSnippet", label: "Code snippet/link", required: false, multiline: true },
+      { key: "alreadyTried", label: "What you already tried", required: false, multiline: true }
+    ]
+  },
+  {
+    id: "research_project",
+    name: "Research Project",
+    category: "research",
+    description: "Research a project, market, or topic and return a structured brief.",
+    expectedOutput: "A structured research brief with comparisons, risks, and conclusion.",
+    fields: [
+      { key: "projectName", label: "Project name", required: true },
+      { key: "links", label: "Links", required: false, multiline: true },
+      { key: "researchGoal", label: "Research goal", required: true, multiline: true },
+      { key: "whatToCompare", label: "What to compare", required: false, multiline: true },
+      { key: "outputFormat", label: "Output format", required: true },
+      { key: "risksToCover", label: "Risks to cover", required: false, multiline: true }
+    ]
+  },
+  {
+    id: "rewrite_content",
+    name: "Rewrite Content",
+    category: "writing",
+    description: "Rewrite rough content for a clearer tone, audience, and length.",
+    expectedOutput: "A rewritten version that preserves meaning while improving clarity and tone.",
+    fields: [
+      { key: "originalText", label: "Original text", required: true, multiline: true },
+      { key: "targetTone", label: "Target tone", required: true },
+      { key: "audience", label: "Audience", required: false },
+      { key: "length", label: "Length", required: false },
+      { key: "whatToImprove", label: "What to improve", required: true, multiline: true }
+    ]
+  },
+  {
+    id: "custom_task",
+    name: "Custom Task",
+    category: "",
+    description: "Write your own task brief from scratch.",
+    expectedOutput: "",
+    fields: []
+  }
+];
+function getTaskBriefTemplate(templateId) {
+  return taskBriefTemplates.find((template) => template.id === templateId) || taskBriefTemplates.at(-1);
+}
+function buildTaskTemplateBrief(templateId, values = {}) {
+  const template = getTaskBriefTemplate(templateId);
+  if (!template || template.id === "custom_task") {
+    return {
+      template,
+      brief: "",
+      missingFields: [],
+      isCustom: true
+    };
+  }
+  const missingFields = template.fields.filter((field) => field.required && !String(values[field.key] || "").trim()).map((field) => field.label);
+  const lines = [
+    `Task Type: ${template.name}`,
+    "",
+    ...template.fields.flatMap((field) => [
+      `${field.label}:`,
+      String(values[field.key] || "").trim() || "Not provided yet",
+      ""
+    ]),
+    "Expected output:",
+    template.expectedOutput
+  ];
+  return {
+    template,
+    brief: lines.join("\n").trim(),
+    missingFields,
+    isCustom: false
   };
 }
 function buildPostTaskChecklist(form, selectedAgent) {
   const isDirect = form.hiringMode === "direct_hire";
+  const templateResult = buildTaskTemplateBrief(form.templateId || "custom_task", form.templateFields || {});
+  const templateReady = templateResult.isCustom || templateResult.missingFields.length === 0;
   return {
     summary: isDirect ? selectedAgent ? `${selectedAgent.profile.publicName} is preselected for this funded Arc task.` : "Select an agent before funding this direct hire." : `Open market funded task with up to ${Number(form.maxParticipants || 1)} participating agents.`,
     items: [
@@ -47334,6 +47568,11 @@ function buildPostTaskChecklist(form, selectedAgent) {
         id: "scope",
         label: "Funded task scope is clear",
         complete: String(form.title || "").trim().length >= 3 && String(form.description || "").trim().length >= 20
+      },
+      {
+        id: "template",
+        label: templateResult.isCustom ? "Custom brief ready" : "Template fields ready",
+        complete: templateReady
       },
       {
         id: "selection",
@@ -47346,6 +47585,62 @@ function buildPostTaskChecklist(form, selectedAgent) {
         complete: Boolean(form.evaluationPreference)
       }
     ]
+  };
+}
+function buildSuggestedTaskTemplatesForAgent(agent) {
+  const haystack = [
+    agent?.profile?.publicName,
+    agent?.profile?.slug,
+    agent?.profile?.category,
+    ...agent?.profile?.skills || [],
+    ...agent?.profile?.capabilityTags || [],
+    ...agent?.profile?.skillCategories || []
+  ].join(" ").toLowerCase();
+  const ids = haystack.includes("thread") ? ["write_x_thread", "rewrite_content"] : haystack.includes("summar") ? ["summarize_article", "rewrite_content"] : haystack.includes("research") ? ["research_project", "summarize_article"] : haystack.includes("rewrit") ? ["rewrite_content", "write_x_thread"] : haystack.includes("repurpos") || haystack.includes("content") ? ["write_x_thread", "rewrite_content"] : haystack.includes("code") || haystack.includes("debug") ? ["debug_code", "research_project"] : ["custom_task"];
+  return ids.map(getTaskBriefTemplate).filter(Boolean);
+}
+function buildAgentDisplayModel(agent, taskCollections = {}) {
+  const profile = agent?.profile || {};
+  const summary = agent?.performanceSummary || {};
+  const paidCompleted = summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0;
+  const tasksAttempted = summary.tasksAttempted ?? summary.totalTasks ?? paidCompleted ?? 0;
+  const paidEarnings = summary.paidEarnings ?? summary.totalEarnings ?? 0;
+  const approvalRate = typeof summary.approvalRate === "number" && tasksAttempted > 0 ? `${Math.round(summary.approvalRate * 100)}%` : "Not enough data yet";
+  const averageScore = typeof summary.averageScore === "number" && summary.averageScore > 0 ? String(Math.round(summary.averageScore)) : "Not enough data yet";
+  const deliveryTime = summary.averageResponseTimeMs || summary.averageLatencyMs ? formatResponseMetric(agent) : "Not enough data yet";
+  const typeLabel = profile.originType === "external" ? "External Agent" : "Platform Agent";
+  const connectionStatus = profile.originType === "external" ? labelize(profile.connectionStatus || agent?.healthStatus || "unknown") : "Dispatch managed";
+  const verificationLabel = profile.originType === "external" ? ["active", "healthy", "online", "connected"].includes(String(profile.connectionStatus || agent?.healthStatus || "").toLowerCase()) ? "Connection active" : "Not verified yet" : "Platform managed";
+  const bestUseCases = (profile.skills?.length ? profile.skills : profile.capabilityTags || profile.skillCategories || []).slice(0, 5).map((item) => labelize(item));
+  const recentWork = buildRecentAgentWork(agent, taskCollections);
+  const suggestedTemplates = buildSuggestedTaskTemplatesForAgent(agent);
+  const description = profile.description || "Marketplace worker for structured funded AI tasks.";
+  const specialty = bestUseCases[0] || labelize(profile.category || "general work");
+  return {
+    name: profile.publicName || "Unnamed Agent",
+    slug: profile.slug || "",
+    categoryLabel: labelize(profile.category || "general"),
+    typeLabel,
+    description,
+    shortDescription: description.split(".")[0].slice(0, 110),
+    specialty,
+    bestUseCases,
+    badges: buildAgentIdentityBadges(agent),
+    connectionStatus,
+    verificationLabel,
+    statusLabel: labelize(summary.status || "new"),
+    completedTasksDisplay: String(paidCompleted || 0),
+    approvalRateDisplay: approvalRate,
+    totalEarnedDisplay: `${Number(paidEarnings || 0).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    averageDeliveryDisplay: deliveryTime,
+    averageScoreDisplay: averageScore,
+    reviewsDisplay: (summary.totalReviews || summary.totalApprovals || 0) > 0 ? String(summary.totalReviews || summary.totalApprovals) : "No reviews yet",
+    rankDisplay: summary.rankPosition ? `#${summary.rankPosition}` : "Not ranked yet",
+    pricingNote: profile.pricingHint || "Set per funded task reward",
+    payoutWalletDisplay: shortWallet(profile.payoutWallet || profile.ownerWallet),
+    recentWork,
+    suggestedTemplates,
+    trustNote: paidCompleted > 0 ? "Trust comes from funded task completions, owner-approved outcomes, settlement history, and reliability over time." : "Not enough completed work yet. Reputation will build as this agent completes approved funded tasks."
   };
 }
 function buildAgentIdentityBadges(agent) {
@@ -47400,6 +47695,13 @@ function buildApprovalIndicator(task) {
   if (status === "DISPUTED") return "Disputed";
   return labelize(task?.resultStatus || "completed");
 }
+function formatResponseMetric(agent) {
+  const latency = agent.performanceSummary?.averageResponseTimeMs || agent.performanceSummary?.averageLatencyMs || 0;
+  if (!latency) return "No response data yet";
+  if (latency < 1e3) return `${latency} ms`;
+  if (latency < 6e4) return `${Math.round(latency / 1e3)} sec`;
+  return `${Math.round(latency / 6e4)} min`;
+}
 function readBigIntLike(value) {
   if (typeof value === "bigint") return value;
   if (typeof value === "number" && Number.isFinite(value)) return BigInt(Math.trunc(value));
@@ -47415,18 +47717,19 @@ function readBigIntLike(value) {
 function buildReviewPanelModel(task) {
   const hasEvaluation = Boolean(task?.latestEvaluation);
   const canReviewSubmittedResult = ["SUBMITTED", "UNDER_REVIEW"].includes(task?.status);
+  const revisionRequested = Boolean(task?.revisionRequests?.length) || String(task?.resultStatus || "").toLowerCase() === "needs_revision" || task?.userReview?.decision === "needs_human_review";
   const canDispute = ["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task?.status);
   const canAppeal = ["DISPUTED", "REJECTED", "UNRESOLVED"].includes(task?.status);
   const settlementReady = task?.status === "APPROVED" || (task?.reviewActions || []).includes("settle");
   const finalOutcome = task?.latestEvaluation?.finalOutcome || null;
   return {
-    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult ? ["approve", "reject"] : [],
+    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult && !revisionRequested ? ["approve", "request_revision"] : [],
     advancedActions: [
       ...canReviewSubmittedResult ? ["assisted", "hybrid"] : [],
       ...canDispute ? ["dispute"] : [],
       ...canAppeal ? ["appeal"] : []
     ],
-    headline: settlementReady ? "This task is ready for Arc Testnet USDC settlement." : finalOutcome === "disputed" ? "A dispute paused payout and opened an escalation path." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths." : canReviewSubmittedResult ? hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or reject." : "Review the submitted output and decide whether USDC payout moves." : "Waiting for a submitted result before review and settlement actions become available."
+    headline: settlementReady ? "This task is ready for Arc Testnet USDC settlement." : finalOutcome === "disputed" ? "A dispute paused payout and opened an escalation path." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths." : revisionRequested ? "The owner requested changes. Payment stays funded and locked until revised work is approved." : canReviewSubmittedResult ? hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether USDC payout moves." : "Waiting for a submitted result before review and settlement actions become available."
   };
 }
 function buildTaskResultModel(task, executionRuns = []) {
@@ -47637,77 +47940,75 @@ function renderPerformanceColumn(state2) {
   `;
 }
 function renderAgentCard(agent) {
-  const approvalRate = Math.round((agent.performanceSummary.approvalRate || 0) * 100);
-  const averageScore = Math.round(agent.performanceSummary.averageScore || 0);
-  const latency = agent.performanceSummary.averageResponseTimeMs || agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
-  const completedJobs = agent.performanceSummary.paidTasksCompleted ?? agent.performanceSummary.tasksCompleted ?? 0;
-  const totalEarnings = agent.performanceSummary.paidEarnings ?? agent.performanceSummary.totalEarnings ?? 0;
-  const tagline = agent.profile.description.split(".")[0].slice(0, 92);
+  const display = buildAgentDisplayModel(agent);
   const tags = [.../* @__PURE__ */ new Set([...agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags, speedLabel(agent)])].slice(0, 4);
-  const identityBadges = buildAgentIdentityBadges(agent);
   const statusTone = agentStatusTone(agent);
-  const statusLabel = agentStatusLabel(agent);
-  const rankPosition = agent.performanceSummary.rankPosition;
-  const agentType = agent.profile.originType === "external" ? "External Agent" : "Built-in Agent";
-  const connectionLabel = agent.profile.originType === "external" ? labelize(agent.profile.connectionStatus || agent.healthStatus || "unknown") : "Dispatch managed";
   return `
     <article class="agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
       <div class="agent-card__top">
         <div class="agent-card__identity">
-          <div class="avatar">${initials(agent.profile.publicName)}</div>
+          <div class="avatar">${initials(display.name)}</div>
           <div>
-            <strong>${escapeHtml(agent.profile.publicName)}</strong>
-            <p class="agent-card__tagline">${escapeHtml(tagline)}</p>
+            <strong>${escapeHtml(display.name)}</strong>
+            <p class="agent-card__tagline">${escapeHtml(display.shortDescription)}</p>
           </div>
         </div>
         <div class="agent-card__meta">
-          ${rankPosition ? `<span class="agent-rank">#${rankPosition}</span>` : ""}
-          <span class="status-chip ${statusTone}">${statusLabel}</span>
+          ${agent.performanceSummary.rankPosition ? `<span class="agent-rank">${escapeHtml(display.rankDisplay)}</span>` : ""}
+          <span class="status-chip ${statusTone}">${escapeHtml(display.statusLabel)}</span>
         </div>
       </div>
       <div class="agent-tags">
-          ${identityBadges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-          <span class="tag">Type: ${escapeHtml(agentType)}</span>
-          <span class="tag">Connection: ${escapeHtml(connectionLabel)}</span>
+          ${display.badges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
+          <span class="tag">${escapeHtml(display.typeLabel)}</span>
+          <span class="tag">${escapeHtml(display.verificationLabel)}</span>
       </div>
       <div class="agent-tags">
         ${tags.map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
       </div>
+      <p class="muted agent-card__trust">Best for: ${escapeHtml(display.specialty)}</p>
       <div class="agent-metrics">
-        <div><strong>${formatCurrency(totalEarnings)}</strong><span>Earned from settled USDC work</span></div>
-        <div><strong>${completedJobs}</strong><span>Paid funded tasks</span></div>
-        <div><strong class="metric-success">${formatPercent(approvalRate)}</strong><span>Approval rate</span></div>
-        <div><strong>${averageScore || "--"}</strong><span>Avg evaluation score</span></div>
-        <div><strong>${rankPosition ? `#${rankPosition}` : "--"}</strong><span>Marketplace rank</span></div>
-        <div><strong>${formatLatency(latency)}</strong><span>Avg response</span></div>
+        <div><strong>${escapeHtml(display.totalEarnedDisplay)}</strong><span>Earned from settled work</span></div>
+        <div><strong>${escapeHtml(display.completedTasksDisplay)}</strong><span>Paid funded tasks</span></div>
+        <div><strong class="metric-success">${escapeHtml(display.approvalRateDisplay)}</strong><span>Approval rate</span></div>
+        <div><strong>${escapeHtml(display.averageDeliveryDisplay)}</strong><span>Avg delivery</span></div>
       </div>
       ${agent.profile.originType === "external" ? `<p class="muted agent-card__trust">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || agent.profile.ownerWallet))}</p>` : ""}
-      <p class="muted agent-card__trust">Reputation comes from funded task completions, owner-approved outcomes, settlement history, and reliability over time.</p>
+      <p class="muted agent-card__trust">${escapeHtml(display.trustNote)}</p>
       <footer>
-        <button class="hero-primary" data-direct="${agent.profile.agentId}">Hire Agent</button>
+        <button data-route="/agents/${agent.profile.slug}">View Agent</button>
+        <button class="hero-primary" data-direct="${agent.profile.agentId}">Create Task</button>
       </footer>
     </article>
   `;
 }
-function renderTaskRow(task, agentRegistry = /* @__PURE__ */ new Map()) {
-  const lifecycle = buildTaskLifecycleModel(task);
-  const selectedAgentId = task.selectedAgentId || task.participatingAgentIds?.[0] || null;
+function renderTaskRow(task, agentRegistry = /* @__PURE__ */ new Map(), revisionRequestsByTask = {}) {
+  const displayTask = {
+    ...task,
+    revisionRequests: revisionRequestsByTask[task.taskId] || task.revisionRequests || []
+  };
+  const lifecycle = buildTaskLifecycleModel(displayTask);
+  const payment = lifecycle.paymentDisplay;
+  const taskStatus = lifecycle.statusDisplay;
+  const selectedAgentId = displayTask.selectedAgentId || displayTask.participatingAgentIds?.[0] || null;
   const selectedAgent = selectedAgentId ? agentRegistry.get(selectedAgentId) : null;
   const assignmentLabel = selectedAgent ? `${selectedAgent.profile.publicName} (${selectedAgent.profile.originType === "external" ? "External" : "Platform"})` : lifecycle.assignmentLabel;
   return `
-    <article class="task-row task-row--${taskStatusTone(task.status)}">
-      <strong>${escapeHtml(task.title)}</strong>
-      <p>${formatCurrency(task.rewardAmount)} reward</p>
+    <article class="task-row task-row--${taskStatusTone(displayTask.status)}">
+      <strong>${escapeHtml(displayTask.title || "Untitled funded task")}</strong>
+      <p>${escapeHtml(payment.amountDisplay)} reward</p>
       <div class="agent-tags" style="margin-top:10px;">
-        <span class="tag">${escapeHtml(lifecycle.currentLabel)}</span>
+        <span class="tag">${escapeHtml(taskStatus.label)}</span>
         <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
-        <span class="tag">${escapeHtml(lifecycle.evaluationLabel)}</span>
-        <span class="tag">${escapeHtml(lifecycle.settlementLabel)}</span>
+        <span class="tag">${escapeHtml(payment.label)}</span>
       </div>
       <p style="margin-top:10px;">${escapeHtml(assignmentLabel)}</p>
-      <p class="muted" style="margin-top:8px;">${escapeHtml(lifecycle.settlementMessage)}</p>
+      <p class="muted" style="margin-top:8px;">Status: ${escapeHtml(taskStatus.description)}</p>
+      <p class="muted" style="margin-top:8px;">Payment: ${escapeHtml(payment.description)}</p>
+      <p class="muted" style="margin-top:8px;">Next: ${escapeHtml(taskStatus.nextActionText)} | ${escapeHtml(taskStatus.whoActsNext)}</p>
+      ${payment.fundingTxLink ? `<p class="muted" style="margin-top:8px;"><a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a></p>` : ""}
       <footer>
-        <button data-route="/tasks/${task.taskId}">Open Task</button>
+        <button data-route="/tasks/${displayTask.taskId}">${escapeHtml(taskStatus.primaryCtaText)}</button>
       </footer>
     </article>
   `;
@@ -47772,7 +48073,7 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
     title: "Your funded tasks waiting on wallet or Arc confirmation",
     tasks: pendingTasks,
     emptyMessage: "No pending funded tasks.",
-    renderTask: (task) => renderTaskRow(task, agentRegistry)
+    renderTask: (task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})
   })}
         </section>
       ` : ""}
@@ -47821,21 +48122,21 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
     title: "Open funded work agents can pick up",
     tasks: availableTasks,
     emptyMessage: "No open funded tasks yet.",
-    renderTask: (task) => renderTaskRow(task, agentRegistry)
+    renderTask: (task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})
   })}
         ${renderTaskRail({
     eyebrow: "Funded Tasks",
     title: "USDC-backed work already in motion",
     tasks: fundedTasks,
     emptyMessage: "No funded work in motion yet.",
-    renderTask: (task) => renderTaskRow(task, agentRegistry)
+    renderTask: (task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})
   })}
         ${renderTaskRail({
     eyebrow: "Completed Tasks",
     title: "Recently approved marketplace outcomes",
     tasks: recentCompletedTasks,
     emptyMessage: "No approved outcomes yet. Completed funded tasks will appear here after owner approval and settlement.",
-    renderTask: (task) => renderTaskRow(task, agentRegistry)
+    renderTask: (task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})
   })}
       </section>
     </section>
@@ -47947,25 +48248,21 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
     el2.appRoot.innerHTML = `<section class="shell-section"><strong>Agent not found</strong><p class="muted">No matching public profile was found.</p></section>`;
     return;
   }
-  const bestFor = (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 4).map((item) => labelize(item));
-  const recentWork = buildRecentAgentWork(agent, {
+  const display = buildAgentDisplayModel(agent, {
     completedTasks: state2.tasks?.completedTasks || [],
     rejectedTasks: state2.tasks?.rejectedTasks || [],
     disputedTasks: state2.tasks?.disputedTasks || []
   });
-  const paidTasksCompleted = agent.performanceSummary.paidTasksCompleted ?? agent.performanceSummary.tasksCompleted ?? 0;
-  const paidEarnings = agent.performanceSummary.paidEarnings ?? agent.performanceSummary.totalEarnings ?? 0;
+  const bestFor = display.bestUseCases;
+  const recentWork = display.recentWork;
   const pendingEarnings = agent.performanceSummary.pendingEarnings ?? 0;
-  const averageScore = Math.round(agent.performanceSummary.averageScore || 0);
-  const agentType = agent.profile.originType === "external" ? "External Agent" : "Built-in Agent";
   const payoutWallet = agent.profile.ownerWallet || null;
-  const connectionLabel = agent.profile.originType === "external" ? labelize(agent.profile.connectionStatus || agent.healthStatus || "unknown") : "Dispatch managed";
   el2.appRoot.innerHTML = `
     <section data-structure="agent-profile">
       <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Agent</p>
-        <h1>${escapeHtml(agent.profile.publicName)}</h1>
-        <p class="muted">${escapeHtml(agent.profile.description)}</p>
+        <p class="mini-label">${escapeHtml(display.typeLabel)}</p>
+        <h1>${escapeHtml(display.name)}</h1>
+        <p class="muted">${escapeHtml(display.description)}</p>
       </header>
       <section class="profile-grid reveal-on-scroll">
         <article class="shell-section task-main">
@@ -47976,25 +48273,27 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
             </div>
           </div>
           <div class="agent-tags">
-            ${buildAgentIdentityBadges(agent).map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-            <span class="tag">Type: ${escapeHtml(agentType)}</span>
+            ${display.badges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
+            <span class="tag">Type: ${escapeHtml(display.typeLabel)}</span>
             ${agent.profile.originType === "external" ? '<span class="tag">Adapter compatible</span>' : ""}
-            <span class="tag">Connection: ${escapeHtml(connectionLabel)}</span>
+            <span class="tag">Connection: ${escapeHtml(display.connectionStatus)}</span>
+            <span class="tag">${escapeHtml(display.verificationLabel)}</span>
             <span class="status-chip ${agentStatusTone(agent)}">${agentStatusLabel(agent)}</span>
           </div>
           <div class="task-summary">
-            <div class="metric-card"><strong>${formatCurrency(paidEarnings)}</strong><span>Paid earnings</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.totalEarnedDisplay)}</strong><span>Paid earnings</span></div>
             <div class="metric-card"><strong>${formatCurrency(pendingEarnings)}</strong><span>Pending approved reward</span></div>
-            <div class="metric-card"><strong>${paidTasksCompleted}</strong><span>Paid funded tasks</span></div>
-            <div class="metric-card"><strong>${formatPercent(Math.round((agent.performanceSummary.approvalRate || 0) * 100))}</strong><span>Approval rate</span></div>
-            <div class="metric-card"><strong>${averageScore || "--"}</strong><span>Avg evaluation score</span></div>
-            <div class="metric-card"><strong>${formatLatency(agent.performanceSummary.averageResponseTimeMs || agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs)}</strong><span>Avg response</span></div>
-            <div class="metric-card"><strong>${agent.performanceSummary.rankPosition ? `#${agent.performanceSummary.rankPosition}` : "--"}</strong><span>Marketplace rank</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.completedTasksDisplay)}</strong><span>Paid funded tasks</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.approvalRateDisplay)}</strong><span>Approval rate</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.averageScoreDisplay)}</strong><span>Avg evaluation score</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.averageDeliveryDisplay)}</strong><span>Avg delivery</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.rankDisplay)}</strong><span>Marketplace rank</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.reviewsDisplay)}</strong><span>Reviews</span></div>
             <div class="metric-card"><strong>${agent.performanceSummary.disputeCount || 0}</strong><span>Disputes</span></div>
           </div>
-          <p class="muted">Reputation is calculated from funded task completions, owner-approved outcomes, settlement receipts, review quality, and reliability over time on Arc Testnet.</p>
+          <p class="muted">${escapeHtml(display.trustNote)}</p>
           <div class="agent-tags">
-            ${(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 6).map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
+            ${bestFor.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || '<span class="muted">General-purpose marketplace work.</span>'}
           </div>
         </article>
         <aside class="task-side">
@@ -48005,18 +48304,22 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
             <div class="agent-tags">
               ${bestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("") || '<span class="muted">General-purpose marketplace work.</span>'}
             </div>
+            <p class="muted" style="margin-top:12px;">Pricing note: ${escapeHtml(display.pricingNote)}</p>
             <p class="muted" style="margin-top:12px;">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || payoutWallet))}</p>
             ${agent.profile.developerName ? `<p class="muted">Developer: ${escapeHtml(agent.profile.developerName)}</p>` : ""}
             ${agent.profile.endpointUrl ? `<p class="muted">Endpoint: ${escapeHtml(agent.profile.endpointUrl)}</p>` : ""}
             ${agent.profile.outputSchema ? `<p class="muted">Output schema: ${escapeHtml(typeof agent.profile.outputSchema === "string" ? agent.profile.outputSchema : "Structured object schema")}</p>` : ""}
+            <div class="agent-tags" style="margin-top:12px;">
+              ${display.suggestedTemplates.map((template) => `<span class="tag">${escapeHtml(template.name)}</span>`).join("")}
+            </div>
           </article>
           <article class="shell-panel">
             <p class="mini-label">Hire flow</p>
-            <h3>${agent.profile.originType === "platform" ? "Start with the platform default worker" : "Start funded work with this agent"}</h3>
+            <h3>Create task with this agent</h3>
             <textarea id="quickTaskIdea" rows="5" placeholder="Describe the outcome you want from this agent."></textarea>
             ${agent.profile.originType === "platform" ? '<p class="muted">This worker ships with Dispatch as the launch benchmark. It earns reputation through the same funded-task, review, and settlement loop as future external agents.</p>' : '<p class="muted">External workers can integrate through Dispatch adapters, receive funded job envelopes, submit outputs, and earn after owner approval.</p>'}
             <footer>
-              <button class="hero-primary" id="hireAgentButton">Hire Agent</button>
+              <button class="hero-primary" id="hireAgentButton">Create task with this agent</button>
             </footer>
           </article>
         </aside>
@@ -48050,6 +48353,15 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
     const quickTaskIdea = document.getElementById("quickTaskIdea")?.value?.trim();
     state2.taskForm.hiringMode = "direct_hire";
     state2.taskForm.selectedAgentId = agent.profile.agentId;
+    const suggestedTemplate = display.suggestedTemplates.find((template) => template.id !== "custom_task") || display.suggestedTemplates[0];
+    if (suggestedTemplate) {
+      state2.taskForm.templateId = suggestedTemplate.id;
+      state2.taskForm.templateFields = {};
+      state2.taskForm.templateMessage = `${suggestedTemplate.name} is suggested for ${agent.profile.publicName}. Fill the template fields or switch to Custom Task.`;
+      if (suggestedTemplate.category) {
+        state2.taskForm.category = suggestedTemplate.category;
+      }
+    }
     if (quickTaskIdea) {
       state2.taskForm.description = quickTaskIdea;
       if (!state2.taskForm.title.trim()) {
@@ -48091,7 +48403,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
       </section>
       <section class="shell-section reveal-on-scroll">
         <div class="steps-grid">
-          ${state2.dashboardTab === "my_agents" ? myAgents.map((agent) => renderAgentCard(agent)).join("") : state2.dashboardTab === "earnings" ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned from approved funded work</p></article>`).join("") : myTasks.map((task) => renderTaskRow(task, agentRegistry)).join("") || emptyState("No funded work here yet.")}
+          ${state2.dashboardTab === "my_agents" ? myAgents.map((agent) => renderAgentCard(agent)).join("") : state2.dashboardTab === "earnings" ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned from approved funded work</p></article>`).join("") : myTasks.map((task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})).join("") || emptyState("No funded work here yet.")}
         </div>
       </section>
     </section>
@@ -48141,9 +48453,7 @@ function readBigIntLike2(value) {
   return 0n;
 }
 function arcTxLink(hash3) {
-  const value = String(hash3 || "").trim();
-  if (!/^0x[a-fA-F0-9]{64}$/.test(value)) return null;
-  return `https://testnet.arcscan.app/tx/${value}`;
+  return buildArcTransactionLink(hash3);
 }
 function renderTaskDetailPageView({
   el: el2,
@@ -48151,7 +48461,8 @@ function renderTaskDetailPageView({
   history: history2,
   onchainSnapshot,
   reviewModel,
-  resultModel
+  resultModel,
+  revisionModel
 }) {
   const agents = task.selectedAgents || [];
   const reviewActions = task.reviewActions || [];
@@ -48189,6 +48500,9 @@ function renderTaskDetailPageView({
   const settlementLabel = fundingConfirmed ? labelize(task.settlementState || "reward_funded") : browserTxHashes.length ? "Funding Syncing" : "Awaiting Funding";
   const executionHeadline = task.status === "EXECUTING" ? "Agent is actively working and this task surface is waiting for the next result update." : task.status === "SUBMITTED" ? "Execution finished and the result is ready for a review decision." : fundingConfirmed ? "The task is staged and waiting for the next execution event." : browserTxHashes.length ? "Signed wallet transactions were captured and the marketplace is syncing the latest onchain state." : "This task has not been funded onchain yet.";
   const nextStepSummary = task.status === "SUBMITTED" ? "Review the output, then approve and settle if it looks good." : task.status === "EXECUTING" ? "The assigned agent is still working. This page will update as execution moves." : fundingConfirmed ? "This task is waiting for the next marketplace action." : browserTxHashes.length ? "The wallet signing flow completed and the marketplace is finalizing funding and assignment status." : "Fund this task onchain before it can move into assignment and execution.";
+  const payment = lifecycle.paymentDisplay;
+  const taskStatus = lifecycle.statusDisplay;
+  const paymentBannerTone = payment.variant === "success" ? "success" : payment.variant === "warning" ? "warning" : "info";
   el2.appRoot.innerHTML = `
     <section data-structure="task-detail">
       <header class="reveal-on-scroll is-visible">
@@ -48203,17 +48517,20 @@ function renderTaskDetailPageView({
             <p class="mini-label">Lifecycle</p>
             <h2>Funded work progress</h2>
           </div>
-          <span class="tag">${escapeHtml(lifecycle.currentLabel)}</span>
+          <span class="tag">${escapeHtml(taskStatus.label)}</span>
         </div>
         <div class="task-summary">
           <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>USDC reward</span></div>
+          <div class="metric-card"><strong>${escapeHtml(taskStatus.label)}</strong><span>Current status</span></div>
           <div class="metric-card"><strong>${escapeHtml(lifecycle.fundingLabel)}</strong><span>Funding</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.reviewStateLabel)}</strong><span>Review</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
+          <div class="metric-card"><strong>${escapeHtml(lifecycle.nextActor)}</strong><span>Who acts next</span></div>
         </div>
         <div class="status-banner ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
-          <strong>Lifecycle summary</strong>
-          <p>${escapeHtml(lifecycle.settlementMessage)}</p>
+          <strong>${escapeHtml(taskStatus.label)}</strong>
+          <p>${escapeHtml(taskStatus.description)}</p>
+          <p><strong>Next required action:</strong> ${escapeHtml(taskStatus.nextActionText)} | ${escapeHtml(taskStatus.whoActsNext)}</p>
         </div>
         ${isDemoTask ? `
           <div class="status-banner info">
@@ -48225,7 +48542,7 @@ function renderTaskDetailPageView({
         <div class="steps-grid" style="margin-top:18px;">
           ${lifecycle.steps.map((step) => `
             <article class="step-card">
-              <div class="step-icon">${escapeHtml(step.status === "complete" ? "\u2713" : step.status === "current" ? "\u2022" : step.status === "warning" || step.status === "failed" ? "!" : "\xB7")}</div>
+              <div class="step-icon">${escapeHtml(step.status === "complete" ? "OK" : step.status === "current" ? "Now" : step.status === "warning" || step.status === "failed" ? "!" : ".")}</div>
               <strong>${escapeHtml(step.label)}</strong>
               <p>${escapeHtml(step.helper)}</p>
               <div class="agent-tags" style="margin-top:10px;">
@@ -48237,6 +48554,30 @@ function renderTaskDetailPageView({
         </div>
       </section>
 
+      <section class="shell-section reveal-on-scroll">
+        <div class="section-head">
+          <div>
+            <p class="mini-label">USDC payment</p>
+            <h2>Payment state</h2>
+          </div>
+          <span class="tag">${escapeHtml(payment.label)}</span>
+        </div>
+        <div class="task-summary">
+          <div class="metric-card"><strong>${escapeHtml(payment.amountDisplay)}</strong><span>Task reward</span></div>
+          <div class="metric-card"><strong>${escapeHtml(payment.label)}</strong><span>Payment status</span></div>
+          <div class="metric-card"><strong>${escapeHtml(payment.nextPaymentAction)}</strong><span>Next payment action</span></div>
+          <div class="metric-card"><strong>${escapeHtml(payment.networkDisplay)}</strong><span>Network</span></div>
+        </div>
+        <div class="status-banner ${paymentBannerTone}">
+          <strong>${escapeHtml(payment.label)}</strong>
+          <p>${escapeHtml(payment.description)}</p>
+        </div>
+        <div class="agent-tags" style="margin-top:12px;">
+          ${payment.fundingTxLink ? `<a class="tag" href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tag">Funding tx: Not available yet</span>`}
+          ${payment.settlementTxLink ? `<a class="tag" href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tag">Release tx: Not available yet</span>`}
+        </div>
+      </section>
+
       <section class="task-grid reveal-on-scroll">
         <article class="task-main shell-section">
           <div class="section-head">
@@ -48244,7 +48585,7 @@ function renderTaskDetailPageView({
               <p class="mini-label">Execution</p>
               <h2>Live task status</h2>
             </div>
-            <span class="tag">${escapeHtml(labelize(task.status))}</span>
+            <span class="tag">${escapeHtml(taskStatus.label)}</span>
           </div>
           <div class="status-banner info">
             <strong>Execution rail</strong>
@@ -48253,11 +48594,11 @@ function renderTaskDetailPageView({
           <div class="task-summary">
             <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>Reward</span></div>
             <div class="metric-card"><strong>${deadlineCountdown(task.deadline)}</strong><span>Deadline</span></div>
-            <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
-            <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
+            <div class="metric-card"><strong>${escapeHtml(lifecycle.reviewStateLabel)}</strong><span>Review</span></div>
+            <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
           </div>
           <div class="simple-panel">
-            <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(lifecycle.currentLabel)}${task.status === "EXECUTING" ? " - agent is working now." : task.status === "SUBMITTED" ? " - result is ready for review." : ""}</span></div>
+            <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(taskStatus.label)} - ${escapeHtml(taskStatus.description)}</span></div>
             <div class="agent-tags" style="margin-top:12px;">
               ${agents.length ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)} | ${escapeHtml(agent.originType === "external" ? "External" : "Platform")}</span>`).join("") : "<span class='muted'>No agent assigned yet.</span>"}
             </div>
@@ -48269,10 +48610,14 @@ function renderTaskDetailPageView({
             <p class="mini-label">Task summary</p>
             <h3>What happens next</h3>
             <p class="muted">${nextStepSummary}</p>
+            <div class="status-banner info" style="margin-top:12px;">
+              <strong>${escapeHtml(taskStatus.primaryCtaText)}</strong>
+              <p>${escapeHtml(lifecycle.nextActionHelper)}</p>
+            </div>
             <div class="agent-tags" style="margin-top:12px;">
               <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
-              <span class="tag">${escapeHtml(lifecycle.evaluationLabel)}</span>
-              <span class="tag">${escapeHtml(lifecycle.settlementLabel)}</span>
+              <span class="tag">${escapeHtml(lifecycle.reviewStateLabel)}</span>
+              <span class="tag">${escapeHtml(lifecycle.paymentStateLabel)}</span>
             </div>
             ${task.onchainTaskRef || onchainTask ? `<p class="muted">${fundingConfirmed ? "Onchain task ref" : "Task pointer"}: ${escapeHtml(task.onchainTaskRef || `task:${task.taskId}`)}</p>` : ""}
             ${browserTxHashes.length ? `
@@ -48362,13 +48707,24 @@ function renderTaskDetailPageView({
         <aside class="task-side">
           <article class="shell-panel">
             <p class="mini-label">Actions</p>
-            <h3>Review and settle</h3>
+            <h3>${escapeHtml(taskStatus.primaryCtaText)}</h3>
             <p class="muted">${escapeHtml(reviewModel.headline)}</p>
             <div class="review-actions">
-              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve</button>' : ""}
-              ${reviewModel.primaryActions.includes("reject") ? '<button data-user-review="reject">Reject</button>' : ""}
-              ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Approve & Pay</button>` : ""}
+              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve work</button>' : ""}
+              ${reviewModel.primaryActions.includes("request_revision") ? "<button data-request-revision-toggle>Request revision</button>" : ""}
+              ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>` : ""}
+              ${reviewModel.primaryActions.length === 0 ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
+            ${reviewModel.primaryActions.includes("request_revision") ? `
+              <div class="simple-panel" data-revision-form style="margin-top:14px;">
+                <strong>Request changes</strong>
+                <p class="muted">This records revision guidance without releasing payment. USDC stays funded and locked until approval.</p>
+                <label class="field-stack" style="margin-top:12px;"><span class="muted">What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
+                <label class="field-stack"><span class="muted">What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
+                <label class="field-stack"><span class="muted">Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
+                <button data-request-revision="${task.taskId}">Save revision request</button>
+              </div>
+            ` : ""}
             <div class="secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
               ${resultModel?.improveAgainUnavailableReason ? `<p class="muted">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
@@ -48380,6 +48736,46 @@ function renderTaskDetailPageView({
             <div class="secondary-actions">
               ${additionalReviewActions.map((action) => `<button data-task-action="${action}" data-task-id="${task.taskId}">${escapeHtml(labelize(action))}</button>`).join("")}
             </div>
+          </article>
+        </aside>
+      </section>
+
+      <section class="task-grid reveal-on-scroll">
+        <article class="task-main shell-section">
+          <div class="section-head">
+            <div>
+              <p class="mini-label">Revision history</p>
+              <h2>Requested changes</h2>
+            </div>
+            <span class="tag">${escapeHtml(revisionModel?.headline || "No revision requested")}</span>
+          </div>
+          <div class="status-banner ${revisionModel?.hasRevisionRequested ? "warning" : "info"}">
+            <strong>${escapeHtml(revisionModel?.headline || "No revision requested")}</strong>
+            <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
+          </div>
+          <div class="live-feed" style="margin-top:16px;">
+            ${(revisionModel?.items || []).map((item, index2) => `
+              <article class="feed-card feed-card--warning" style="animation-delay:${index2 * 70}ms">
+                <span class="feed-card__pulse"></span>
+                <div>
+                  <strong>${escapeHtml(item.changeRequest)}</strong>
+                  <p>Missing: ${escapeHtml(item.missingDetails)}</p>
+                  ${item.extraInstruction ? `<p>Extra instruction: ${escapeHtml(item.extraInstruction)}</p>` : ""}
+                  <div class="agent-tags" style="margin-top:10px;">
+                    <span class="tag">${escapeHtml(item.requestedBy)}</span>
+                    ${item.requestedAt ? `<span class="tag">${escapeHtml(new Date(item.requestedAt).toLocaleString())}</span>` : ""}
+                    ${item.resubmissionNote ? `<span class="tag">${escapeHtml(item.resubmissionNote)}</span>` : ""}
+                  </div>
+                </div>
+              </article>
+            `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.")}
+          </div>
+        </article>
+        <aside class="task-side">
+          <article class="shell-panel">
+            <p class="mini-label">Revision payment rule</p>
+            <h3>Approval still controls release</h3>
+            <p class="muted">Requesting a revision does not settle the task, create a payout transaction, or mark work complete. Payment remains funded and locked until the owner approves.</p>
           </article>
         </aside>
       </section>
@@ -48401,7 +48797,7 @@ function renderTaskDetailPageView({
                   <p>${escapeHtml(item.description)}</p>
                 </div>
               </article>
-            `).join("") || emptyState("No timeline items yet.")}
+            `).join("") || emptyState("No timeline yet. Waiting for update.")}
           </div>
         </article>
         <aside class="task-side">
@@ -48419,7 +48815,7 @@ function renderTaskDetailPageView({
                     ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
                   </div>
                 </article>
-              `).join("") || emptyState("No payout receipts yet.")}
+              `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.")}
             </div>
           </article>
         </aside>
@@ -48757,6 +49153,9 @@ var ambientRefreshPending = false;
 var attachmentIngestionModulePromise = null;
 var pendingTaskAutoChecks = /* @__PURE__ */ new Set();
 var activeTaskDetailRenderToken = 0;
+function persistRevisionRequests() {
+  localStorage.setItem("dispatchRevisionRequests", JSON.stringify(state.revisionRequests || {}));
+}
 function loadAttachmentIngestionModule() {
   if (!attachmentIngestionModulePromise) {
     attachmentIngestionModulePromise = Promise.resolve().then(() => (init_attachment_ingestion(), attachment_ingestion_exports));
@@ -49592,6 +49991,9 @@ async function createTask() {
     const selectedAgent = payload.selectedAgentId ? state.agents.find((agent) => agent.profile.agentId === payload.selectedAgentId) : null;
     state.taskForm.title = "";
     state.taskForm.description = "";
+    state.taskForm.templateId = "custom_task";
+    state.taskForm.templateFields = {};
+    state.taskForm.templateMessage = "";
     state.taskForm.structuredNotes = "";
     state.taskForm.attachments = [];
     state.taskForm.rewardAmount = "";
@@ -49705,6 +50107,8 @@ async function renderPostTaskPage() {
   const selectedAgentBestFor = selectedAgent ? bestFitLabels(selectedAgent) : [];
   const selectedAgentIdeas = selectedAgent ? starterIdeasForAgent(selectedAgent) : [];
   const taskChecklist = buildPostTaskChecklist(state.taskForm, selectedAgent);
+  const selectedTemplate = getTaskBriefTemplate(state.taskForm.templateId || "custom_task");
+  const templateResult = buildTaskTemplateBrief(selectedTemplate.id, state.taskForm.templateFields || {});
   const walletReady = Boolean(state.wallet.trim());
   if (walletReady) {
     await refreshWalletNetworkState();
@@ -49786,9 +50190,39 @@ async function renderPostTaskPage() {
                 <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
                 </div>
             </div>
+            <div class="simple-panel" style="margin-bottom:18px;">
+              <div class="section-head">
+                <div>
+                  <p class="mini-label">Template</p>
+                  <h3>Start with a task template</h3>
+                  <p class="muted">Choose a common task shape, fill the useful details, then generate an editable brief for the existing funded task flow.</p>
+                </div>
+                <span class="meta-pill">${escapeHtml(selectedTemplate.name)}</span>
+              </div>
+              <label class="field-stack field-wide">
+                <span class="muted">Task template</span>
+                <select id="taskTemplateId">
+                  ${taskBriefTemplates.map((template) => `<option value="${template.id}" ${selectedTemplate.id === template.id ? "selected" : ""}>${escapeHtml(template.name)}</option>`).join("")}
+                </select>
+              </label>
+              ${selectedTemplate.id === "custom_task" ? `
+                <p class="muted" style="margin-top:12px;">Custom Task keeps the original blank composer. Write directly in the title and description fields below.</p>
+              ` : `
+                <div class="form-grid field-stack" style="margin-top:14px;">
+                  ${selectedTemplate.fields.map((field) => {
+    const value = state.taskForm.templateFields?.[field.key] || "";
+    return field.multiline ? `<label class="field-wide"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><textarea data-template-field="${field.key}" rows="4" placeholder="${escapeHtml(field.label)}">${escapeHtml(value)}</textarea></label>` : `<label><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><input data-template-field="${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.label)}" /></label>`;
+  }).join("")}
+                </div>
+                <div class="secondary-actions" style="margin-top:14px;">
+                  <button type="button" id="generateTaskBrief">Generate / Update Brief</button>
+                </div>
+                ${state.taskForm.templateMessage ? `<div class="status-banner ${templateResult.missingFields.length ? "warning" : "info"}" style="margin-top:12px;"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
+              `}
+            </div>
             <div class="form-grid field-stack">
               <label class="field-wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
-              <label class="field-wide"><strong>Description</strong><textarea id="taskDescription" rows="7" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
+              <label class="field-wide"><strong>Final editable brief</strong><textarea id="taskDescription" rows="9" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
               <label><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
               <label><strong>Reward (USDC)</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /></label>
               <label><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
@@ -49929,6 +50363,45 @@ async function renderPostTaskPage() {
       state.taskForm[key] = event.target.value;
       if (id === "selectedAgentId") renderPostTaskPage();
     });
+  });
+  document.getElementById("taskTemplateId")?.addEventListener("input", (event) => {
+    state.taskForm.templateId = event.target.value;
+    state.taskForm.templateFields = {};
+    state.taskForm.templateMessage = event.target.value === "custom_task" ? "Custom Task selected. Write your own brief below." : "Fill the template fields, then generate an editable task brief.";
+    const template = getTaskBriefTemplate(event.target.value);
+    if (template?.category) state.taskForm.category = template.category;
+    renderPostTaskPage();
+  });
+  document.querySelectorAll("[data-template-field]").forEach((node) => {
+    node.addEventListener("input", (event) => {
+      state.taskForm.templateFields = {
+        ...state.taskForm.templateFields || {},
+        [node.dataset.templateField]: event.target.value
+      };
+      state.taskForm.templateMessage = "";
+    });
+  });
+  document.getElementById("generateTaskBrief")?.addEventListener("click", () => {
+    const result = buildTaskTemplateBrief(state.taskForm.templateId, state.taskForm.templateFields || {});
+    if (result.isCustom) {
+      state.taskForm.templateMessage = "Custom Task selected. Write your own brief below.";
+      renderPostTaskPage();
+      return;
+    }
+    if (result.missingFields.length) {
+      state.taskForm.templateMessage = `Add required template fields first: ${result.missingFields.join(", ")}.`;
+      renderPostTaskPage();
+      return;
+    }
+    state.taskForm.description = result.brief;
+    if (!state.taskForm.title.trim()) {
+      state.taskForm.title = result.template.name;
+    }
+    if (result.template.category) {
+      state.taskForm.category = result.template.category;
+    }
+    state.taskForm.templateMessage = "Brief generated. Review and edit it before funding the task.";
+    renderPostTaskPage();
   });
   document.querySelectorAll("[data-mode]").forEach((node) => {
     node.addEventListener("click", () => {
@@ -50153,6 +50626,44 @@ async function runUserDecision(taskId, decision, trigger) {
     setButtonLoading(trigger, false);
   }
 }
+async function requestRevision(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Saving");
+    requireWallet2();
+    const changeRequest = document.getElementById("revisionChangeRequest")?.value?.trim() || "";
+    const missingDetails = document.getElementById("revisionMissingDetails")?.value?.trim() || "";
+    const extraInstruction = document.getElementById("revisionExtraInstruction")?.value?.trim() || "";
+    if (!changeRequest && !missingDetails) {
+      updateStatus2("Revision note needed", "Add what needs to change or what was missing before requesting a revision.", "warn");
+      return;
+    }
+    const existing = state.revisionRequests?.[taskId] || [];
+    const revisionRequest = {
+      id: `revision_${Date.now()}`,
+      taskId,
+      changeRequest,
+      missingDetails,
+      extraInstruction,
+      requestedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      requestedBy: state.wallet
+    };
+    state.revisionRequests = {
+      ...state.revisionRequests || {},
+      [taskId]: [revisionRequest, ...existing]
+    };
+    persistRevisionRequests();
+    updateStatus2(
+      "Revision requested",
+      "The request was saved locally. Payment remains funded and locked until the owner approves revised work.",
+      "success"
+    );
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus2("Revision request failed", statusMessage(error, "Revision request failed"), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
 async function runImproveAgain(taskId, trigger) {
   try {
     setButtonLoading(trigger, true, "Improving");
@@ -50206,17 +50717,20 @@ async function renderTaskDetail(taskId) {
     return;
   }
   const task = state.task;
+  const localRevisionRequests = state.revisionRequests?.[task.taskId] || [];
+  const displayTask = { ...task, revisionRequests: localRevisionRequests };
   const shouldProbeOnchainTask = Boolean(task.onchainTaskRef) || ["pending_wallet", "pending_chain"].includes(task.transactionState) || Boolean(task.latestCreateTxHash) || Boolean(task.latestFundTxHash) || Boolean(task.latestAssignTxHash);
-  const reviewModel = buildReviewPanelModel(task);
+  const reviewModel = buildReviewPanelModel(displayTask);
   renderTaskDetailPageView({
     el,
-    task,
+    task: displayTask,
     history: state.history,
     onchainSnapshot: null,
     reviewModel,
-    resultModel: buildTaskResultModel(task, [])
+    resultModel: buildTaskResultModel(displayTask, []),
+    revisionModel: buildTaskRevisionDisplayModel(displayTask)
   });
-  bindTaskDetailActions(task);
+  bindTaskDetailActions(displayTask);
   const shouldAutoCheckFunding = ["pending_wallet", "pending_chain"].includes(task.transactionState) && (task.latestCreateTxHash || task.latestFundTxHash || task.latestAssignTxHash) && !pendingTaskAutoChecks.has(task.taskId);
   if (shouldAutoCheckFunding) {
     pendingTaskAutoChecks.add(task.taskId);
@@ -50236,13 +50750,14 @@ async function renderTaskDetail(taskId) {
     }
     renderTaskDetailPageView({
       el,
-      task,
+      task: displayTask,
       history: state.history,
       onchainSnapshot,
       reviewModel,
-      resultModel: buildTaskResultModel(task, taskRuns.items || [])
+      resultModel: buildTaskResultModel(displayTask, taskRuns.items || []),
+      revisionModel: buildTaskRevisionDisplayModel(displayTask)
     });
-    bindTaskDetailActions(task);
+    bindTaskDetailActions(displayTask);
   });
 }
 function bindTaskDetailActions(task) {
@@ -50254,6 +50769,12 @@ function bindTaskDetailActions(task) {
   });
   document.querySelectorAll("[data-user-review]").forEach((node) => {
     node.addEventListener("click", () => runUserDecision(task.taskId, node.dataset.userReview, node));
+  });
+  document.querySelectorAll("[data-request-revision]").forEach((node) => {
+    node.addEventListener("click", () => requestRevision(node.dataset.requestRevision || task.taskId, node));
+  });
+  document.querySelectorAll("[data-request-revision-toggle]").forEach((node) => {
+    node.addEventListener("click", () => document.getElementById("revisionChangeRequest")?.focus());
   });
   document.querySelectorAll("[data-platform-improve]").forEach((node) => {
     node.addEventListener("click", () => runImproveAgain(task.taskId, node));

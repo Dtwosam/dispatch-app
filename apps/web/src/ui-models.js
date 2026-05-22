@@ -1,5 +1,11 @@
 import { labelize } from "./app-ui.js";
 
+export function buildArcTransactionLink(hash) {
+  const value = String(hash || "").trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(value)) return null;
+  return `https://testnet.arcscan.app/tx/${value}`;
+}
+
 export function shortWallet(wallet) {
   const value = String(wallet || "").trim();
   if (value.length <= 10) return value || "No wallet";
@@ -26,9 +32,14 @@ export function buildTaskLifecycleModel(task, options = {}) {
   const transactionState = String(task?.transactionState || "").toLowerCase();
   const settlementState = String(task?.settlementState || "").toLowerCase();
   const finalOutcome = String(task?.latestEvaluation?.finalOutcome || "").toLowerCase();
+  const revisionRequests = [
+    ...(Array.isArray(task?.revisionRequests) ? task.revisionRequests : []),
+    ...(Array.isArray(options.revisionRequests) ? options.revisionRequests : []),
+  ];
   const assignedAgents = task?.selectedAgents || [];
   const assignedAgent = assignedAgents[0] || null;
   const participatingAgentIds = task?.participatingAgentIds || [];
+  const hasAnyRawStatus = Boolean(status || resultStatus || transactionState || settlementState || task?.onchainTaskRef || task?.latestSettlement);
 
   const fundingConfirmed = Boolean(settlementSummary?.isFunded)
     || transactionState === "accepted"
@@ -52,13 +63,22 @@ export function buildTaskLifecycleModel(task, options = {}) {
     || (settlementState === "pending_settlement" && !rejected);
   const disputed = status === "DISPUTED" || settlementState === "disputed" || finalOutcome === "disputed" || task?.disputeRecord?.status === "open";
   const unresolved = status === "UNRESOLVED" || settlementState === "unresolved" || finalOutcome === "unresolved";
+  const cancelled = ["CANCELLED", "CANCELED", "CANCELLED_BY_OWNER", "CANCELED_BY_OWNER"].includes(status)
+    || ["cancelled", "canceled"].includes(resultStatus)
+    || ["cancelled", "canceled"].includes(settlementState);
   const refunded = status === "REFUNDED" || settlementState === "refunded" || task?.latestSettlement?.outcome === "refunded";
   const settled = status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
+  const completed = status === "COMPLETED" || resultStatus === "completed";
   const settlementReady = Boolean(settlementSummary?.canReleasePayment)
     || (!settled && !refunded && approved
       && (settlementState === "pending_settlement" || (task?.reviewActions || []).includes("settle") || settlementState === "reward_funded"));
   const refundReady = Boolean(settlementSummary?.canRefund);
-  const needsRevision = rejected && !refunded;
+  const revisionRequested = Boolean(revisionRequests.length)
+    || resultStatus === "needs_revision"
+    || task?.userReview?.decision === "needs_human_review"
+    || (rejected && !refunded && !disputed && !unresolved);
+  const needsRevision = revisionRequested && !refunded;
+  const noSubmission = !submitted;
 
   const fundingLabel = fundingConfirmed
     ? "Funded"
@@ -75,8 +95,10 @@ export function buildTaskLifecycleModel(task, options = {}) {
         ? "Disputed"
         : unresolved
           ? "Unresolved"
-          : rejected
-            ? "Rejected"
+          : revisionRequested
+            ? "Revision requested"
+            : rejected
+              ? "Rejected"
             : approved
               ? "Approved"
               : underReview
@@ -102,30 +124,36 @@ export function buildTaskLifecycleModel(task, options = {}) {
               ? "Settlement pending"
               : "Funding required";
   const currentLabel = settled
-    ? "Payment released"
-    : refunded
-      ? "Reward refunded"
-      : disputed
-        ? "Disputed"
-        : unresolved
-          ? "Needs appeal"
+    ? "Payment Released"
+    : completed
+      ? "Completed"
+      : refunded || cancelled
+        ? "Cancelled"
+        : disputed || unresolved
+          ? "Disputed"
           : settlementReady
-            ? "Settlement ready"
+            ? "Approved"
             : approved
               ? "Approved"
-              : underReview
-                ? "Under review"
-                : submitted
-                  ? "Output submitted"
-                  : executing
-                    ? "In progress"
-                    : assigned
-                      ? "Agent assigned"
-                      : fundingPending
-                        ? "Funding pending"
-                        : fundingConfirmed
-                          ? "Funded"
-                          : "Task posted";
+              : revisionRequested
+                ? "Revision Requested"
+                : rejected
+                  ? "Revision Requested"
+                : underReview
+                  ? "In Review"
+                  : submitted
+                    ? "Submitted"
+                    : executing
+                      ? "In Progress"
+                      : assigned
+                        ? "Agent Assigned"
+                        : fundingPending
+                          ? "Waiting for Funding"
+                          : fundingConfirmed
+                            ? "Funded"
+                            : hasAnyRawStatus
+                              ? "Draft"
+                              : "Unknown";
   const settlementMessage = settled
     ? "Payment released."
     : refunded
@@ -135,7 +163,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
         : settlementReady
           ? "Approved. USDC release is ready."
           : needsRevision
-            ? "Revision needed before payout."
+            ? "Revision requested before payout."
             : rejected
               ? "Rejected. Payout not recommended."
               : disputed
@@ -153,6 +181,281 @@ export function buildTaskLifecycleModel(task, options = {}) {
                           : fundingConfirmed
                             ? "Task is funded and waiting for the next step."
                             : "Awaiting onchain funding.";
+  const amountDisplay = Number.isFinite(Number(task?.rewardAmount))
+    ? `${Number(task.rewardAmount).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`
+    : "Not available yet";
+  const fundingTxLink = buildArcTransactionLink(task?.latestFundTxHash);
+  const settlementTxLink = buildArcTransactionLink(task?.latestSettlement?.txReference);
+  const releasePending = Boolean(settlementTxLink) && !settled && !refunded;
+  const paymentStateLabel = settled
+    ? "Payment released"
+    : refunded
+      ? "Reward refunded"
+      : settlementReady
+        ? "Payment ready"
+        : refundReady
+          ? "Refund ready"
+          : fundingConfirmed
+            ? "USDC funded"
+            : fundingPending
+              ? "Funding syncing"
+              : "Funding required";
+  const reviewStateLabel = approved
+    ? "Owner approved"
+    : revisionRequested
+      ? "Revision requested"
+      : rejected
+        ? "Owner rejected"
+      : disputed
+        ? "Disputed"
+        : underReview
+          ? "AI guidance attached"
+          : submitted
+            ? "Needs owner review"
+            : noSubmission
+              ? "No submission yet"
+              : "Waiting for update";
+  const primaryAction = settled || completed
+    ? { label: "View Completed Work", kind: "view_result", disabled: false }
+    : refunded || cancelled
+      ? { label: "View Task", kind: "view_result", disabled: false }
+      : disputed || unresolved
+        ? { label: "View Dispute", kind: "dispute", disabled: false }
+        : settlementReady
+          ? { label: "Release Payment", kind: "settle", disabled: false }
+          : revisionRequested
+            ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true }
+            : rejected
+              ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true }
+            : submitted || underReview
+              ? { label: "Review Submission", kind: "review", disabled: false }
+              : executing
+                ? { label: "Waiting for Agent", kind: "wait", disabled: true }
+                : assigned
+                  ? { label: "Waiting for Agent", kind: "wait", disabled: true }
+                  : fundingConfirmed
+                    ? { label: "Assign Agent", kind: "assign", disabled: false }
+                    : fundingPending
+                      ? { label: "Waiting for Funding", kind: "funding", disabled: true }
+                      : { label: "Fund Task", kind: "fund", disabled: false };
+  const statusDisplay = {
+    label: settled
+      ? "Payment Released"
+      : completed
+        ? "Completed"
+        : refunded || cancelled
+          ? "Cancelled"
+          : disputed || unresolved
+            ? "Disputed"
+            : settlementReady || approved
+              ? "Approved"
+              : revisionRequested || rejected
+                ? "Revision Requested"
+                : underReview
+                  ? "In Review"
+                  : submitted
+                    ? "Submitted"
+                    : executing
+                      ? "In Progress"
+                      : assigned
+                        ? "Agent Assigned"
+                        : fundingPending
+                          ? "Waiting for Funding"
+                          : fundingConfirmed
+                            ? "Funded"
+                            : hasAnyRawStatus
+                              ? "Draft"
+                              : "Unknown",
+    description: settled
+      ? "Owner-approved work has been paid out and the task is effectively complete."
+      : completed
+        ? "The task is complete and ready to view as finished work."
+        : refunded || cancelled
+          ? "The task is closed and no normal payment release is available."
+          : disputed || unresolved
+            ? "The task needs dispute or appeal handling before payment can move."
+            : settlementReady || approved
+              ? "The owner approval step is complete and payment release is the next major action."
+              : revisionRequested || rejected
+                ? "The owner requested changes. Payment remains funded and locked until approved."
+                : underReview
+                  ? "A submitted result is being reviewed. AI guidance is advisory; the owner decides."
+                  : submitted
+                    ? "The agent submitted output and the owner needs to review it."
+                    : executing
+                      ? "The assigned agent is actively working on the funded task."
+                      : assigned
+                        ? "An agent is assigned and execution is the next step."
+                        : fundingPending
+                          ? "Funding was started and Dispatch is waiting for Arc Testnet confirmation."
+                          : fundingConfirmed
+                            ? "The task is funded and ready for assignment or execution."
+                            : hasAnyRawStatus
+                              ? "The task exists but needs funding before marketplace execution."
+                              : "Dispatch cannot determine the current task state yet.",
+    nextActionText: primaryAction.label,
+    whoActsNext: settled || completed || refunded || cancelled
+      ? "No action needed"
+      : revisionRequested || rejected
+          ? "Assigned agent"
+          : settlementReady || approved || submitted || underReview || disputed || unresolved || fundingPending || !fundingConfirmed
+            ? "Task owner"
+        : executing || assigned
+          ? "Assigned agent"
+          : "Marketplace",
+    primaryCtaText: primaryAction.label,
+    variant: settled || completed
+      ? "success"
+      : refunded || cancelled || disputed || unresolved || revisionRequested || rejected || fundingFailed
+        ? "warning"
+        : fundingPending || fundingConfirmed || assigned || executing || submitted || underReview || approved || settlementReady
+          ? "info"
+          : "neutral",
+    lifecycleStepAlignment: settled
+      ? "payment"
+      : completed
+        ? "completed"
+        : refunded || cancelled
+          ? "completed"
+          : disputed || unresolved || revisionRequested || rejected || underReview
+            ? "review"
+            : settlementReady || approved
+              ? "approved"
+              : submitted
+                ? "submitted"
+                : executing
+                  ? "in_progress"
+                  : assigned
+                    ? "assigned"
+                    : fundingPending || fundingConfirmed
+                      ? "funding"
+                      : "posted",
+    actionableBy: settled || completed || refunded || cancelled
+      ? "none"
+      : executing || assigned
+        ? "agent"
+        : fundingConfirmed && !assigned
+          ? "system"
+          : "owner",
+    raw: {
+      status,
+      resultStatus,
+      transactionState,
+      settlementState,
+    },
+  };
+  const paymentDisplay = {
+    label: settled
+      ? "Released"
+      : refunded
+        ? "Refunded"
+        : disputed || unresolved
+          ? "Disputed"
+          : releasePending
+            ? "Release Pending"
+            : settlementReady
+              ? "Ready to Release"
+              : submitted || underReview || approved || revisionRequested || rejected
+                ? "Locked Until Approval"
+                : fundingConfirmed
+                  ? "Funded"
+                  : fundingPending
+                    ? "Funding Pending"
+                    : fundingFailed
+                      ? "Unknown"
+                      : task
+                        ? "Not Funded"
+                        : "Unknown",
+    description: settled
+      ? "Payment has been released to the agent after owner approval."
+      : refunded
+        ? "The task reward has been refunded instead of released."
+        : disputed || unresolved
+          ? "Payment is paused while the task is disputed or unresolved."
+          : releasePending
+            ? "Transaction submitted. Waiting for confirmation."
+            : settlementReady
+              ? "Work has been approved. Payment is ready to release."
+              : revisionRequested || rejected
+                ? "Payment is funded and locked while the requested changes are pending. Approval is still required before release."
+                : submitted || underReview
+                ? "Payment is funded but locked. The owner must review the submitted work before release."
+                : approved
+                  ? "Owner approval is recorded. Payment can move to release."
+                  : fundingConfirmed
+                    ? "Payment is funded but not released yet."
+                    : fundingPending
+                      ? "Funding transaction is being confirmed on Arc Testnet."
+                      : fundingFailed
+                        ? "Funding status is unclear after a failed wallet or chain update."
+                        : task
+                          ? "This task has not been funded yet."
+                          : "Payment state is not available yet.",
+    nextPaymentAction: settled
+      ? "No payment action needed."
+      : refunded
+        ? "No release action is available after refund."
+        : disputed || unresolved
+          ? "Resolve the dispute before payment can move."
+          : releasePending
+            ? "Wait for Arc Testnet confirmation."
+            : settlementReady
+              ? "Release payment."
+              : revisionRequested || rejected
+                ? "Wait for revised output before approval."
+                : submitted || underReview
+                ? "Review the submitted work."
+                : approved
+                  ? "Prepare payment release."
+                  : fundingConfirmed
+                    ? "Wait for output and owner approval."
+                    : fundingPending
+                      ? "Wait for funding confirmation."
+                      : "Fund the task with testnet USDC.",
+    variant: settled
+      ? "success"
+      : refunded || disputed || unresolved || fundingFailed
+        ? "warning"
+        : settlementReady || releasePending || fundingConfirmed || fundingPending || revisionRequested
+          ? "info"
+          : "neutral",
+    amountDisplay,
+    networkDisplay: "Arc Testnet",
+    fundingTxHash: task?.latestFundTxHash || null,
+    fundingTxLink,
+    settlementTxHash: task?.latestSettlement?.txReference || null,
+    settlementTxLink,
+    transactionLinks: [
+      fundingTxLink ? { label: "Funding transaction", href: fundingTxLink, hash: task.latestFundTxHash } : null,
+      settlementTxLink ? { label: "Release transaction", href: settlementTxLink, hash: task.latestSettlement.txReference } : null,
+    ].filter(Boolean),
+  };
+  const nextActor = statusDisplay.whoActsNext;
+  const nextActionHelper = settled
+    ? "The task is complete. Review the delivered work and payout trail."
+    : completed
+      ? "The task is complete. View the delivered work and final status."
+    : refunded
+      ? "The task is closed and the reward has been refunded."
+      : cancelled
+        ? "The task is closed and no normal marketplace action is available."
+        : disputed || unresolved
+          ? "Open the dispute or appeal view before payment can move."
+      : settlementReady
+        ? "Release USDC payment now that the output is approved."
+        : revisionRequested || rejected
+          ? "Waiting for revised output. Payment remains funded and locked until owner approval."
+          : submitted || underReview
+            ? "Review the submitted output. AI review is guidance; owner approval controls payout."
+            : executing
+              ? "The agent is working. Wait for the submitted output before reviewing."
+              : assigned
+                ? "An agent is assigned. Execution will produce a submitted output next."
+                : fundingConfirmed
+                  ? "The task is funded. Dispatch can route it to an agent for execution."
+                  : fundingPending
+                    ? "Wallet activity was captured. Wait for Arc Testnet confirmation."
+                    : "Fund the task with testnet USDC before assignment or execution can begin.";
   const reputationLabel = settled
     ? "Reputation updated"
     : refunded
@@ -169,14 +472,14 @@ export function buildTaskLifecycleModel(task, options = {}) {
   const steps = [
     {
       key: "posted",
-      label: "Task posted",
+      label: "Task Created",
       status: "complete",
       helper: "Dispatch recorded the task request and reward terms.",
       timestamp: task?.createdAt || timelineByKind.get("task_created") || null,
     },
     {
       key: "funding",
-      label: fundingLabel,
+      label: "Funded",
       status: fundingConfirmed ? "complete" : fundingFailed ? "failed" : fundingPending ? "current" : "pending",
       helper: fundingConfirmed
         ? "Funding is confirmed and the task can move through the marketplace."
@@ -189,7 +492,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
     },
     {
       key: "assigned",
-      label: assigned ? "Agent assigned" : "Awaiting assignment",
+      label: "Agent Assigned",
       status: assigned ? "complete" : fundingConfirmed ? "current" : "pending",
       helper: assigned
         ? assignmentLabel
@@ -197,24 +500,35 @@ export function buildTaskLifecycleModel(task, options = {}) {
       timestamp: timelineByKind.get("agent_accepted") || timelineByKind.get("agent_invited") || null,
     },
     {
+      key: "in_progress",
+      label: "In Progress",
+      status: submitted || approved || settled || refunded || revisionRequested || rejected || disputed || unresolved ? "complete" : executing ? "current" : assigned ? "pending" : "pending",
+      helper: executing
+        ? "The assigned worker is actively completing the task."
+        : submitted
+          ? "Execution finished and a result was submitted."
+          : assigned
+            ? "Execution starts after the agent begins work."
+            : "Waiting for an assigned agent before work can start.",
+      timestamp: timelineByKind.get("execution_started") || null,
+    },
+    {
       key: "submitted",
-      label: submitted ? "Output submitted" : executing ? "In progress" : "Execution pending",
-      status: submitted ? "complete" : executing ? "current" : "pending",
+      label: "Submitted",
+      status: submitted ? "complete" : executing ? "pending" : "pending",
       helper: submitted
         ? "A result is on the task and ready for owner review."
-        : executing
-          ? "The assigned worker is actively completing the task."
-          : "Execution starts after assignment.",
+        : "No submission yet.",
       timestamp: timelineByKind.get("submission_received") || null,
     },
     {
       key: "review",
-      label: approved ? "Approved" : rejected ? "Rejected" : disputed ? "Disputed" : unresolved ? "Review paused" : underReview ? "Owner review" : submitted ? "Awaiting owner review" : "Review pending",
-      status: approved ? "complete" : rejected || disputed || unresolved ? "warning" : underReview ? "current" : "pending",
+      label: "Review",
+      status: approved ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : underReview || submitted ? "current" : "pending",
       helper: approved
         ? "The task owner approved the output for settlement."
-        : rejected
-          ? "The submitted output did not meet the payout bar."
+        : revisionRequested || rejected
+          ? "The owner requested changes. Payment stays locked until approval."
           : disputed
             ? "A dispute paused payout."
             : unresolved
@@ -227,15 +541,26 @@ export function buildTaskLifecycleModel(task, options = {}) {
       timestamp: timelineByKind.get("review_started") || timelineByKind.get("result_verified") || null,
     },
     {
-      key: "settlement",
-      label: settled ? "Payment released" : refunded ? "Reward refunded" : settlementReady ? "Settlement ready" : refundReady || rejected ? "Refund available" : disputed ? "Settlement paused" : "Settlement pending",
-      status: settled || refunded ? "complete" : rejected || disputed || unresolved ? "warning" : settlementReady ? "current" : "pending",
+      key: "approved",
+      label: "Approved",
+      status: approved || settled ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : submitted || underReview ? "pending" : "pending",
+      helper: approved || settled
+        ? "Owner approval is recorded and payment can move."
+        : revisionRequested || rejected
+          ? "Approval is still required before payment can be released."
+          : "Owner approval happens after reviewing a submitted output.",
+      timestamp: timelineByKind.get("approved") || timelineByKind.get("result_verified") || null,
+    },
+    {
+      key: "payment",
+      label: "Payment Released",
+      status: settled || refunded ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : settlementReady ? "current" : "pending",
       helper: settlementMessage,
       timestamp: task?.latestSettlement?.settlementTimestamp || timelineByKind.get("settled") || timelineByKind.get("refund_completed") || null,
     },
     {
       key: "reputation",
-      label: reputationLabel,
+      label: "Completed",
       status: settled || refunded ? "complete" : "pending",
       helper: settled
         ? "Agent reputation can now reflect a paid, owner-approved funded outcome."
@@ -249,22 +574,205 @@ export function buildTaskLifecycleModel(task, options = {}) {
   return {
     steps,
     currentLabel,
+    statusDisplay,
     fundingLabel,
     evaluationLabel,
     settlementLabel,
     settlementMessage,
+    paymentStateLabel,
+    paymentDisplay,
+    reviewStateLabel,
+    primaryAction,
+    nextActor,
+    nextActionHelper,
     assignmentLabel,
     assignedAgent,
     isSettled: settled,
     isRefunded: refunded,
     isRejected: rejected,
+    isRevisionRequested: revisionRequested,
     isDisputed: disputed,
     isUnresolved: unresolved,
+    isCancelled: cancelled,
+  };
+}
+
+export function buildTaskPaymentDisplayModel(task, options = {}) {
+  return buildTaskLifecycleModel(task, options).paymentDisplay;
+}
+
+export function buildTaskStatusDisplayModel(task, options = {}) {
+  return buildTaskLifecycleModel(task, options).statusDisplay;
+}
+
+export function buildTaskRevisionDisplayModel(task, options = {}) {
+  const sourceItems = [
+    ...(Array.isArray(task?.revisionRequests) ? task.revisionRequests : []),
+    ...(Array.isArray(options.revisionRequests) ? options.revisionRequests : []),
+  ];
+  const normalizedItems = sourceItems
+    .filter(Boolean)
+    .map((item, index) => {
+      const changeRequest = String(item.changeRequest || item.note || item.reason || "").trim();
+      const missingDetails = String(item.missingDetails || item.missing || "").trim();
+      const extraInstruction = String(item.extraInstruction || item.instruction || "").trim();
+      return {
+        id: item.id || `revision_${index + 1}`,
+        changeRequest: changeRequest || "Revision details were not provided.",
+        missingDetails: missingDetails || "Not specified.",
+        extraInstruction: extraInstruction || "",
+        requestedAt: item.requestedAt || item.createdAt || null,
+        requestedBy: item.requestedBy || item.actorWallet || "Task owner",
+        resubmissionNote: item.resubmissionNote || null,
+      };
+    })
+    .sort((left, right) => new Date(right.requestedAt || 0).getTime() - new Date(left.requestedAt || 0).getTime());
+  const hasRevisionRequested = normalizedItems.length > 0
+    || String(task?.resultStatus || "").toLowerCase() === "needs_revision"
+    || task?.userReview?.decision === "needs_human_review";
+
+  return {
+    hasRevisionRequested,
+    items: normalizedItems,
+    latestRequest: normalizedItems[0] || null,
+    headline: hasRevisionRequested
+      ? "Revision requested"
+      : "No revision requested",
+    description: hasRevisionRequested
+      ? "Payment remains funded and locked until the owner approves revised work."
+      : "Revision history will appear here after changes are requested.",
+    emptyMessage: "No revision requested. Review actions appear after the agent submits work.",
+  };
+}
+
+export const taskBriefTemplates = [
+  {
+    id: "write_x_thread",
+    name: "Write X Thread",
+    category: "writing",
+    description: "Turn a topic, links, or notes into a polished X thread.",
+    expectedOutput: "A polished X thread based on the details above.",
+    fields: [
+      { key: "topic", label: "Topic", required: true },
+      { key: "audience", label: "Audience", required: true },
+      { key: "tone", label: "Tone", required: true },
+      { key: "keyPoints", label: "Key points", required: true, multiline: true },
+      { key: "referenceLinks", label: "Reference links", required: false, multiline: true },
+      { key: "tweetCount", label: "Number of tweets", required: true },
+      { key: "cta", label: "CTA", required: false },
+    ],
+  },
+  {
+    id: "summarize_article",
+    name: "Summarize Article",
+    category: "summarization",
+    description: "Summarize an article, link, transcript, or pasted text.",
+    expectedOutput: "A concise summary with the requested style, length, and key points.",
+    fields: [
+      { key: "article", label: "Article/link/text", required: true, multiline: true },
+      { key: "summaryStyle", label: "Summary style", required: true },
+      { key: "length", label: "Length", required: true },
+      { key: "mainPoints", label: "Main points to extract", required: false, multiline: true },
+      { key: "audience", label: "Audience", required: false },
+    ],
+  },
+  {
+    id: "debug_code",
+    name: "Debug Code",
+    category: "coding",
+    description: "Explain and debug a code issue with clear reproduction context.",
+    expectedOutput: "A clear diagnosis, likely cause, suggested fix, and next steps.",
+    fields: [
+      { key: "techStack", label: "Tech stack", required: true },
+      { key: "errorMessage", label: "Error message", required: true, multiline: true },
+      { key: "expectedBehavior", label: "Expected behavior", required: true, multiline: true },
+      { key: "actualBehavior", label: "Actual behavior", required: true, multiline: true },
+      { key: "codeSnippet", label: "Code snippet/link", required: false, multiline: true },
+      { key: "alreadyTried", label: "What you already tried", required: false, multiline: true },
+    ],
+  },
+  {
+    id: "research_project",
+    name: "Research Project",
+    category: "research",
+    description: "Research a project, market, or topic and return a structured brief.",
+    expectedOutput: "A structured research brief with comparisons, risks, and conclusion.",
+    fields: [
+      { key: "projectName", label: "Project name", required: true },
+      { key: "links", label: "Links", required: false, multiline: true },
+      { key: "researchGoal", label: "Research goal", required: true, multiline: true },
+      { key: "whatToCompare", label: "What to compare", required: false, multiline: true },
+      { key: "outputFormat", label: "Output format", required: true },
+      { key: "risksToCover", label: "Risks to cover", required: false, multiline: true },
+    ],
+  },
+  {
+    id: "rewrite_content",
+    name: "Rewrite Content",
+    category: "writing",
+    description: "Rewrite rough content for a clearer tone, audience, and length.",
+    expectedOutput: "A rewritten version that preserves meaning while improving clarity and tone.",
+    fields: [
+      { key: "originalText", label: "Original text", required: true, multiline: true },
+      { key: "targetTone", label: "Target tone", required: true },
+      { key: "audience", label: "Audience", required: false },
+      { key: "length", label: "Length", required: false },
+      { key: "whatToImprove", label: "What to improve", required: true, multiline: true },
+    ],
+  },
+  {
+    id: "custom_task",
+    name: "Custom Task",
+    category: "",
+    description: "Write your own task brief from scratch.",
+    expectedOutput: "",
+    fields: [],
+  },
+];
+
+export function getTaskBriefTemplate(templateId) {
+  return taskBriefTemplates.find((template) => template.id === templateId) || taskBriefTemplates.at(-1);
+}
+
+export function buildTaskTemplateBrief(templateId, values = {}) {
+  const template = getTaskBriefTemplate(templateId);
+  if (!template || template.id === "custom_task") {
+    return {
+      template,
+      brief: "",
+      missingFields: [],
+      isCustom: true,
+    };
+  }
+
+  const missingFields = template.fields
+    .filter((field) => field.required && !String(values[field.key] || "").trim())
+    .map((field) => field.label);
+
+  const lines = [
+    `Task Type: ${template.name}`,
+    "",
+    ...template.fields.flatMap((field) => [
+      `${field.label}:`,
+      String(values[field.key] || "").trim() || "Not provided yet",
+      "",
+    ]),
+    "Expected output:",
+    template.expectedOutput,
+  ];
+
+  return {
+    template,
+    brief: lines.join("\n").trim(),
+    missingFields,
+    isCustom: false,
   };
 }
 
 export function buildPostTaskChecklist(form, selectedAgent) {
   const isDirect = form.hiringMode === "direct_hire";
+  const templateResult = buildTaskTemplateBrief(form.templateId || "custom_task", form.templateFields || {});
+  const templateReady = templateResult.isCustom || templateResult.missingFields.length === 0;
   return {
     summary: isDirect
       ? (selectedAgent ? `${selectedAgent.profile.publicName} is preselected for this funded Arc task.` : "Select an agent before funding this direct hire.")
@@ -274,6 +782,11 @@ export function buildPostTaskChecklist(form, selectedAgent) {
         id: "scope",
         label: "Funded task scope is clear",
         complete: String(form.title || "").trim().length >= 3 && String(form.description || "").trim().length >= 20,
+      },
+      {
+        id: "template",
+        label: templateResult.isCustom ? "Custom brief ready" : "Template fields ready",
+        complete: templateReady,
       },
       {
         id: "selection",
@@ -300,6 +813,99 @@ export function buildAgentProfileHighlights(agent) {
     `${paidCompleted} paid funded jobs`,
     `${paidEarnings} USDC earned from settled work`,
   ];
+}
+
+export function buildSuggestedTaskTemplatesForAgent(agent) {
+  const haystack = [
+    agent?.profile?.publicName,
+    agent?.profile?.slug,
+    agent?.profile?.category,
+    ...(agent?.profile?.skills || []),
+    ...(agent?.profile?.capabilityTags || []),
+    ...(agent?.profile?.skillCategories || []),
+  ].join(" ").toLowerCase();
+
+  const ids = haystack.includes("thread")
+    ? ["write_x_thread", "rewrite_content"]
+    : haystack.includes("summar")
+      ? ["summarize_article", "rewrite_content"]
+      : haystack.includes("research")
+        ? ["research_project", "summarize_article"]
+        : haystack.includes("rewrit")
+          ? ["rewrite_content", "write_x_thread"]
+          : haystack.includes("repurpos") || haystack.includes("content")
+            ? ["write_x_thread", "rewrite_content"]
+            : haystack.includes("code") || haystack.includes("debug")
+              ? ["debug_code", "research_project"]
+              : ["custom_task"];
+
+  return ids
+    .map(getTaskBriefTemplate)
+    .filter(Boolean);
+}
+
+export function buildAgentDisplayModel(agent, taskCollections = {}) {
+  const profile = agent?.profile || {};
+  const summary = agent?.performanceSummary || {};
+  const paidCompleted = summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0;
+  const tasksAttempted = summary.tasksAttempted ?? summary.totalTasks ?? paidCompleted ?? 0;
+  const paidEarnings = summary.paidEarnings ?? summary.totalEarnings ?? 0;
+  const approvalRate = typeof summary.approvalRate === "number" && tasksAttempted > 0
+    ? `${Math.round(summary.approvalRate * 100)}%`
+    : "Not enough data yet";
+  const averageScore = typeof summary.averageScore === "number" && summary.averageScore > 0
+    ? String(Math.round(summary.averageScore))
+    : "Not enough data yet";
+  const deliveryTime = summary.averageResponseTimeMs || summary.averageLatencyMs
+    ? formatResponseMetric(agent)
+    : "Not enough data yet";
+  const typeLabel = profile.originType === "external" ? "External Agent" : "Platform Agent";
+  const connectionStatus = profile.originType === "external"
+    ? labelize(profile.connectionStatus || agent?.healthStatus || "unknown")
+    : "Dispatch managed";
+  const verificationLabel = profile.originType === "external"
+    ? (["active", "healthy", "online", "connected"].includes(String(profile.connectionStatus || agent?.healthStatus || "").toLowerCase())
+        ? "Connection active"
+        : "Not verified yet")
+    : "Platform managed";
+  const bestUseCases = (profile.skills?.length ? profile.skills : profile.capabilityTags || profile.skillCategories || [])
+    .slice(0, 5)
+    .map((item) => labelize(item));
+  const recentWork = buildRecentAgentWork(agent, taskCollections);
+  const suggestedTemplates = buildSuggestedTaskTemplatesForAgent(agent);
+  const description = profile.description || "Marketplace worker for structured funded AI tasks.";
+  const specialty = bestUseCases[0] || labelize(profile.category || "general work");
+
+  return {
+    name: profile.publicName || "Unnamed Agent",
+    slug: profile.slug || "",
+    categoryLabel: labelize(profile.category || "general"),
+    typeLabel,
+    description,
+    shortDescription: description.split(".")[0].slice(0, 110),
+    specialty,
+    bestUseCases,
+    badges: buildAgentIdentityBadges(agent),
+    connectionStatus,
+    verificationLabel,
+    statusLabel: labelize(summary.status || "new"),
+    completedTasksDisplay: String(paidCompleted || 0),
+    approvalRateDisplay: approvalRate,
+    totalEarnedDisplay: `${Number(paidEarnings || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`,
+    averageDeliveryDisplay: deliveryTime,
+    averageScoreDisplay: averageScore,
+    reviewsDisplay: (summary.totalReviews || summary.totalApprovals || 0) > 0
+      ? String(summary.totalReviews || summary.totalApprovals)
+      : "No reviews yet",
+    rankDisplay: summary.rankPosition ? `#${summary.rankPosition}` : "Not ranked yet",
+    pricingNote: profile.pricingHint || "Set per funded task reward",
+    payoutWalletDisplay: shortWallet(profile.payoutWallet || profile.ownerWallet),
+    recentWork,
+    suggestedTemplates,
+    trustNote: paidCompleted > 0
+      ? "Trust comes from funded task completions, owner-approved outcomes, settlement history, and reliability over time."
+      : "Not enough completed work yet. Reputation will build as this agent completes approved funded tasks.",
+  };
 }
 
 export function buildAgentIdentityBadges(agent) {
@@ -388,12 +994,15 @@ function readBigIntLike(value) {
 export function buildReviewPanelModel(task) {
   const hasEvaluation = Boolean(task?.latestEvaluation);
   const canReviewSubmittedResult = ["SUBMITTED", "UNDER_REVIEW"].includes(task?.status);
+  const revisionRequested = Boolean(task?.revisionRequests?.length)
+    || String(task?.resultStatus || "").toLowerCase() === "needs_revision"
+    || task?.userReview?.decision === "needs_human_review";
   const canDispute = ["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task?.status);
   const canAppeal = ["DISPUTED", "REJECTED", "UNRESOLVED"].includes(task?.status);
   const settlementReady = task?.status === "APPROVED" || (task?.reviewActions || []).includes("settle");
   const finalOutcome = task?.latestEvaluation?.finalOutcome || null;
   return {
-    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult ? ["approve", "reject"] : [],
+    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult && !revisionRequested ? ["approve", "request_revision"] : [],
     advancedActions: [
       ...(canReviewSubmittedResult ? ["assisted", "hybrid"] : []),
       ...(canDispute ? ["dispute"] : []),
@@ -405,8 +1014,10 @@ export function buildReviewPanelModel(task) {
         ? "A dispute paused payout and opened an escalation path."
         : finalOutcome === "unresolved" || task?.status === "UNRESOLVED"
           ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths."
-        : canReviewSubmittedResult
-          ? (hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or reject." : "Review the submitted output and decide whether USDC payout moves.")
+        : revisionRequested
+          ? "The owner requested changes. Payment stays funded and locked until revised work is approved."
+          : canReviewSubmittedResult
+            ? (hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether USDC payout moves.")
         : "Waiting for a submitted result before review and settlement actions become available.",
   };
 }

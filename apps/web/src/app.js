@@ -54,13 +54,26 @@ import {
   validateTaskDetailResponse,
   validateTaskListResponse,
 } from "./api-contracts.js";
-import { buildPostTaskChecklist, buildReviewPanelModel, buildTaskResultModel, shortWallet } from "./ui-models.js";
+import {
+  buildPostTaskChecklist,
+  buildReviewPanelModel,
+  buildTaskResultModel,
+  buildTaskRevisionDisplayModel,
+  buildTaskTemplateBrief,
+  getTaskBriefTemplate,
+  shortWallet,
+  taskBriefTemplates,
+} from "./ui-models.js";
 const state = createInitialState();
 const el = getAppElements();
 let ambientRefreshPending = false;
 let attachmentIngestionModulePromise = null;
 const pendingTaskAutoChecks = new Set();
 let activeTaskDetailRenderToken = 0;
+
+function persistRevisionRequests() {
+  localStorage.setItem("dispatchRevisionRequests", JSON.stringify(state.revisionRequests || {}));
+}
 
 function loadAttachmentIngestionModule() {
   if (!attachmentIngestionModulePromise) {
@@ -1001,6 +1014,9 @@ async function createTask() {
 
     state.taskForm.title = "";
     state.taskForm.description = "";
+    state.taskForm.templateId = "custom_task";
+    state.taskForm.templateFields = {};
+    state.taskForm.templateMessage = "";
     state.taskForm.structuredNotes = "";
     state.taskForm.attachments = [];
     state.taskForm.rewardAmount = "";
@@ -1120,6 +1136,8 @@ async function renderPostTaskPage() {
   const selectedAgentBestFor = selectedAgent ? bestFitLabels(selectedAgent) : [];
   const selectedAgentIdeas = selectedAgent ? starterIdeasForAgent(selectedAgent) : [];
   const taskChecklist = buildPostTaskChecklist(state.taskForm, selectedAgent);
+  const selectedTemplate = getTaskBriefTemplate(state.taskForm.templateId || "custom_task");
+  const templateResult = buildTaskTemplateBrief(selectedTemplate.id, state.taskForm.templateFields || {});
   const walletReady = Boolean(state.wallet.trim());
   if (walletReady) {
     await refreshWalletNetworkState();
@@ -1229,9 +1247,41 @@ async function renderPostTaskPage() {
                 <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
                 </div>
             </div>
+            <div class="simple-panel" style="margin-bottom:18px;">
+              <div class="section-head">
+                <div>
+                  <p class="mini-label">Template</p>
+                  <h3>Start with a task template</h3>
+                  <p class="muted">Choose a common task shape, fill the useful details, then generate an editable brief for the existing funded task flow.</p>
+                </div>
+                <span class="meta-pill">${escapeHtml(selectedTemplate.name)}</span>
+              </div>
+              <label class="field-stack field-wide">
+                <span class="muted">Task template</span>
+                <select id="taskTemplateId">
+                  ${taskBriefTemplates.map((template) => `<option value="${template.id}" ${selectedTemplate.id === template.id ? "selected" : ""}>${escapeHtml(template.name)}</option>`).join("")}
+                </select>
+              </label>
+              ${selectedTemplate.id === "custom_task" ? `
+                <p class="muted" style="margin-top:12px;">Custom Task keeps the original blank composer. Write directly in the title and description fields below.</p>
+              ` : `
+                <div class="form-grid field-stack" style="margin-top:14px;">
+                  ${selectedTemplate.fields.map((field) => {
+                    const value = state.taskForm.templateFields?.[field.key] || "";
+                    return field.multiline
+                      ? `<label class="field-wide"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><textarea data-template-field="${field.key}" rows="4" placeholder="${escapeHtml(field.label)}">${escapeHtml(value)}</textarea></label>`
+                      : `<label><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><input data-template-field="${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.label)}" /></label>`;
+                  }).join("")}
+                </div>
+                <div class="secondary-actions" style="margin-top:14px;">
+                  <button type="button" id="generateTaskBrief">Generate / Update Brief</button>
+                </div>
+                ${state.taskForm.templateMessage ? `<div class="status-banner ${templateResult.missingFields.length ? "warning" : "info"}" style="margin-top:12px;"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
+              `}
+            </div>
             <div class="form-grid field-stack">
               <label class="field-wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
-              <label class="field-wide"><strong>Description</strong><textarea id="taskDescription" rows="7" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
+              <label class="field-wide"><strong>Final editable brief</strong><textarea id="taskDescription" rows="9" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
               <label><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
               <label><strong>Reward (USDC)</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /></label>
               <label><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
@@ -1378,6 +1428,50 @@ async function renderPostTaskPage() {
       state.taskForm[key] = event.target.value;
       if (id === "selectedAgentId") renderPostTaskPage();
     });
+  });
+
+  document.getElementById("taskTemplateId")?.addEventListener("input", (event) => {
+    state.taskForm.templateId = event.target.value;
+    state.taskForm.templateFields = {};
+    state.taskForm.templateMessage = event.target.value === "custom_task"
+      ? "Custom Task selected. Write your own brief below."
+      : "Fill the template fields, then generate an editable task brief.";
+    const template = getTaskBriefTemplate(event.target.value);
+    if (template?.category) state.taskForm.category = template.category;
+    renderPostTaskPage();
+  });
+
+  document.querySelectorAll("[data-template-field]").forEach((node) => {
+    node.addEventListener("input", (event) => {
+      state.taskForm.templateFields = {
+        ...(state.taskForm.templateFields || {}),
+        [node.dataset.templateField]: event.target.value,
+      };
+      state.taskForm.templateMessage = "";
+    });
+  });
+
+  document.getElementById("generateTaskBrief")?.addEventListener("click", () => {
+    const result = buildTaskTemplateBrief(state.taskForm.templateId, state.taskForm.templateFields || {});
+    if (result.isCustom) {
+      state.taskForm.templateMessage = "Custom Task selected. Write your own brief below.";
+      renderPostTaskPage();
+      return;
+    }
+    if (result.missingFields.length) {
+      state.taskForm.templateMessage = `Add required template fields first: ${result.missingFields.join(", ")}.`;
+      renderPostTaskPage();
+      return;
+    }
+    state.taskForm.description = result.brief;
+    if (!state.taskForm.title.trim()) {
+      state.taskForm.title = result.template.name;
+    }
+    if (result.template.category) {
+      state.taskForm.category = result.template.category;
+    }
+    state.taskForm.templateMessage = "Brief generated. Review and edit it before funding the task.";
+    renderPostTaskPage();
   });
 
   document.querySelectorAll("[data-mode]").forEach((node) => {
@@ -1620,6 +1714,47 @@ async function runUserDecision(taskId, decision, trigger) {
   }
 }
 
+async function requestRevision(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Saving");
+    requireWallet();
+    const changeRequest = document.getElementById("revisionChangeRequest")?.value?.trim() || "";
+    const missingDetails = document.getElementById("revisionMissingDetails")?.value?.trim() || "";
+    const extraInstruction = document.getElementById("revisionExtraInstruction")?.value?.trim() || "";
+    if (!changeRequest && !missingDetails) {
+      updateStatus("Revision note needed", "Add what needs to change or what was missing before requesting a revision.", "warn");
+      return;
+    }
+
+    const existing = state.revisionRequests?.[taskId] || [];
+    const revisionRequest = {
+      id: `revision_${Date.now()}`,
+      taskId,
+      changeRequest,
+      missingDetails,
+      extraInstruction,
+      requestedAt: new Date().toISOString(),
+      requestedBy: state.wallet,
+    };
+    state.revisionRequests = {
+      ...(state.revisionRequests || {}),
+      [taskId]: [revisionRequest, ...existing],
+    };
+    persistRevisionRequests();
+
+    updateStatus(
+      "Revision requested",
+      "The request was saved locally. Payment remains funded and locked until the owner approves revised work.",
+      "success",
+    );
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus("Revision request failed", statusMessage(error, "Revision request failed"), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
+
 async function runImproveAgain(taskId, trigger) {
   try {
     setButtonLoading(trigger, true, "Improving");
@@ -1677,21 +1812,24 @@ async function renderTaskDetail(taskId) {
   }
 
   const task = state.task;
+  const localRevisionRequests = state.revisionRequests?.[task.taskId] || [];
+  const displayTask = { ...task, revisionRequests: localRevisionRequests };
   const shouldProbeOnchainTask = Boolean(task.onchainTaskRef)
     || ["pending_wallet", "pending_chain"].includes(task.transactionState)
     || Boolean(task.latestCreateTxHash)
     || Boolean(task.latestFundTxHash)
     || Boolean(task.latestAssignTxHash);
-  const reviewModel = buildReviewPanelModel(task);
+  const reviewModel = buildReviewPanelModel(displayTask);
   renderTaskDetailPageView({
     el,
-    task,
+    task: displayTask,
     history: state.history,
     onchainSnapshot: null,
     reviewModel,
-    resultModel: buildTaskResultModel(task, []),
+    resultModel: buildTaskResultModel(displayTask, []),
+    revisionModel: buildTaskRevisionDisplayModel(displayTask),
   });
-  bindTaskDetailActions(task);
+  bindTaskDetailActions(displayTask);
 
   const shouldAutoCheckFunding = ["pending_wallet", "pending_chain"].includes(task.transactionState)
     && (task.latestCreateTxHash || task.latestFundTxHash || task.latestAssignTxHash)
@@ -1715,13 +1853,14 @@ async function renderTaskDetail(taskId) {
     }
     renderTaskDetailPageView({
       el,
-      task,
+      task: displayTask,
       history: state.history,
       onchainSnapshot,
       reviewModel,
-      resultModel: buildTaskResultModel(task, taskRuns.items || []),
+      resultModel: buildTaskResultModel(displayTask, taskRuns.items || []),
+      revisionModel: buildTaskRevisionDisplayModel(displayTask),
     });
-    bindTaskDetailActions(task);
+    bindTaskDetailActions(displayTask);
   });
 }
 
@@ -1734,6 +1873,12 @@ function bindTaskDetailActions(task) {
   });
   document.querySelectorAll("[data-user-review]").forEach((node) => {
     node.addEventListener("click", () => runUserDecision(task.taskId, node.dataset.userReview, node));
+  });
+  document.querySelectorAll("[data-request-revision]").forEach((node) => {
+    node.addEventListener("click", () => requestRevision(node.dataset.requestRevision || task.taskId, node));
+  });
+  document.querySelectorAll("[data-request-revision-toggle]").forEach((node) => {
+    node.addEventListener("click", () => document.getElementById("revisionChangeRequest")?.focus());
   });
   document.querySelectorAll("[data-platform-improve]").forEach((node) => {
     node.addEventListener("click", () => runImproveAgain(task.taskId, node));

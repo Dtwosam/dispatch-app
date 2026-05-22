@@ -29,6 +29,18 @@ function readConfiguredApiBase() {
   return isLocalHost ? "http://localhost:4020" : hostedDefaultApiBase || origin;
 }
 
+function readJsonStorage(key, fallback) {
+  if (typeof localStorage === "undefined") return fallback;
+  try {
+    const value = localStorage.getItem(key);
+    if (!value) return fallback;
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export const API_BASE = readConfiguredApiBase();
 
 export const routes = [
@@ -115,6 +127,7 @@ export function createInitialState() {
     },
     task: null,
     history: { items: [] },
+    revisionRequests: readJsonStorage("dispatchRevisionRequests", {}),
     mobileNavOpen: false,
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
@@ -157,6 +170,9 @@ export function createInitialState() {
     taskForm: {
       title: "",
       description: "",
+      templateId: "custom_task",
+      templateFields: {},
+      templateMessage: "",
       category: "research",
       rewardAmount: "",
       deadline: "",

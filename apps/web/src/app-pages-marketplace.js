@@ -6,7 +6,6 @@ import {
   emptyState,
   escapeHtml,
   formatCurrency,
-  formatLatency,
   formatPercent,
   initials,
   labelize,
@@ -20,7 +19,7 @@ import {
   taskStatusTone,
   trustScore,
 } from "./app-ui.js";
-import { buildAgentIdentityBadges, buildRecentAgentWork, buildTaskLifecycleModel, shortWallet } from "./ui-models.js";
+import { buildAgentDisplayModel, buildTaskLifecycleModel, shortWallet } from "./ui-models.js";
 
 function topAgentBucket(state) {
   return (state.leaderboards?.buckets || []).find((item) => item.key === "top_earning_agents")
@@ -188,55 +187,45 @@ function renderPerformanceColumn(state) {
 }
 
 function renderAgentCard(agent) {
-  const approvalRate = Math.round((agent.performanceSummary.approvalRate || 0) * 100);
-  const averageScore = Math.round(agent.performanceSummary.averageScore || 0);
-  const latency = agent.performanceSummary.averageResponseTimeMs || agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
-  const completedJobs = agent.performanceSummary.paidTasksCompleted ?? agent.performanceSummary.tasksCompleted ?? 0;
-  const totalEarnings = agent.performanceSummary.paidEarnings ?? agent.performanceSummary.totalEarnings ?? 0;
-  const tagline = agent.profile.description.split(".")[0].slice(0, 92);
+  const display = buildAgentDisplayModel(agent);
   const tags = [...new Set([...(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags), speedLabel(agent)])].slice(0, 4);
-  const identityBadges = buildAgentIdentityBadges(agent);
   const statusTone = agentStatusTone(agent);
-  const statusLabel = agentStatusLabel(agent);
-  const rankPosition = agent.performanceSummary.rankPosition;
-  const agentType = agent.profile.originType === "external" ? "External Agent" : "Built-in Agent";
-  const connectionLabel = agent.profile.originType === "external" ? labelize(agent.profile.connectionStatus || agent.healthStatus || "unknown") : "Dispatch managed";
 
   return `
     <article class="agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
       <div class="agent-card__top">
         <div class="agent-card__identity">
-          <div class="avatar">${initials(agent.profile.publicName)}</div>
+          <div class="avatar">${initials(display.name)}</div>
           <div>
-            <strong>${escapeHtml(agent.profile.publicName)}</strong>
-            <p class="agent-card__tagline">${escapeHtml(tagline)}</p>
+            <strong>${escapeHtml(display.name)}</strong>
+            <p class="agent-card__tagline">${escapeHtml(display.shortDescription)}</p>
           </div>
         </div>
         <div class="agent-card__meta">
-          ${rankPosition ? `<span class="agent-rank">#${rankPosition}</span>` : ""}
-          <span class="status-chip ${statusTone}">${statusLabel}</span>
+          ${agent.performanceSummary.rankPosition ? `<span class="agent-rank">${escapeHtml(display.rankDisplay)}</span>` : ""}
+          <span class="status-chip ${statusTone}">${escapeHtml(display.statusLabel)}</span>
         </div>
       </div>
       <div class="agent-tags">
-          ${identityBadges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-          <span class="tag">Type: ${escapeHtml(agentType)}</span>
-          <span class="tag">Connection: ${escapeHtml(connectionLabel)}</span>
+          ${display.badges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
+          <span class="tag">${escapeHtml(display.typeLabel)}</span>
+          <span class="tag">${escapeHtml(display.verificationLabel)}</span>
       </div>
       <div class="agent-tags">
         ${tags.map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
       </div>
+      <p class="muted agent-card__trust">Best for: ${escapeHtml(display.specialty)}</p>
       <div class="agent-metrics">
-        <div><strong>${formatCurrency(totalEarnings)}</strong><span>Earned from settled USDC work</span></div>
-        <div><strong>${completedJobs}</strong><span>Paid funded tasks</span></div>
-        <div><strong class="metric-success">${formatPercent(approvalRate)}</strong><span>Approval rate</span></div>
-        <div><strong>${averageScore || "--"}</strong><span>Avg evaluation score</span></div>
-        <div><strong>${rankPosition ? `#${rankPosition}` : "--"}</strong><span>Marketplace rank</span></div>
-        <div><strong>${formatLatency(latency)}</strong><span>Avg response</span></div>
+        <div><strong>${escapeHtml(display.totalEarnedDisplay)}</strong><span>Earned from settled work</span></div>
+        <div><strong>${escapeHtml(display.completedTasksDisplay)}</strong><span>Paid funded tasks</span></div>
+        <div><strong class="metric-success">${escapeHtml(display.approvalRateDisplay)}</strong><span>Approval rate</span></div>
+        <div><strong>${escapeHtml(display.averageDeliveryDisplay)}</strong><span>Avg delivery</span></div>
       </div>
       ${agent.profile.originType === "external" ? `<p class="muted agent-card__trust">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || agent.profile.ownerWallet))}</p>` : ""}
-      <p class="muted agent-card__trust">Reputation comes from funded task completions, owner-approved outcomes, settlement history, and reliability over time.</p>
+      <p class="muted agent-card__trust">${escapeHtml(display.trustNote)}</p>
       <footer>
-        <button class="hero-primary" data-direct="${agent.profile.agentId}">Hire Agent</button>
+        <button data-route="/agents/${agent.profile.slug}">View Agent</button>
+        <button class="hero-primary" data-direct="${agent.profile.agentId}">Create Task</button>
       </footer>
     </article>
   `;
@@ -301,27 +290,35 @@ function renderFeed(state) {
   `;
 }
 
-function renderTaskRow(task, agentRegistry = new Map()) {
-  const lifecycle = buildTaskLifecycleModel(task);
-  const selectedAgentId = task.selectedAgentId || task.participatingAgentIds?.[0] || null;
+function renderTaskRow(task, agentRegistry = new Map(), revisionRequestsByTask = {}) {
+  const displayTask = {
+    ...task,
+    revisionRequests: revisionRequestsByTask[task.taskId] || task.revisionRequests || [],
+  };
+  const lifecycle = buildTaskLifecycleModel(displayTask);
+  const payment = lifecycle.paymentDisplay;
+  const taskStatus = lifecycle.statusDisplay;
+  const selectedAgentId = displayTask.selectedAgentId || displayTask.participatingAgentIds?.[0] || null;
   const selectedAgent = selectedAgentId ? agentRegistry.get(selectedAgentId) : null;
   const assignmentLabel = selectedAgent
     ? `${selectedAgent.profile.publicName} (${selectedAgent.profile.originType === "external" ? "External" : "Platform"})`
     : lifecycle.assignmentLabel;
   return `
-    <article class="task-row task-row--${taskStatusTone(task.status)}">
-      <strong>${escapeHtml(task.title)}</strong>
-      <p>${formatCurrency(task.rewardAmount)} reward</p>
+    <article class="task-row task-row--${taskStatusTone(displayTask.status)}">
+      <strong>${escapeHtml(displayTask.title || "Untitled funded task")}</strong>
+      <p>${escapeHtml(payment.amountDisplay)} reward</p>
       <div class="agent-tags" style="margin-top:10px;">
-        <span class="tag">${escapeHtml(lifecycle.currentLabel)}</span>
+        <span class="tag">${escapeHtml(taskStatus.label)}</span>
         <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
-        <span class="tag">${escapeHtml(lifecycle.evaluationLabel)}</span>
-        <span class="tag">${escapeHtml(lifecycle.settlementLabel)}</span>
+        <span class="tag">${escapeHtml(payment.label)}</span>
       </div>
       <p style="margin-top:10px;">${escapeHtml(assignmentLabel)}</p>
-      <p class="muted" style="margin-top:8px;">${escapeHtml(lifecycle.settlementMessage)}</p>
+      <p class="muted" style="margin-top:8px;">Status: ${escapeHtml(taskStatus.description)}</p>
+      <p class="muted" style="margin-top:8px;">Payment: ${escapeHtml(payment.description)}</p>
+      <p class="muted" style="margin-top:8px;">Next: ${escapeHtml(taskStatus.nextActionText)} | ${escapeHtml(taskStatus.whoActsNext)}</p>
+      ${payment.fundingTxLink ? `<p class="muted" style="margin-top:8px;"><a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a></p>` : ""}
       <footer>
-        <button data-route="/tasks/${task.taskId}">Open Task</button>
+        <button data-route="/tasks/${displayTask.taskId}">${escapeHtml(taskStatus.primaryCtaText)}</button>
       </footer>
     </article>
   `;
@@ -395,7 +392,7 @@ export function renderHomePage({ el, state, onNavigate }) {
             title: "Your funded tasks waiting on wallet or Arc confirmation",
             tasks: pendingTasks,
             emptyMessage: "No pending funded tasks.",
-            renderTask: (task) => renderTaskRow(task, agentRegistry),
+            renderTask: (task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {}),
           })}
         </section>
       ` : ""}
@@ -444,21 +441,21 @@ export function renderHomePage({ el, state, onNavigate }) {
           title: "Open funded work agents can pick up",
           tasks: availableTasks,
           emptyMessage: "No open funded tasks yet.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry),
+          renderTask: (task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {}),
         })}
         ${renderTaskRail({
           eyebrow: "Funded Tasks",
           title: "USDC-backed work already in motion",
           tasks: fundedTasks,
           emptyMessage: "No funded work in motion yet.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry),
+          renderTask: (task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {}),
         })}
         ${renderTaskRail({
           eyebrow: "Completed Tasks",
           title: "Recently approved marketplace outcomes",
           tasks: recentCompletedTasks,
           emptyMessage: "No approved outcomes yet. Completed funded tasks will appear here after owner approval and settlement.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry),
+          renderTask: (task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {}),
         })}
       </section>
     </section>
@@ -577,29 +574,22 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
     el.appRoot.innerHTML = `<section class="shell-section"><strong>Agent not found</strong><p class="muted">No matching public profile was found.</p></section>`;
     return;
   }
-  const bestFor = (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags)
-    .slice(0, 4)
-    .map((item) => labelize(item));
-
-  const recentWork = buildRecentAgentWork(agent, {
+  const display = buildAgentDisplayModel(agent, {
     completedTasks: state.tasks?.completedTasks || [],
     rejectedTasks: state.tasks?.rejectedTasks || [],
     disputedTasks: state.tasks?.disputedTasks || [],
   });
-  const paidTasksCompleted = agent.performanceSummary.paidTasksCompleted ?? agent.performanceSummary.tasksCompleted ?? 0;
-  const paidEarnings = agent.performanceSummary.paidEarnings ?? agent.performanceSummary.totalEarnings ?? 0;
+  const bestFor = display.bestUseCases;
+  const recentWork = display.recentWork;
   const pendingEarnings = agent.performanceSummary.pendingEarnings ?? 0;
-  const averageScore = Math.round(agent.performanceSummary.averageScore || 0);
-  const agentType = agent.profile.originType === "external" ? "External Agent" : "Built-in Agent";
   const payoutWallet = agent.profile.ownerWallet || null;
-  const connectionLabel = agent.profile.originType === "external" ? labelize(agent.profile.connectionStatus || agent.healthStatus || "unknown") : "Dispatch managed";
 
   el.appRoot.innerHTML = `
     <section data-structure="agent-profile">
       <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Agent</p>
-        <h1>${escapeHtml(agent.profile.publicName)}</h1>
-        <p class="muted">${escapeHtml(agent.profile.description)}</p>
+        <p class="mini-label">${escapeHtml(display.typeLabel)}</p>
+        <h1>${escapeHtml(display.name)}</h1>
+        <p class="muted">${escapeHtml(display.description)}</p>
       </header>
       <section class="profile-grid reveal-on-scroll">
         <article class="shell-section task-main">
@@ -610,25 +600,27 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
             </div>
           </div>
           <div class="agent-tags">
-            ${buildAgentIdentityBadges(agent).map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-            <span class="tag">Type: ${escapeHtml(agentType)}</span>
+            ${display.badges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
+            <span class="tag">Type: ${escapeHtml(display.typeLabel)}</span>
             ${agent.profile.originType === "external" ? '<span class="tag">Adapter compatible</span>' : ""}
-            <span class="tag">Connection: ${escapeHtml(connectionLabel)}</span>
+            <span class="tag">Connection: ${escapeHtml(display.connectionStatus)}</span>
+            <span class="tag">${escapeHtml(display.verificationLabel)}</span>
             <span class="status-chip ${agentStatusTone(agent)}">${agentStatusLabel(agent)}</span>
           </div>
           <div class="task-summary">
-            <div class="metric-card"><strong>${formatCurrency(paidEarnings)}</strong><span>Paid earnings</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.totalEarnedDisplay)}</strong><span>Paid earnings</span></div>
             <div class="metric-card"><strong>${formatCurrency(pendingEarnings)}</strong><span>Pending approved reward</span></div>
-            <div class="metric-card"><strong>${paidTasksCompleted}</strong><span>Paid funded tasks</span></div>
-            <div class="metric-card"><strong>${formatPercent(Math.round((agent.performanceSummary.approvalRate || 0) * 100))}</strong><span>Approval rate</span></div>
-            <div class="metric-card"><strong>${averageScore || "--"}</strong><span>Avg evaluation score</span></div>
-            <div class="metric-card"><strong>${formatLatency(agent.performanceSummary.averageResponseTimeMs || agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs)}</strong><span>Avg response</span></div>
-            <div class="metric-card"><strong>${agent.performanceSummary.rankPosition ? `#${agent.performanceSummary.rankPosition}` : "--"}</strong><span>Marketplace rank</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.completedTasksDisplay)}</strong><span>Paid funded tasks</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.approvalRateDisplay)}</strong><span>Approval rate</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.averageScoreDisplay)}</strong><span>Avg evaluation score</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.averageDeliveryDisplay)}</strong><span>Avg delivery</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.rankDisplay)}</strong><span>Marketplace rank</span></div>
+            <div class="metric-card"><strong>${escapeHtml(display.reviewsDisplay)}</strong><span>Reviews</span></div>
             <div class="metric-card"><strong>${agent.performanceSummary.disputeCount || 0}</strong><span>Disputes</span></div>
           </div>
-          <p class="muted">Reputation is calculated from funded task completions, owner-approved outcomes, settlement receipts, review quality, and reliability over time on Arc Testnet.</p>
+          <p class="muted">${escapeHtml(display.trustNote)}</p>
           <div class="agent-tags">
-            ${(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 6).map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
+            ${bestFor.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || '<span class="muted">General-purpose marketplace work.</span>'}
           </div>
         </article>
         <aside class="task-side">
@@ -639,20 +631,24 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
             <div class="agent-tags">
               ${bestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("") || '<span class="muted">General-purpose marketplace work.</span>'}
             </div>
+            <p class="muted" style="margin-top:12px;">Pricing note: ${escapeHtml(display.pricingNote)}</p>
             <p class="muted" style="margin-top:12px;">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || payoutWallet))}</p>
             ${agent.profile.developerName ? `<p class="muted">Developer: ${escapeHtml(agent.profile.developerName)}</p>` : ""}
             ${agent.profile.endpointUrl ? `<p class="muted">Endpoint: ${escapeHtml(agent.profile.endpointUrl)}</p>` : ""}
             ${agent.profile.outputSchema ? `<p class="muted">Output schema: ${escapeHtml(typeof agent.profile.outputSchema === "string" ? agent.profile.outputSchema : "Structured object schema")}</p>` : ""}
+            <div class="agent-tags" style="margin-top:12px;">
+              ${display.suggestedTemplates.map((template) => `<span class="tag">${escapeHtml(template.name)}</span>`).join("")}
+            </div>
           </article>
           <article class="shell-panel">
             <p class="mini-label">Hire flow</p>
-            <h3>${agent.profile.originType === "platform" ? "Start with the platform default worker" : "Start funded work with this agent"}</h3>
+            <h3>Create task with this agent</h3>
             <textarea id="quickTaskIdea" rows="5" placeholder="Describe the outcome you want from this agent."></textarea>
             ${agent.profile.originType === "platform"
               ? '<p class="muted">This worker ships with Dispatch as the launch benchmark. It earns reputation through the same funded-task, review, and settlement loop as future external agents.</p>'
               : '<p class="muted">External workers can integrate through Dispatch adapters, receive funded job envelopes, submit outputs, and earn after owner approval.</p>'}
             <footer>
-              <button class="hero-primary" id="hireAgentButton">Hire Agent</button>
+              <button class="hero-primary" id="hireAgentButton">Create task with this agent</button>
             </footer>
           </article>
         </aside>
@@ -687,6 +683,15 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
     const quickTaskIdea = document.getElementById("quickTaskIdea")?.value?.trim();
     state.taskForm.hiringMode = "direct_hire";
     state.taskForm.selectedAgentId = agent.profile.agentId;
+    const suggestedTemplate = display.suggestedTemplates.find((template) => template.id !== "custom_task") || display.suggestedTemplates[0];
+    if (suggestedTemplate) {
+      state.taskForm.templateId = suggestedTemplate.id;
+      state.taskForm.templateFields = {};
+      state.taskForm.templateMessage = `${suggestedTemplate.name} is suggested for ${agent.profile.publicName}. Fill the template fields or switch to Custom Task.`;
+      if (suggestedTemplate.category) {
+        state.taskForm.category = suggestedTemplate.category;
+      }
+    }
     if (quickTaskIdea) {
       state.taskForm.description = quickTaskIdea;
       if (!state.taskForm.title.trim()) {
@@ -737,7 +742,7 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
             ? myAgents.map((agent) => renderAgentCard(agent)).join("")
             : state.dashboardTab === "earnings"
               ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned from approved funded work</p></article>`).join("")
-              : myTasks.map((task) => renderTaskRow(task, agentRegistry)).join("") || emptyState("No funded work here yet.")}
+              : myTasks.map((task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {})).join("") || emptyState("No funded work here yet.")}
         </div>
       </section>
     </section>

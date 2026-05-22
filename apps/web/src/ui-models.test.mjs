@@ -1,6 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildAgentIdentityBadges, buildRecentAgentWork, buildTaskLifecycleModel, buildTaskResultModel } from "./ui-models.js";
+import {
+  buildAgentIdentityBadges,
+  buildAgentDisplayModel,
+  buildArcTransactionLink,
+  buildRecentAgentWork,
+  buildReviewPanelModel,
+  buildSuggestedTaskTemplatesForAgent,
+  buildTaskLifecycleModel,
+  buildTaskPaymentDisplayModel,
+  buildTaskRevisionDisplayModel,
+  buildTaskResultModel,
+  buildTaskStatusDisplayModel,
+  buildTaskTemplateBrief,
+  getTaskBriefTemplate,
+  taskBriefTemplates,
+} from "./ui-models.js";
 
 test("platform agents expose the Platform Agent badge for marketplace rendering", () => {
   const badges = buildAgentIdentityBadges({
@@ -65,6 +80,96 @@ test("top and new badges are added from marketplace reputation state", () => {
   assert.ok(newBadges.includes("New"));
 });
 
+test("agent display model exposes real metrics when available", () => {
+  const model = buildAgentDisplayModel({
+    profile: {
+      agentId: "agent_thread",
+      publicName: "Thread Writer",
+      slug: "thread-writer",
+      category: "writing",
+      description: "Turns rough ideas into sharp X threads.",
+      originType: "platform",
+      skills: ["thread writing", "launch copy"],
+      capabilityTags: [],
+      expectedLatencyMsRange: { maxMs: 9000 },
+    },
+    performanceSummary: {
+      paidTasksCompleted: 7,
+      tasksAttempted: 9,
+      paidEarnings: 42,
+      approvalRate: 0.88,
+      averageScore: 84,
+      averageResponseTimeMs: 12000,
+      rankPosition: 2,
+      status: "active",
+      totalReviews: 3,
+    },
+  });
+
+  assert.equal(model.name, "Thread Writer");
+  assert.equal(model.typeLabel, "Platform Agent");
+  assert.equal(model.completedTasksDisplay, "7");
+  assert.equal(model.approvalRateDisplay, "88%");
+  assert.equal(model.totalEarnedDisplay, "42 USDC");
+  assert.equal(model.averageScoreDisplay, "84");
+  assert.equal(model.reviewsDisplay, "3");
+  assert.ok(model.badges.includes("Platform Agent"));
+  assert.deepEqual(model.suggestedTemplates.map((template) => template.id), ["write_x_thread", "rewrite_content"]);
+});
+
+test("agent display model uses honest fallbacks when metrics are missing", () => {
+  const model = buildAgentDisplayModel({
+    profile: {
+      agentId: "agent_external",
+      publicName: "New External Worker",
+      slug: "new-external-worker",
+      category: "research",
+      description: "",
+      originType: "external",
+      skills: [],
+      capabilityTags: [],
+      connectionStatus: "pending",
+      expectedLatencyMsRange: { maxMs: 0 },
+    },
+    performanceSummary: {
+      status: "new",
+    },
+  });
+
+  assert.equal(model.typeLabel, "External Agent");
+  assert.equal(model.completedTasksDisplay, "0");
+  assert.equal(model.approvalRateDisplay, "Not enough data yet");
+  assert.equal(model.averageDeliveryDisplay, "Not enough data yet");
+  assert.equal(model.totalEarnedDisplay, "0 USDC");
+  assert.equal(model.reviewsDisplay, "No reviews yet");
+  assert.equal(model.verificationLabel, "Not verified yet");
+  assert.match(model.trustNote, /Not enough completed work yet/);
+});
+
+test("suggested template mapping follows agent specialty without inventing agents", () => {
+  const summarizer = buildSuggestedTaskTemplatesForAgent({
+    profile: {
+      publicName: "Summarizer",
+      slug: "summarizer",
+      category: "summarization",
+      skills: ["summarization"],
+      capabilityTags: [],
+    },
+  });
+  const research = buildSuggestedTaskTemplatesForAgent({
+    profile: {
+      publicName: "Research Brief",
+      slug: "research-brief",
+      category: "research",
+      skills: ["research"],
+      capabilityTags: [],
+    },
+  });
+
+  assert.deepEqual(summarizer.map((template) => template.id), ["summarize_article", "rewrite_content"]);
+  assert.deepEqual(research.map((template) => template.id), ["research_project", "summarize_article"]);
+});
+
 test("recent work uses task summaries and safe titles instead of full private content", () => {
   const items = buildRecentAgentWork(
     {
@@ -125,6 +230,9 @@ test("task lifecycle marks approved funded work as settlement ready before payou
   assert.equal(model.evaluationLabel, "Approved");
   assert.equal(model.settlementLabel, "Ready for settlement");
   assert.equal(model.settlementMessage, "Approved. USDC release is ready.");
+  assert.equal(model.paymentStateLabel, "Payment ready");
+  assert.equal(model.primaryAction.label, "Release Payment");
+  assert.equal(model.nextActor, "Task owner");
 });
 
 test("task lifecycle marks refunded work as closed with reward refunded", () => {
@@ -156,7 +264,423 @@ test("task lifecycle marks refunded work as closed with reward refunded", () => 
 
   assert.equal(model.settlementLabel, "Reward refunded");
   assert.equal(model.settlementMessage, "Reward refunded.");
-  assert.equal(model.steps.at(-1).label, "Refund closed");
+  assert.equal(model.paymentStateLabel, "Reward refunded");
+  assert.equal(model.primaryAction.label, "View Task");
+  assert.equal(model.steps.at(-1).label, "Completed");
+});
+
+test("task status display maps raw lifecycle states into user-facing labels", () => {
+  const cases = [
+    [
+      "draft",
+      { taskId: "draft", status: "DRAFT", transactionState: "", settlementState: "", reviewActions: [], timeline: [] },
+      { label: "Draft", cta: "Fund Task", actor: "Task owner", step: "posted" },
+    ],
+    [
+      "waiting funding",
+      { taskId: "funding", status: "DRAFT", transactionState: "pending_chain", reviewActions: [], timeline: [] },
+      { label: "Waiting for Funding", cta: "Waiting for Funding", actor: "Task owner", step: "funding" },
+    ],
+    [
+      "funded",
+      { taskId: "funded", status: "OPEN", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:funded", reviewActions: [], timeline: [] },
+      { label: "Funded", cta: "Assign Agent", actor: "Marketplace", step: "funding" },
+    ],
+    [
+      "assigned",
+      { taskId: "assigned", status: "ASSIGNED", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:assigned", selectedAgents: [{ displayName: "Thread Writer", originType: "platform" }], reviewActions: [], timeline: [] },
+      { label: "Agent Assigned", cta: "Waiting for Agent", actor: "Assigned agent", step: "assigned" },
+    ],
+    [
+      "in progress",
+      { taskId: "running", status: "EXECUTING", resultStatus: "in_progress", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:running", selectedAgents: [{ displayName: "Thread Writer", originType: "platform" }], reviewActions: [], timeline: [] },
+      { label: "In Progress", cta: "Waiting for Agent", actor: "Assigned agent", step: "in_progress" },
+    ],
+    [
+      "submitted",
+      { taskId: "submitted", status: "SUBMITTED", resultStatus: "submitted", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:submitted", reviewActions: ["approve", "reject"], timeline: [] },
+      { label: "Submitted", cta: "Review Submission", actor: "Task owner", step: "submitted" },
+    ],
+    [
+      "in review",
+      { taskId: "review", status: "UNDER_REVIEW", resultStatus: "submitted", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:review", latestEvaluation: { overallScore: 80 }, reviewActions: ["approve", "reject"], timeline: [] },
+      { label: "In Review", cta: "Review Submission", actor: "Task owner", step: "review" },
+    ],
+    [
+      "approved",
+      { taskId: "approved", status: "APPROVED", resultStatus: "approved", transactionState: "accepted", settlementState: "pending_settlement", onchainTaskRef: "0xescrow:approved", reviewActions: ["settle"], timeline: [] },
+      { label: "Approved", cta: "Release Payment", actor: "Task owner", step: "approved" },
+    ],
+    [
+      "released",
+      { taskId: "paid", status: "SETTLED", resultStatus: "settled", transactionState: "accepted", settlementState: "settled", onchainTaskRef: "0xescrow:paid", latestSettlement: { outcome: "paid", txReference: null }, reviewActions: [], timeline: [] },
+      { label: "Payment Released", cta: "View Completed Work", actor: "No action needed", step: "payment" },
+    ],
+    [
+      "disputed",
+      { taskId: "dispute", status: "DISPUTED", transactionState: "accepted", settlementState: "disputed", onchainTaskRef: "0xescrow:dispute", reviewActions: ["appeal"], timeline: [] },
+      { label: "Disputed", cta: "View Dispute", actor: "Task owner", step: "review" },
+    ],
+    [
+      "cancelled",
+      { taskId: "cancelled", status: "CANCELLED", transactionState: "accepted", settlementState: "cancelled", reviewActions: [], timeline: [] },
+      { label: "Cancelled", cta: "View Task", actor: "No action needed", step: "completed" },
+    ],
+    [
+      "unknown",
+      { taskId: "unknown", status: "", transactionState: "", settlementState: "", reviewActions: [], timeline: [] },
+      { label: "Unknown", cta: "Fund Task", actor: "Task owner", step: "posted" },
+    ],
+  ];
+
+  for (const [name, task, expected] of cases) {
+    const model = buildTaskStatusDisplayModel(task);
+    assert.equal(model.label, expected.label, name);
+    assert.equal(model.primaryCtaText, expected.cta, name);
+    assert.equal(model.whoActsNext, expected.actor, name);
+    assert.equal(model.lifecycleStepAlignment, expected.step, name);
+  }
+});
+
+test("task status display prefers terminal payment evidence over incomplete raw status", () => {
+  const model = buildTaskStatusDisplayModel({
+    taskId: "conflict",
+    status: "SUBMITTED",
+    resultStatus: "submitted",
+    transactionState: "accepted",
+    settlementState: "reward_funded",
+    onchainTaskRef: "0xescrow:conflict",
+    latestSettlement: {
+      outcome: "paid",
+      txReference: `0x${"c".repeat(64)}`,
+      settlementTimestamp: "2026-04-03T10:00:00.000Z",
+    },
+    reviewActions: ["approve", "reject"],
+    timeline: [],
+  });
+
+  assert.equal(model.label, "Payment Released");
+  assert.equal(model.primaryCtaText, "View Completed Work");
+  assert.equal(model.actionableBy, "none");
+});
+
+test("task brief template list includes the supported first-pass templates", () => {
+  assert.deepEqual(
+    taskBriefTemplates.map((template) => template.id),
+    [
+      "write_x_thread",
+      "summarize_article",
+      "debug_code",
+      "research_project",
+      "rewrite_content",
+      "custom_task",
+    ],
+  );
+  assert.equal(getTaskBriefTemplate("missing").id, "custom_task");
+});
+
+test("task brief generation is deterministic for each structured template", () => {
+  const examples = {
+    write_x_thread: {
+      topic: "Arc stablecoin payments",
+      audience: "crypto founders",
+      tone: "clear and energetic",
+      keyPoints: "Fast settlement\nUSDC-native gas\nAgent marketplace",
+      referenceLinks: "https://example.com",
+      tweetCount: "8",
+      cta: "Try Dispatch",
+    },
+    summarize_article: {
+      article: "https://example.com/article",
+      summaryStyle: "executive",
+      length: "short",
+      mainPoints: "market, risk, adoption",
+      audience: "operators",
+    },
+    debug_code: {
+      techStack: "Node + Vite",
+      errorMessage: "Cannot resolve module",
+      expectedBehavior: "Build should pass",
+      actualBehavior: "Build fails",
+      codeSnippet: "import x from 'y'",
+      alreadyTried: "Reinstalled packages",
+    },
+    research_project: {
+      projectName: "Dispatch",
+      links: "https://dispatch.example",
+      researchGoal: "Assess agent marketplace positioning",
+      whatToCompare: "competitors",
+      outputFormat: "brief",
+      risksToCover: "payment, adoption",
+    },
+    rewrite_content: {
+      originalText: "rough words",
+      targetTone: "premium",
+      audience: "web3 users",
+      length: "short",
+      whatToImprove: "clarity and flow",
+    },
+  };
+
+  for (const template of taskBriefTemplates.filter((item) => item.id !== "custom_task")) {
+    const result = buildTaskTemplateBrief(template.id, examples[template.id]);
+    assert.equal(result.missingFields.length, 0, template.id);
+    assert.match(result.brief, new RegExp(`Task Type: ${template.name}`));
+    assert.match(result.brief, /Expected output:/);
+    assert.equal(result.brief, buildTaskTemplateBrief(template.id, examples[template.id]).brief);
+  }
+});
+
+test("custom task template preserves blank composer behavior", () => {
+  const result = buildTaskTemplateBrief("custom_task", { topic: "Ignored" });
+  assert.equal(result.isCustom, true);
+  assert.equal(result.brief, "");
+  assert.equal(result.missingFields.length, 0);
+});
+
+test("task brief generation reports missing required fields with safe fallbacks", () => {
+  const result = buildTaskTemplateBrief("write_x_thread", {
+    topic: "Arc payments",
+    audience: "",
+    tone: "direct",
+    keyPoints: "",
+    tweetCount: "6",
+  });
+
+  assert.deepEqual(result.missingFields, ["Audience", "Key points"]);
+  assert.match(result.brief, /Audience:\nNot provided yet/);
+  assert.match(result.brief, /Key points:\nNot provided yet/);
+});
+
+test("task lifecycle exposes clear owner review action for submitted work", () => {
+  const model = buildTaskLifecycleModel({
+    taskId: "task_submitted",
+    status: "SUBMITTED",
+    resultStatus: "submitted",
+    transactionState: "accepted",
+    settlementState: "reward_funded",
+    onchainTaskRef: "0xescrow:task_submitted",
+    rewardAmount: 10,
+    createdAt: "2026-04-01T10:00:00.000Z",
+    updatedAt: "2026-04-03T10:00:00.000Z",
+    selectedAgents: [{ agentId: "agent_thread", displayName: "Thread Writer", originType: "platform" }],
+    participatingAgentIds: ["agent_thread"],
+    reviewActions: ["approve", "reject"],
+    timeline: [],
+  });
+
+  assert.equal(model.reviewStateLabel, "Needs owner review");
+  assert.equal(model.paymentStateLabel, "USDC funded");
+  assert.equal(model.primaryAction.label, "Review Submission");
+  assert.equal(model.nextActor, "Task owner");
+});
+
+test("review panel offers approve and request revision for submitted work", () => {
+  const model = buildReviewPanelModel({
+    taskId: "task_review_actions",
+    status: "SUBMITTED",
+    resultStatus: "submitted",
+    reviewActions: ["approve", "reject"],
+    latestEvaluation: {
+      overallScore: 72,
+    },
+  });
+
+  assert.deepEqual(model.primaryActions, ["approve", "request_revision"]);
+  assert.ok(!model.primaryActions.includes("reject"));
+  assert.match(model.headline, /approve or request changes/);
+});
+
+test("revision requested keeps payment locked and shifts action back to the agent", () => {
+  const revision = {
+    id: "revision_1",
+    changeRequest: "Tighten the CTA and make the hook less generic.",
+    missingDetails: "Suggested visuals were missing.",
+    extraInstruction: "Keep the thread crypto-native.",
+    requestedAt: "2026-04-03T10:00:00.000Z",
+    requestedBy: "0xowner",
+  };
+  const task = {
+    taskId: "task_revision",
+    status: "SUBMITTED",
+    resultStatus: "submitted",
+    transactionState: "accepted",
+    settlementState: "reward_funded",
+    onchainTaskRef: "0xescrow:task_revision",
+    rewardAmount: 10,
+    revisionRequests: [revision],
+    selectedAgents: [{ agentId: "agent_thread", displayName: "Thread Writer", originType: "platform" }],
+    participatingAgentIds: ["agent_thread"],
+    reviewActions: ["approve", "reject"],
+    timeline: [],
+  };
+  const lifecycle = buildTaskLifecycleModel(task);
+  const payment = buildTaskPaymentDisplayModel(task);
+  const revisionModel = buildTaskRevisionDisplayModel(task);
+  const reviewModel = buildReviewPanelModel(task);
+
+  assert.equal(lifecycle.statusDisplay.label, "Revision Requested");
+  assert.equal(lifecycle.reviewStateLabel, "Revision requested");
+  assert.equal(lifecycle.primaryAction.label, "Waiting for Revision");
+  assert.equal(lifecycle.nextActor, "Assigned agent");
+  assert.equal(payment.label, "Locked Until Approval");
+  assert.match(payment.description, /Approval is still required/);
+  assert.equal(payment.settlementTxLink, null);
+  assert.equal(revisionModel.hasRevisionRequested, true);
+  assert.equal(revisionModel.items[0].changeRequest, revision.changeRequest);
+  assert.deepEqual(reviewModel.primaryActions, []);
+});
+
+test("revision display uses safe fallbacks when details are thin", () => {
+  const model = buildTaskRevisionDisplayModel({
+    taskId: "task_revision_fallback",
+    revisionRequests: [{ id: "revision_empty" }],
+  });
+
+  assert.equal(model.hasRevisionRequested, true);
+  assert.equal(model.items[0].changeRequest, "Revision details were not provided.");
+  assert.equal(model.items[0].missingDetails, "Not specified.");
+  assert.equal(model.items[0].requestedBy, "Task owner");
+});
+
+test("task lifecycle keeps waiting stages explicit while agent works", () => {
+  const model = buildTaskLifecycleModel({
+    taskId: "task_executing",
+    status: "EXECUTING",
+    resultStatus: "in_progress",
+    transactionState: "accepted",
+    settlementState: "reward_funded",
+    onchainTaskRef: "0xescrow:task_executing",
+    rewardAmount: 10,
+    createdAt: "2026-04-01T10:00:00.000Z",
+    updatedAt: "2026-04-03T10:00:00.000Z",
+    selectedAgents: [{ agentId: "agent_thread", displayName: "Thread Writer", originType: "platform" }],
+    participatingAgentIds: ["agent_thread"],
+    reviewActions: [],
+    timeline: [],
+  });
+
+  assert.equal(model.reviewStateLabel, "No submission yet");
+  assert.equal(model.primaryAction.label, "Waiting for Agent");
+  assert.equal(model.primaryAction.disabled, true);
+  assert.equal(model.nextActor, "Assigned agent");
+});
+
+test("payment display marks an unfunded task without inventing transaction links", () => {
+  const model = buildTaskPaymentDisplayModel({
+    taskId: "task_unfunded",
+    status: "DRAFT",
+    transactionState: "pending_wallet",
+    rewardAmount: 10,
+    reviewActions: [],
+    timeline: [],
+  });
+
+  assert.equal(model.label, "Funding Pending");
+  assert.equal(model.amountDisplay, "10 USDC");
+  assert.equal(model.networkDisplay, "Arc Testnet");
+  assert.equal(model.fundingTxLink, null);
+  assert.equal(model.settlementTxLink, null);
+});
+
+test("payment display shows funded work locked until output approval", () => {
+  const model = buildTaskPaymentDisplayModel({
+    taskId: "task_funded",
+    status: "EXECUTING",
+    resultStatus: "in_progress",
+    transactionState: "accepted",
+    settlementState: "reward_funded",
+    onchainTaskRef: "0xescrow:task_funded",
+    rewardAmount: 12,
+    reviewActions: [],
+    timeline: [],
+  });
+
+  assert.equal(model.label, "Funded");
+  assert.equal(model.description, "Payment is funded but not released yet.");
+  assert.equal(model.nextPaymentAction, "Wait for output and owner approval.");
+});
+
+test("payment display shows submitted funded work waiting on owner review", () => {
+  const model = buildTaskPaymentDisplayModel({
+    taskId: "task_submitted_payment",
+    status: "SUBMITTED",
+    resultStatus: "submitted",
+    transactionState: "accepted",
+    settlementState: "reward_funded",
+    onchainTaskRef: "0xescrow:task_submitted_payment",
+    rewardAmount: 10,
+    reviewActions: ["approve", "reject"],
+    timeline: [],
+  });
+
+  assert.equal(model.label, "Locked Until Approval");
+  assert.match(model.description, /owner must review/);
+  assert.equal(model.nextPaymentAction, "Review the submitted work.");
+});
+
+test("payment display shows approved funded work ready to release", () => {
+  const model = buildTaskPaymentDisplayModel({
+    taskId: "task_ready_payment",
+    status: "APPROVED",
+    resultStatus: "approved",
+    transactionState: "accepted",
+    settlementState: "pending_settlement",
+    onchainTaskRef: "0xescrow:task_ready_payment",
+    rewardAmount: 10,
+    reviewActions: ["settle"],
+    timeline: [],
+  });
+
+  assert.equal(model.label, "Ready to Release");
+  assert.equal(model.description, "Work has been approved. Payment is ready to release.");
+  assert.equal(model.nextPaymentAction, "Release payment.");
+});
+
+test("payment display shows released payment and settlement transaction link", () => {
+  const txHash = `0x${"a".repeat(64)}`;
+  const model = buildTaskPaymentDisplayModel({
+    taskId: "task_paid",
+    status: "SETTLED",
+    resultStatus: "settled",
+    transactionState: "accepted",
+    settlementState: "settled",
+    onchainTaskRef: "0xescrow:task_paid",
+    rewardAmount: 10,
+    latestSettlement: {
+      outcome: "paid",
+      txReference: txHash,
+      settlementTimestamp: "2026-04-03T10:00:00.000Z",
+    },
+    reviewActions: [],
+    timeline: [],
+  });
+
+  assert.equal(model.label, "Released");
+  assert.equal(model.nextPaymentAction, "No payment action needed.");
+  assert.equal(model.settlementTxLink, `https://testnet.arcscan.app/tx/${txHash}`);
+});
+
+test("payment display uses safe fallback when amount and state are unknown", () => {
+  const model = buildTaskPaymentDisplayModel({
+    taskId: "task_unknown",
+    status: "",
+    transactionState: "",
+    settlementState: "",
+    reviewActions: [],
+    timeline: [],
+  });
+
+  assert.equal(model.label, "Not Funded");
+  assert.equal(model.amountDisplay, "Not available yet");
+  assert.equal(model.description, "This task has not been funded yet.");
+});
+
+test("Arc transaction links are only generated for valid hashes", () => {
+  const txHash = `0x${"b".repeat(64)}`;
+  assert.equal(buildArcTransactionLink(txHash), `https://testnet.arcscan.app/tx/${txHash}`);
+  assert.equal(buildArcTransactionLink("missing_fund:task_1"), null);
+  assert.equal(buildArcTransactionLink("0x1234"), null);
 });
 
 test("task lifecycle prefers backend settlement summaries for refund-ready and disputed messaging", () => {
