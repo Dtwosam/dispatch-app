@@ -46622,7 +46622,7 @@ var routes = [
   ["/arc-demo", "Arc Demo"],
   ["/create-agent", "Create Agent"],
   ["/connect-agent", "Connect Agent"],
-  ["/dashboard", "Dashboard"]
+  ["/dashboard", "Builder Dashboard"]
 ];
 var categories = [
   "research",
@@ -46700,7 +46700,7 @@ function createInitialState() {
     mobileNavOpen: false,
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
-    dashboardTab: "my_tasks",
+    dashboardTab: "agents",
     wizardStep: 1,
     agentDraftMeta: {
       draftId: null,
@@ -47759,6 +47759,90 @@ function buildTaskDraftFromServicePackage(servicePackage, agent = null) {
     templateMessage: `${servicePackage?.name || "Service package"} prefilled this task. Review and edit the brief before funding.`
   };
 }
+function collectTaskBuckets(taskCollections = {}) {
+  return [
+    ...taskCollections.myPostedTasks || [],
+    ...taskCollections.allOpenTasks || [],
+    ...taskCollections.activeTasks || [],
+    ...taskCollections.completedTasks || [],
+    ...taskCollections.rejectedTasks || [],
+    ...taskCollections.disputedTasks || []
+  ].filter((task, index2, items) => task?.taskId && items.findIndex((candidate) => candidate?.taskId === task.taskId) === index2);
+}
+function taskBelongsToAgent(task, agentId) {
+  return task?.selectedAgentId === agentId || (task?.participatingAgentIds || []).includes(agentId);
+}
+function buildAgentAttentionItems(agent, taskCollections = {}) {
+  const agentId = agent?.profile?.agentId;
+  if (!agentId) return [];
+  return collectTaskBuckets(taskCollections).filter((task) => taskBelongsToAgent(task, agentId)).filter((task) => {
+    const status = String(task.status || "").toUpperCase();
+    const resultStatus = String(task.resultStatus || "").toLowerCase();
+    return ["ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "DISPUTED"].includes(status) || ["submitted", "needs_revision", "disputed"].includes(resultStatus) || Boolean(task.revisionRequests?.length) || Boolean(task.disputeRecords?.length);
+  }).slice(0, 5).map((task) => {
+    const lifecycle = buildTaskLifecycleModel(task);
+    return {
+      taskId: task.taskId,
+      title: buildSafeTaskSummary(task),
+      statusLabel: lifecycle.statusDisplay.label,
+      paymentLabel: lifecycle.paymentDisplay.label,
+      nextAction: lifecycle.statusDisplay.nextActionText,
+      whoActsNext: lifecycle.statusDisplay.whoActsNext
+    };
+  });
+}
+function buildAgentBuilderAgentRowModel(agent, taskCollections = {}) {
+  const display = buildAgentDisplayModel(agent, taskCollections);
+  const packages = buildAgentServicePackages(agent);
+  const attentionItems = buildAgentAttentionItems(agent, taskCollections);
+  return {
+    agentId: agent?.profile?.agentId || "",
+    slug: agent?.profile?.slug || "",
+    name: display.name,
+    typeLabel: display.typeLabel,
+    statusLabel: display.statusLabel,
+    connectionStatus: display.connectionStatus,
+    verificationLabel: display.verificationLabel,
+    packageSummary: display.packageSummary,
+    firstPackageId: packages[0]?.id || null,
+    completedTasksDisplay: display.completedTasksDisplay,
+    totalEarnedDisplay: display.totalEarnedDisplay,
+    approvalRateDisplay: display.approvalRateDisplay,
+    attentionItems,
+    attentionCount: attentionItems.length
+  };
+}
+function buildAgentBuilderSummaryModel(agents = [], taskCollections = {}) {
+  const rows = agents.map((agent) => buildAgentBuilderAgentRowModel(agent, taskCollections));
+  const paidTasksCompleted = agents.reduce((sum, agent) => {
+    const summary = agent?.performanceSummary || {};
+    return sum + Number(summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0);
+  }, 0);
+  const paidEarnings = agents.reduce((sum, agent) => {
+    const summary = agent?.performanceSummary || {};
+    return sum + Number(summary.paidEarnings ?? summary.totalEarnings ?? 0);
+  }, 0);
+  const activeAgents = agents.filter((agent) => {
+    const status = String(agent?.performanceSummary?.status || agent?.profile?.connectionStatus || "").toLowerCase();
+    return ["active", "healthy", "online", "connected"].includes(status) || agent?.profile?.originType === "platform";
+  }).length;
+  const attentionCount = rows.reduce((sum, row) => sum + row.attentionCount, 0);
+  return {
+    agentsListed: agents.length,
+    activeAgents,
+    paidTasksCompleted,
+    paidEarnings,
+    paidEarningsDisplay: `${paidEarnings.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    attentionCount,
+    ownershipNote: "Builder dashboard preview. Showing agents available in this Dispatch demo; wallet-specific ownership requires backend/account persistence."
+  };
+}
+function buildAgentBuilderDashboardModel(agents = [], taskCollections = {}) {
+  return {
+    summary: buildAgentBuilderSummaryModel(agents, taskCollections),
+    agentRows: agents.map((agent) => buildAgentBuilderAgentRowModel(agent, taskCollections))
+  };
+}
 function buildAgentDisplayModel(agent, taskCollections = {}) {
   const profile = agent?.profile || {};
   const summary = agent?.performanceSummary || {};
@@ -48588,37 +48672,70 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
   revealSections(el2.appRoot);
 }
 function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
-  const agentRegistry = new Map(state2.agents.map((agent) => [agent.profile.agentId, agent]));
-  const myTasks = state2.tasks?.myPostedTasks || [];
-  const myAgents = state2.agents.filter((agent) => agent.profile.ownerWallet === state2.wallet);
-  const earnings = myAgents.reduce((sum, agent) => sum + (agent.performanceSummary.totalEarnings || 0), 0);
-  const successRate = myAgents.length ? Math.round(myAgents.reduce((sum, agent) => sum + (agent.performanceSummary.approvalRate || 0), 0) / myAgents.length * 100) : 0;
-  const tasksCompleted = myAgents.reduce((sum, agent) => sum + (agent.performanceSummary.tasksCompleted || 0), 0);
+  const taskCollections = {
+    myPostedTasks: state2.tasks?.myPostedTasks || [],
+    allOpenTasks: state2.tasks?.allOpenTasks || [],
+    activeTasks: state2.tasks?.activeTasks || [],
+    completedTasks: state2.tasks?.completedTasks || [],
+    rejectedTasks: state2.tasks?.rejectedTasks || [],
+    disputedTasks: state2.tasks?.disputedTasks || []
+  };
+  const dashboard = buildAgentBuilderDashboardModel(state2.agents, taskCollections);
+  const { summary, agentRows } = dashboard;
+  const attentionItems = agentRows.flatMap((row) => row.attentionItems.map((item) => ({ ...item, agentName: row.name, agentSlug: row.slug })));
   el2.appRoot.innerHTML = `
     <section data-structure="dashboard">
       <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Dashboard</p>
-        <h1>Run funded AI work in Dispatch.</h1>
-        <p class="muted">Track funded tasks, owner-approved outcomes, Arc Testnet settlement, and agent momentum from one operator view.</p>
+        <p class="mini-label">Agent Builder</p>
+        <h1>Builder dashboard preview.</h1>
+        <p class="muted">Track agents available in this Dispatch environment, their package readiness, real paid-work metrics, and tasks that may need attention.</p>
       </header>
+      <article class="status-banner info reveal-on-scroll">
+        <strong>Preview mode</strong>
+        <p>${escapeHtml(summary.ownershipNote)}</p>
+      </article>
       <section class="shell-section reveal-on-scroll">
         <div class="task-summary">
-          <div class="metric-card"><strong data-count="${Math.round(earnings)}" data-format="currency">${formatCurrency(earnings)}</strong><span>Approved earnings</span></div>
-          <div class="metric-card"><strong data-count="${successRate}">${successRate}</strong><span>Approval rate</span></div>
-          <div class="metric-card"><strong data-count="${tasksCompleted}">${tasksCompleted}</strong><span>Funded work completed</span></div>
-          <div class="metric-card"><strong data-count="${myTasks.length}">${myTasks.length}</strong><span>Posted funded tasks</span></div>
+          <div class="metric-card"><strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong><span>Agents listed</span></div>
+          <div class="metric-card"><strong data-count="${summary.activeAgents}">${summary.activeAgents}</strong><span>Active or available</span></div>
+          <div class="metric-card"><strong data-count="${summary.paidTasksCompleted}">${summary.paidTasksCompleted}</strong><span>Paid funded tasks</span></div>
+          <div class="metric-card"><strong>${escapeHtml(summary.paidEarningsDisplay)}</strong><span>Settled earnings shown</span></div>
+          <div class="metric-card"><strong data-count="${summary.attentionCount}">${summary.attentionCount}</strong><span>Tasks needing attention</span></div>
         </div>
       </section>
       <section class="shell-section reveal-on-scroll">
         <div class="segmented">
-          <button class="${state2.dashboardTab === "my_tasks" ? "active" : ""}" data-dashboard-tab="my_tasks">My Tasks</button>
-          <button class="${state2.dashboardTab === "my_agents" ? "active" : ""}" data-dashboard-tab="my_agents">My Agents</button>
+          <button class="${state2.dashboardTab === "agents" ? "active" : ""}" data-dashboard-tab="agents">Agents</button>
+          <button class="${state2.dashboardTab === "attention" ? "active" : ""}" data-dashboard-tab="attention">Tasks needing attention</button>
           <button class="${state2.dashboardTab === "earnings" ? "active" : ""}" data-dashboard-tab="earnings">Earnings</button>
         </div>
       </section>
       <section class="shell-section reveal-on-scroll">
         <div class="steps-grid">
-          ${state2.dashboardTab === "my_agents" ? myAgents.map((agent) => renderAgentCard(agent)).join("") : state2.dashboardTab === "earnings" ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned from approved funded work</p></article>`).join("") : myTasks.map((task) => renderTaskRow(task, agentRegistry, state2)).join("") || emptyState("No funded work here yet.")}
+          ${state2.dashboardTab === "attention" ? attentionItems.map((item) => `
+                <article class="task-row">
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <p>${escapeHtml(item.agentName)} | ${escapeHtml(item.statusLabel)} | ${escapeHtml(item.paymentLabel)}</p>
+                  <p class="muted">Next: ${escapeHtml(item.nextAction)} | ${escapeHtml(item.whoActsNext)}</p>
+                  <footer><button data-route="/tasks/${item.taskId}">View Task</button></footer>
+                </article>
+              `).join("") || emptyState("No agent tasks need attention yet.") : state2.dashboardTab === "earnings" ? agentRows.map((row) => `<article class="task-row"><strong>${escapeHtml(row.name)}</strong><p>${escapeHtml(row.totalEarnedDisplay)} from real settled performance data.</p><p class="muted">${escapeHtml(row.completedTasksDisplay)} paid funded tasks | ${escapeHtml(row.approvalRateDisplay)} approval rate</p></article>`).join("") : agentRows.map((row) => `
+                  <article class="task-row">
+                    <div class="agent-tags">
+                      <span class="tag">${escapeHtml(row.typeLabel)}</span>
+                      <span class="tag">${escapeHtml(row.statusLabel)}</span>
+                      <span class="tag">${escapeHtml(row.connectionStatus)}</span>
+                    </div>
+                    <strong>${escapeHtml(row.name)}</strong>
+                    <p>${escapeHtml(row.packageSummary)}</p>
+                    <p class="muted">${escapeHtml(row.completedTasksDisplay)} paid funded tasks | ${escapeHtml(row.totalEarnedDisplay)} earned | ${escapeHtml(row.approvalRateDisplay)} approval</p>
+                    <p class="muted">Health/verification: ${escapeHtml(row.verificationLabel)}</p>
+                    <footer>
+                      <button data-route="/agents/${row.slug}">View Profile</button>
+                      ${row.firstPackageId ? `<button class="hero-primary" data-dashboard-package-agent="${row.agentId}" data-dashboard-package="${row.firstPackageId}">Start with Package</button>` : `<button data-direct="${row.agentId}">Create Custom Task</button>`}
+                    </footer>
+                  </article>
+                `).join("") || emptyState("Connect an agent to begin.")}
         </div>
       </section>
     </section>
@@ -48633,6 +48750,27 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
     node.addEventListener("click", () => {
       state2.taskForm.hiringMode = "direct_hire";
       state2.taskForm.selectedAgentId = node.dataset.direct;
+      onNavigate("/post-task");
+    });
+  });
+  document.querySelectorAll("[data-dashboard-package]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const agent = state2.agents.find((item) => item.profile.agentId === node.dataset.dashboardPackageAgent);
+      const servicePackage = buildAgentServicePackages(agent).find((item) => item.id === node.dataset.dashboardPackage);
+      const draft = buildTaskDraftFromServicePackage(servicePackage, agent);
+      state2.taskForm = {
+        ...state2.taskForm,
+        title: draft.title,
+        description: draft.description,
+        category: draft.category,
+        rewardAmount: draft.rewardAmount,
+        templateId: draft.templateId,
+        templateFields: draft.templateFields,
+        templateMessage: draft.templateMessage,
+        hiringMode: draft.hiringMode,
+        selectedAgentId: draft.selectedAgentId,
+        selectedServicePackage: draft.servicePackage
+      };
       onNavigate("/post-task");
     });
   });

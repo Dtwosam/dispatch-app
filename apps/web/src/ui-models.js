@@ -1030,6 +1030,103 @@ export function buildTaskDraftFromServicePackage(servicePackage, agent = null) {
   };
 }
 
+function collectTaskBuckets(taskCollections = {}) {
+  return [
+    ...(taskCollections.myPostedTasks || []),
+    ...(taskCollections.allOpenTasks || []),
+    ...(taskCollections.activeTasks || []),
+    ...(taskCollections.completedTasks || []),
+    ...(taskCollections.rejectedTasks || []),
+    ...(taskCollections.disputedTasks || []),
+  ].filter((task, index, items) => task?.taskId && items.findIndex((candidate) => candidate?.taskId === task.taskId) === index);
+}
+
+function taskBelongsToAgent(task, agentId) {
+  return task?.selectedAgentId === agentId || (task?.participatingAgentIds || []).includes(agentId);
+}
+
+export function buildAgentAttentionItems(agent, taskCollections = {}) {
+  const agentId = agent?.profile?.agentId;
+  if (!agentId) return [];
+  return collectTaskBuckets(taskCollections)
+    .filter((task) => taskBelongsToAgent(task, agentId))
+    .filter((task) => {
+      const status = String(task.status || "").toUpperCase();
+      const resultStatus = String(task.resultStatus || "").toLowerCase();
+      return ["ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "DISPUTED"].includes(status)
+        || ["submitted", "needs_revision", "disputed"].includes(resultStatus)
+        || Boolean(task.revisionRequests?.length)
+        || Boolean(task.disputeRecords?.length);
+    })
+    .slice(0, 5)
+    .map((task) => {
+      const lifecycle = buildTaskLifecycleModel(task);
+      return {
+        taskId: task.taskId,
+        title: buildSafeTaskSummary(task),
+        statusLabel: lifecycle.statusDisplay.label,
+        paymentLabel: lifecycle.paymentDisplay.label,
+        nextAction: lifecycle.statusDisplay.nextActionText,
+        whoActsNext: lifecycle.statusDisplay.whoActsNext,
+      };
+    });
+}
+
+export function buildAgentBuilderAgentRowModel(agent, taskCollections = {}) {
+  const display = buildAgentDisplayModel(agent, taskCollections);
+  const packages = buildAgentServicePackages(agent);
+  const attentionItems = buildAgentAttentionItems(agent, taskCollections);
+  return {
+    agentId: agent?.profile?.agentId || "",
+    slug: agent?.profile?.slug || "",
+    name: display.name,
+    typeLabel: display.typeLabel,
+    statusLabel: display.statusLabel,
+    connectionStatus: display.connectionStatus,
+    verificationLabel: display.verificationLabel,
+    packageSummary: display.packageSummary,
+    firstPackageId: packages[0]?.id || null,
+    completedTasksDisplay: display.completedTasksDisplay,
+    totalEarnedDisplay: display.totalEarnedDisplay,
+    approvalRateDisplay: display.approvalRateDisplay,
+    attentionItems,
+    attentionCount: attentionItems.length,
+  };
+}
+
+export function buildAgentBuilderSummaryModel(agents = [], taskCollections = {}) {
+  const rows = agents.map((agent) => buildAgentBuilderAgentRowModel(agent, taskCollections));
+  const paidTasksCompleted = agents.reduce((sum, agent) => {
+    const summary = agent?.performanceSummary || {};
+    return sum + Number(summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0);
+  }, 0);
+  const paidEarnings = agents.reduce((sum, agent) => {
+    const summary = agent?.performanceSummary || {};
+    return sum + Number(summary.paidEarnings ?? summary.totalEarnings ?? 0);
+  }, 0);
+  const activeAgents = agents.filter((agent) => {
+    const status = String(agent?.performanceSummary?.status || agent?.profile?.connectionStatus || "").toLowerCase();
+    return ["active", "healthy", "online", "connected"].includes(status) || agent?.profile?.originType === "platform";
+  }).length;
+  const attentionCount = rows.reduce((sum, row) => sum + row.attentionCount, 0);
+  return {
+    agentsListed: agents.length,
+    activeAgents,
+    paidTasksCompleted,
+    paidEarnings,
+    paidEarningsDisplay: `${paidEarnings.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`,
+    attentionCount,
+    ownershipNote: "Builder dashboard preview. Showing agents available in this Dispatch demo; wallet-specific ownership requires backend/account persistence.",
+  };
+}
+
+export function buildAgentBuilderDashboardModel(agents = [], taskCollections = {}) {
+  return {
+    summary: buildAgentBuilderSummaryModel(agents, taskCollections),
+    agentRows: agents.map((agent) => buildAgentBuilderAgentRowModel(agent, taskCollections)),
+  };
+}
+
 export function buildAgentDisplayModel(agent, taskCollections = {}) {
   const profile = agent?.profile || {};
   const summary = agent?.performanceSummary || {};

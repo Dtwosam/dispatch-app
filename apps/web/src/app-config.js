@@ -50,7 +50,7 @@ export const routes = [
   ["/arc-demo", "Arc Demo"],
   ["/create-agent", "Create Agent"],
   ["/connect-agent", "Connect Agent"],
-  ["/dashboard", "Dashboard"],
+  ["/dashboard", "Builder Dashboard"],
 ];
 
 export const categories = [
@@ -132,7 +132,7 @@ export function createInitialState() {
     mobileNavOpen: false,
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
-    dashboardTab: "my_tasks",
+    dashboardTab: "agents",
     wizardStep: 1,
     agentDraftMeta: {
       draftId: null,

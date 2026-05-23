@@ -8,6 +8,9 @@ import {
   buildReviewPanelModel,
   buildSuggestedTaskTemplatesForAgent,
   buildAgentServicePackages,
+  buildAgentBuilderDashboardModel,
+  buildAgentBuilderSummaryModel,
+  buildAgentAttentionItems,
   buildServicePackageDisplayModel,
   buildTaskDraftFromServicePackage,
   buildTaskLifecycleModel,
@@ -237,6 +240,73 @@ test("unknown agents do not get fake service packages", () => {
   });
 
   assert.deepEqual(packages, []);
+});
+
+test("builder dashboard summary uses real agent performance data only", () => {
+  const agents = [
+    {
+      profile: { agentId: "thread", publicName: "Thread Writer", slug: "thread-writer", originType: "platform", skills: ["thread writing"] },
+      performanceSummary: { status: "active", paidTasksCompleted: 2, paidEarnings: 30, approvalRate: 0.8 },
+    },
+    {
+      profile: { agentId: "external", publicName: "External Worker", slug: "external-worker", originType: "external", connectionStatus: "pending", skills: [] },
+      performanceSummary: { status: "new" },
+    },
+  ];
+  const summary = buildAgentBuilderSummaryModel(agents, {});
+
+  assert.equal(summary.agentsListed, 2);
+  assert.equal(summary.activeAgents, 1);
+  assert.equal(summary.paidTasksCompleted, 2);
+  assert.equal(summary.paidEarningsDisplay, "30 USDC");
+  assert.match(summary.ownershipNote, /preview/i);
+});
+
+test("builder agent rows expose packages and honest missing metric fallbacks", () => {
+  const model = buildAgentBuilderDashboardModel([
+    {
+      profile: { agentId: "thread", publicName: "Thread Writer", slug: "thread-writer", originType: "platform", skills: ["thread writing"] },
+      performanceSummary: { status: "active" },
+    },
+  ], {});
+  const row = model.agentRows[0];
+
+  assert.equal(row.name, "Thread Writer");
+  assert.equal(row.packageSummary, "Packages from 10 USDC");
+  assert.equal(row.completedTasksDisplay, "0");
+  assert.equal(row.totalEarnedDisplay, "0 USDC");
+  assert.equal(row.approvalRateDisplay, "Not enough data yet");
+});
+
+test("builder attention items include submitted revision and disputed tasks", () => {
+  const agent = {
+    profile: { agentId: "agent_1", publicName: "Research Brief", slug: "research-brief", originType: "platform", skills: ["research"] },
+    performanceSummary: {},
+  };
+  const items = buildAgentAttentionItems(agent, {
+    activeTasks: [
+      { taskId: "assigned", title: "Assigned work", status: "ASSIGNED", selectedAgentId: "agent_1", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:assigned", reviewActions: [] },
+      { taskId: "submitted", title: "Submitted work", status: "SUBMITTED", resultStatus: "submitted", selectedAgentId: "agent_1", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:submitted", reviewActions: ["approve"] },
+      { taskId: "revision", title: "Revision work", status: "SUBMITTED", resultStatus: "submitted", selectedAgentId: "agent_1", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:revision", revisionRequests: [{ changeRequest: "Fix structure" }], reviewActions: [] },
+      { taskId: "disputed", title: "Disputed work", status: "SUBMITTED", resultStatus: "submitted", selectedAgentId: "agent_1", transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:disputed", disputeRecords: [{ reason: "Quality", details: "Low quality" }], reviewActions: [] },
+    ],
+  });
+
+  assert.equal(items.length, 4);
+  assert.deepEqual(items.map((item) => item.statusLabel), ["Agent Assigned", "Submitted", "Revision Requested", "Disputed"]);
+});
+
+test("builder attention items return empty state safely", () => {
+  const items = buildAgentAttentionItems({
+    profile: { agentId: "agent_empty", publicName: "Empty Agent", slug: "empty-agent" },
+    performanceSummary: {},
+  }, {
+    completedTasks: [
+      { taskId: "done", title: "Done", status: "SETTLED", selectedAgentId: "agent_empty" },
+    ],
+  });
+
+  assert.deepEqual(items, []);
 });
 
 test("suggested template mapping follows agent specialty without inventing agents", () => {
