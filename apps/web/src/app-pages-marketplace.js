@@ -232,6 +232,7 @@ function renderAgentCard(agent) {
       </div>
       ${agent.profile.originType === "external" ? `<p class="muted agent-card__trust">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || agent.profile.ownerWallet))}</p>` : ""}
       <p class="muted agent-card__trust">${escapeHtml(display.packageSummary)}. Ready-made services available.</p>
+      <p class="muted agent-card__trust">Readiness: ${escapeHtml(display.readinessLabel)}. Next: ${escapeHtml(display.verificationNextAction)}.</p>
       <p class="muted agent-card__trust">${escapeHtml(display.trustNote)}</p>
       <footer>
         <button data-route="/agents/${agent.profile.slug}">View Agent</button>
@@ -677,6 +678,32 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
       <section class="shell-section reveal-on-scroll">
         <div class="section-head">
           <div>
+            <p class="mini-label">Verification readiness</p>
+            <h2>${escapeHtml(display.readinessLabel)}</h2>
+            <p class="muted">${escapeHtml(display.verificationTrustNote)}</p>
+          </div>
+          <span class="tag">${escapeHtml(display.verificationNextAction)}</span>
+        </div>
+        <div class="task-summary">
+          <div class="metric-card"><strong>${escapeHtml(display.readinessLabel)}</strong><span>Readiness state</span></div>
+          <div class="metric-card"><strong>${display.verificationMissingCount}</strong><span>Missing setup items</span></div>
+          <div class="metric-card"><strong>${display.verificationLimitedCount}</strong><span>Limited-data items</span></div>
+        </div>
+        <div class="task-rail">
+          ${display.verificationChecklist.map((item) => `
+            <article class="task-row">
+              <div class="agent-tags">
+                <span class="tag">${escapeHtml(item.stateLabel)}</span>
+              </div>
+              <strong>${escapeHtml(item.label)}</strong>
+              <p class="muted">${escapeHtml(item.description)}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+      <section class="shell-section reveal-on-scroll">
+        <div class="section-head">
+          <div>
             <p class="mini-label">Service packages</p>
             <h2>Ready-made funded task starters</h2>
             <p class="muted">Packages prefill task creation only. You still edit the brief, fund with USDC, review output, and release payment only after approval.</p>
@@ -872,11 +899,12 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
                       <span class="tag">${escapeHtml(row.typeLabel)}</span>
                       <span class="tag">${escapeHtml(row.statusLabel)}</span>
                       <span class="tag">${escapeHtml(row.connectionStatus)}</span>
+                      <span class="tag">${escapeHtml(row.readinessLabel)}</span>
                     </div>
                     <strong>${escapeHtml(row.name)}</strong>
                     <p>${escapeHtml(row.packageSummary)}</p>
                     <p class="muted">${escapeHtml(row.completedTasksDisplay)} paid funded tasks | ${escapeHtml(row.totalEarnedDisplay)} earned | ${escapeHtml(row.approvalRateDisplay)} approval</p>
-                    <p class="muted">Health/verification: ${escapeHtml(row.verificationLabel)}</p>
+                    <p class="muted">Verification readiness: ${escapeHtml(row.verificationLabel)} | Next: ${escapeHtml(row.verificationNextAction)} | Missing setup items: ${row.verificationMissingCount}</p>
                     <footer>
                       <button data-route="/agents/${row.slug}">View Profile</button>
                       ${row.firstPackageId ? `<button class="hero-primary" data-dashboard-package-agent="${row.agentId}" data-dashboard-package="${row.firstPackageId}">Start with Package</button>` : `<button data-direct="${row.agentId}">Create Custom Task</button>`}

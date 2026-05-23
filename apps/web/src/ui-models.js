@@ -1207,6 +1207,183 @@ export function buildAgentEarningsDashboardModel(agents = [], taskCollections = 
   };
 }
 
+function checklistItem(id, label, state, description) {
+  const stateLabels = {
+    passed: "Passed",
+    missing: "Missing",
+    limited: "Limited data",
+    not_enough_data: "Not enough data yet",
+    needs_review: "Needs review",
+  };
+  return {
+    id,
+    label,
+    state,
+    stateLabel: stateLabels[state] || "Limited data",
+    description,
+  };
+}
+
+function isHealthyConnection(value) {
+  return ["active", "healthy", "online", "connected", "ready"].includes(String(value || "").toLowerCase());
+}
+
+function isUnavailableConnection(value) {
+  return ["offline", "unavailable", "disabled", "paused", "failed", "rejected"].includes(String(value || "").toLowerCase());
+}
+
+export function buildAgentVerificationChecklist(agent, taskCollections = {}) {
+  const profile = agent?.profile || {};
+  const summary = agent?.performanceSummary || {};
+  const agentId = profile.agentId || "";
+  const tasks = collectTaskBuckets(taskCollections).filter((task) => taskBelongsToAgent(task, agentId));
+  const paidTasksFromTasks = tasks.filter(isTaskSettledForEarnings).length;
+  const paidTasks = Math.max(Number(summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0), paidTasksFromTasks);
+  const reviewCount = Math.max(Number(summary.totalReviews ?? summary.totalApprovals ?? summary.tasksAttempted ?? 0), tasks.filter((task) => task.latestEvaluation || task.userReview || task.resultStatus).length);
+  const disputeCount = Math.max(Number(summary.disputeCount ?? 0), tasks.filter(isTaskDisputedForEarnings).length);
+  const packages = buildAgentServicePackages(agent);
+  const connectionValue = profile.connectionStatus || agent?.healthStatus || profile.healthStatus || summary.status || "";
+  const isPlatform = profile.originType !== "external";
+  const hasProfile = Boolean(profile.publicName && (profile.description || profile.skills?.length || profile.capabilityTags?.length));
+  const hasWallet = Boolean(profile.payoutWallet || profile.ownerWallet || profile.operatorWallet);
+  const hasConnectionData = Boolean(profile.connectionStatus || agent?.healthStatus || profile.healthStatus);
+
+  return [
+    checklistItem(
+      "profile",
+      "Agent profile available",
+      hasProfile ? "passed" : profile.publicName ? "limited" : "missing",
+      hasProfile ? "Name and marketplace description are available." : profile.publicName ? "Basic name exists, but profile detail is still thin." : "Agent profile data is missing.",
+    ),
+    checklistItem(
+      "connection",
+      "Connection status available",
+      isPlatform ? "passed" : hasConnectionData ? (isHealthyConnection(connectionValue) ? "passed" : "needs_review") : "missing",
+      isPlatform ? "Platform agent is managed by Dispatch." : hasConnectionData ? `Connection reports ${labelize(connectionValue)}.` : "External endpoint connection data is unavailable.",
+    ),
+    checklistItem(
+      "health",
+      "Health check available",
+      isPlatform ? "passed" : hasConnectionData ? (isHealthyConnection(connectionValue) ? "passed" : "needs_review") : "missing",
+      isPlatform ? "Platform runtime is Dispatch-managed." : hasConnectionData ? "Endpoint status is available for review." : "Connection check needed before stronger readiness can be shown.",
+    ),
+    checklistItem(
+      "wallet",
+      "Payout/owner wallet available",
+      hasWallet ? "passed" : "missing",
+      hasWallet ? "A payout or owner wallet is present." : "Payout or owner wallet is not available yet.",
+    ),
+    checklistItem(
+      "packages",
+      "Service packages configured",
+      packages.length ? "passed" : "limited",
+      packages.length ? `${packages.length} ready-made package${packages.length === 1 ? "" : "s"} configured.` : "No ready-made packages yet; custom tasks can still be created.",
+    ),
+    checklistItem(
+      "paid_history",
+      "Completed paid task history",
+      paidTasks > 0 ? "passed" : "not_enough_data",
+      paidTasks > 0 ? `${paidTasks} paid funded task${paidTasks === 1 ? "" : "s"} recorded.` : "Waiting for first approved funded task.",
+    ),
+    checklistItem(
+      "review_history",
+      "Review/approval history",
+      reviewCount > 0 ? "passed" : "not_enough_data",
+      reviewCount > 0 ? `${reviewCount} review signal${reviewCount === 1 ? "" : "s"} available.` : "Approval rate appears after reviewed work exists.",
+    ),
+    checklistItem(
+      "disputes",
+      "Dispute history",
+      disputeCount > 0 ? "limited" : "not_enough_data",
+      disputeCount > 0 ? `${disputeCount} disputed task${disputeCount === 1 ? "" : "s"} found in available data.` : "No dispute history found in available task data.",
+    ),
+  ];
+}
+
+export function buildAgentVerificationModel(agent, taskCollections = {}) {
+  const profile = agent?.profile || {};
+  const checklist = buildAgentVerificationChecklist(agent, taskCollections);
+  const connectionValue = profile.connectionStatus || agent?.healthStatus || profile.healthStatus || agent?.performanceSummary?.status || "";
+  const isPlatform = profile.originType !== "external";
+  const missingCount = checklist.filter((item) => item.state === "missing").length;
+  const limitedCount = checklist.filter((item) => item.state === "limited" || item.state === "not_enough_data").length;
+  const needsReviewCount = checklist.filter((item) => item.state === "needs_review").length;
+  const paidHistory = checklist.find((item) => item.id === "paid_history");
+  const hasExplicitVerification = profile.verificationStatus === "verified" || profile.verified === true;
+  const externalConnectionMissing = !isPlatform && checklist.some((item) => ["connection", "health"].includes(item.id) && item.state === "missing");
+  const externalConnectionUnavailable = !isPlatform && isUnavailableConnection(connectionValue);
+  const walletMissing = profile.originType === "external" && checklist.some((item) => item.id === "wallet" && item.state === "missing");
+  let state = "limited_data";
+  let stateLabel = "Limited data";
+  let tone = "warning";
+  let nextAction = "Complete more paid tasks";
+  let trustNote = "This agent is visible, but more completed work is needed before stronger trust signals appear.";
+
+  if (hasExplicitVerification && missingCount === 0 && needsReviewCount === 0) {
+    state = "verified";
+    stateLabel = "Verified";
+    tone = "success";
+    nextAction = "Ready for funded tasks";
+    trustNote = "Verification data is available and setup checks are complete.";
+  } else if (externalConnectionUnavailable) {
+    state = "offline";
+    stateLabel = "Offline / unavailable";
+    tone = "danger";
+    nextAction = "Check endpoint health";
+    trustNote = "This external agent does not currently look available for funded work.";
+  } else if (externalConnectionMissing) {
+    state = "connection_check_needed";
+    stateLabel = "Connection check needed";
+    tone = "warning";
+    nextAction = "Check endpoint health";
+    trustNote = "Connection state is missing, so users should review carefully before assigning funded work.";
+  } else if (needsReviewCount > 0 || walletMissing) {
+    state = "needs_review";
+    stateLabel = "Needs review";
+    tone = "warning";
+    nextAction = walletMissing ? "Add payout wallet" : "Review agent setup";
+    trustNote = "This agent is listed, but setup data needs review before stronger readiness can be shown.";
+  } else if (paidHistory?.state !== "passed") {
+    state = "limited_data";
+    stateLabel = "Limited data";
+    tone = "warning";
+    nextAction = "Wait for first completed task";
+    trustNote = "This agent has enough setup data to appear, but needs completed paid work before stronger trust signals appear.";
+  } else {
+    state = "ready";
+    stateLabel = "Ready";
+    tone = "success";
+    nextAction = "Ready for funded tasks";
+    trustNote = "This agent has enough setup and paid-work data to accept funded tasks.";
+  }
+
+  return {
+    state,
+    stateLabel,
+    tone,
+    checklist,
+    missingCount,
+    limitedCount,
+    needsReviewCount,
+    passedCount: checklist.filter((item) => item.state === "passed").length,
+    nextAction,
+    trustNote,
+  };
+}
+
+export function buildAgentTrustReadinessModel(agent, taskCollections = {}) {
+  const verification = buildAgentVerificationModel(agent, taskCollections);
+  return {
+    label: verification.stateLabel,
+    tone: verification.tone,
+    nextAction: verification.nextAction,
+    note: verification.trustNote,
+    missingCount: verification.missingCount,
+    limitedCount: verification.limitedCount,
+    checklist: verification.checklist,
+  };
+}
+
 export function buildAgentBuilderAgentRowModel(agent, taskCollections = {}) {
   const display = buildAgentDisplayModel(agent, taskCollections);
   const packages = buildAgentServicePackages(agent);
@@ -1219,6 +1396,11 @@ export function buildAgentBuilderAgentRowModel(agent, taskCollections = {}) {
     statusLabel: display.statusLabel,
     connectionStatus: display.connectionStatus,
     verificationLabel: display.verificationLabel,
+    readinessLabel: display.readinessLabel,
+    readinessTone: display.readinessTone,
+    verificationNextAction: display.verificationNextAction,
+    verificationMissingCount: display.verificationMissingCount,
+    verificationLimitedCount: display.verificationLimitedCount,
     packageSummary: display.packageSummary,
     firstPackageId: packages[0]?.id || null,
     completedTasksDisplay: display.completedTasksDisplay,
@@ -1279,13 +1461,10 @@ export function buildAgentDisplayModel(agent, taskCollections = {}) {
     : "Not enough data yet";
   const typeLabel = profile.originType === "external" ? "External Agent" : "Platform Agent";
   const connectionStatus = profile.originType === "external"
-    ? labelize(profile.connectionStatus || agent?.healthStatus || "unknown")
+    ? labelize(profile.connectionStatus || agent?.healthStatus || profile.healthStatus || "unknown")
     : "Dispatch managed";
-  const verificationLabel = profile.originType === "external"
-    ? (["active", "healthy", "online", "connected"].includes(String(profile.connectionStatus || agent?.healthStatus || "").toLowerCase())
-        ? "Connection active"
-        : "Not verified yet")
-    : "Platform managed";
+  const verification = buildAgentVerificationModel(agent, taskCollections);
+  const verificationLabel = verification.stateLabel;
   const bestUseCases = (profile.skills?.length ? profile.skills : profile.capabilityTags || profile.skillCategories || [])
     .slice(0, 5)
     .map((item) => labelize(item));
@@ -1307,6 +1486,15 @@ export function buildAgentDisplayModel(agent, taskCollections = {}) {
     badges: buildAgentIdentityBadges(agent),
     connectionStatus,
     verificationLabel,
+    verificationState: verification.state,
+    verificationTone: verification.tone,
+    readinessLabel: verification.stateLabel,
+    readinessTone: verification.tone,
+    verificationChecklist: verification.checklist,
+    verificationMissingCount: verification.missingCount,
+    verificationLimitedCount: verification.limitedCount,
+    verificationNextAction: verification.nextAction,
+    verificationTrustNote: verification.trustNote,
     statusLabel: labelize(summary.status || "new"),
     completedTasksDisplay: String(paidCompleted || 0),
     approvalRateDisplay: approvalRate,

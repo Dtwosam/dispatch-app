@@ -14,6 +14,9 @@ import {
   buildAgentEarningsDashboardModel,
   buildAgentEarningsBreakdown,
   buildEarningsActivityRows,
+  buildAgentTrustReadinessModel,
+  buildAgentVerificationChecklist,
+  buildAgentVerificationModel,
   buildServicePackageDisplayModel,
   buildTaskDraftFromServicePackage,
   buildTaskLifecycleModel,
@@ -152,8 +155,109 @@ test("agent display model uses honest fallbacks when metrics are missing", () =>
   assert.equal(model.averageDeliveryDisplay, "Not enough data yet");
   assert.equal(model.totalEarnedDisplay, "0 USDC");
   assert.equal(model.reviewsDisplay, "No reviews yet");
-  assert.equal(model.verificationLabel, "Not verified yet");
+  assert.equal(model.verificationLabel, "Needs review");
+  assert.equal(model.verificationNextAction, "Add payout wallet");
   assert.match(model.trustNote, /Not enough completed work yet/);
+});
+
+test("platform agent readiness is honest when setup exists but paid history is thin", () => {
+  const model = buildAgentVerificationModel({
+    profile: {
+      agentId: "thread_writer",
+      publicName: "Thread Writer",
+      description: "Turns rough ideas into X threads.",
+      originType: "platform",
+      skills: ["thread writing"],
+    },
+    performanceSummary: { status: "active" },
+  }, {});
+
+  assert.equal(model.stateLabel, "Limited data");
+  assert.equal(model.nextAction, "Wait for first completed task");
+  assert.equal(model.checklist.find((item) => item.id === "packages").state, "passed");
+  assert.equal(model.checklist.find((item) => item.id === "paid_history").stateLabel, "Not enough data yet");
+});
+
+test("external agent with missing connection data asks for connection check", () => {
+  const model = buildAgentTrustReadinessModel({
+    profile: {
+      agentId: "external_missing",
+      publicName: "Endpoint Worker",
+      description: "External task runner.",
+      originType: "external",
+      skills: ["research"],
+      payoutWallet: "0x85DCC174dE5e785Cda3069154D097172F1B39aAA",
+    },
+    performanceSummary: {},
+  }, {});
+
+  assert.equal(model.label, "Connection check needed");
+  assert.equal(model.nextAction, "Check endpoint health");
+  assert.match(model.note, /Connection state is missing/);
+});
+
+test("verification checklist does not fake wallets or performance history", () => {
+  const checklist = buildAgentVerificationChecklist({
+    profile: {
+      agentId: "external_new",
+      publicName: "External New",
+      description: "New external worker.",
+      originType: "external",
+      connectionStatus: "active",
+      skills: ["research"],
+    },
+    performanceSummary: {},
+  }, {});
+
+  assert.equal(checklist.find((item) => item.id === "wallet").state, "missing");
+  assert.equal(checklist.find((item) => item.id === "paid_history").state, "not_enough_data");
+  assert.equal(checklist.find((item) => item.id === "review_history").state, "not_enough_data");
+});
+
+test("completed paid task history only passes from real paid task data", () => {
+  const agent = {
+    profile: {
+      agentId: "agent_paid",
+      publicName: "Paid Agent",
+      description: "Completes funded work.",
+      originType: "platform",
+      skills: ["writing"],
+    },
+    performanceSummary: {},
+  };
+
+  const withoutTasks = buildAgentVerificationChecklist(agent, {});
+  const withTasks = buildAgentVerificationChecklist(agent, {
+    completedTasks: [
+      { taskId: "paid", selectedAgentId: "agent_paid", status: "SETTLED", settlementState: "settled", rewardAmount: 10 },
+    ],
+  });
+
+  assert.equal(withoutTasks.find((item) => item.id === "paid_history").state, "not_enough_data");
+  assert.equal(withTasks.find((item) => item.id === "paid_history").state, "passed");
+});
+
+test("dispute history reflects only real disputed task data", () => {
+  const agent = {
+    profile: {
+      agentId: "agent_dispute",
+      publicName: "Dispute Agent",
+      description: "Handles work.",
+      originType: "platform",
+      skills: ["writing"],
+    },
+    performanceSummary: {},
+  };
+
+  const clean = buildAgentVerificationChecklist(agent, {});
+  const disputed = buildAgentVerificationChecklist(agent, {
+    disputedTasks: [
+      { taskId: "dispute", selectedAgentId: "agent_dispute", status: "DISPUTED", disputeRecords: [{ reason: "Quality" }] },
+    ],
+  });
+
+  assert.equal(clean.find((item) => item.id === "disputes").description, "No dispute history found in available task data.");
+  assert.match(disputed.find((item) => item.id === "disputes").description, /1 disputed task/);
 });
 
 test("service packages build for known agent specialties without fake traction", () => {
@@ -279,6 +383,8 @@ test("builder agent rows expose packages and honest missing metric fallbacks", (
   assert.equal(row.completedTasksDisplay, "0");
   assert.equal(row.totalEarnedDisplay, "0 USDC");
   assert.equal(row.approvalRateDisplay, "Not enough data yet");
+  assert.equal(row.readinessLabel, "Limited data");
+  assert.equal(row.verificationNextAction, "Wait for first completed task");
 });
 
 test("builder attention items include submitted revision and disputed tasks", () => {
