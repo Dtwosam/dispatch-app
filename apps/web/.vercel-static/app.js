@@ -47772,6 +47772,28 @@ function collectTaskBuckets(taskCollections = {}) {
 function taskBelongsToAgent(task, agentId) {
   return task?.selectedAgentId === agentId || (task?.participatingAgentIds || []).includes(agentId);
 }
+function readTaskReward(task) {
+  const value = Number(task?.rewardAmount);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+function isTaskFundedForEarnings(task) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  return !["Not Funded", "Funding Pending", "Unknown"].includes(lifecycle.paymentDisplay.label);
+}
+function isTaskSettledForEarnings(task) {
+  const status = String(task?.status || "").toUpperCase();
+  const settlementState = String(task?.settlementState || "").toLowerCase();
+  return status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
+}
+function isTaskDisputedForEarnings(task) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  return lifecycle.isDisputed;
+}
+function isTaskPendingLockedForEarnings(task) {
+  const status = String(task?.status || "").toUpperCase();
+  if (isTaskSettledForEarnings(task) || isTaskDisputedForEarnings(task)) return false;
+  return isTaskFundedForEarnings(task) && ["ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(status);
+}
 function buildAgentAttentionItems(agent, taskCollections = {}) {
   const agentId = agent?.profile?.agentId;
   if (!agentId) return [];
@@ -47790,6 +47812,93 @@ function buildAgentAttentionItems(agent, taskCollections = {}) {
       whoActsNext: lifecycle.statusDisplay.whoActsNext
     };
   });
+}
+function buildEarningsActivityRows(agents = [], taskCollections = {}) {
+  const agentById = new Map(agents.map((agent) => [agent?.profile?.agentId, agent]));
+  return collectTaskBuckets(taskCollections).flatMap((task) => {
+    const agentIds = [
+      task?.selectedAgentId,
+      ...task?.participatingAgentIds || []
+    ].filter(Boolean);
+    return [...new Set(agentIds)].map((agentId) => ({ task, agent: agentById.get(agentId) || null, agentId }));
+  }).filter(({ task }) => readTaskReward(task) > 0 && isTaskFundedForEarnings(task)).map(({ task, agent, agentId }) => {
+    const lifecycle = buildTaskLifecycleModel(task);
+    const settlementTxLink = buildArcTransactionLink(task?.latestSettlement?.txReference);
+    const fundingTxLink = buildArcTransactionLink(task?.latestFundTxHash);
+    return {
+      taskId: task.taskId,
+      title: buildSafeTaskSummary(task),
+      agentId,
+      agentName: agent?.profile?.publicName || "Assigned agent",
+      amount: readTaskReward(task),
+      amountDisplay: `${readTaskReward(task).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+      paymentState: lifecycle.paymentDisplay.label,
+      reviewState: lifecycle.reviewStateLabel,
+      settlementState: lifecycle.settlementLabel,
+      dateLabel: task?.latestSettlement?.settlementTimestamp || task?.updatedAt || task?.createdAt ? new Date(task.latestSettlement?.settlementTimestamp || task.updatedAt || task.createdAt).toLocaleDateString() : "Waiting for update",
+      txLink: settlementTxLink || fundingTxLink,
+      txLabel: settlementTxLink ? "Settlement tx" : fundingTxLink ? "Funding tx" : "No transaction link"
+    };
+  }).sort((left, right) => {
+    if (left.dateLabel === "Waiting for update") return 1;
+    if (right.dateLabel === "Waiting for update") return -1;
+    return 0;
+  });
+}
+function buildAgentEarningsBreakdown(agent, taskCollections = {}) {
+  const summary = agent?.performanceSummary || {};
+  const agentId = agent?.profile?.agentId || "";
+  const tasks = collectTaskBuckets(taskCollections).filter((task) => taskBelongsToAgent(task, agentId));
+  const paidTasks = Number(summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0);
+  const settledEarnings = Number(summary.paidEarnings ?? summary.totalEarnings ?? 0);
+  const pendingLockedValue = tasks.filter(isTaskPendingLockedForEarnings).reduce((sum, task) => sum + readTaskReward(task), 0);
+  const disputedLockedValue = tasks.filter((task) => isTaskDisputedForEarnings(task) && isTaskFundedForEarnings(task)).reduce((sum, task) => sum + readTaskReward(task), 0);
+  const averagePaidTaskValue = paidTasks > 0 ? settledEarnings / paidTasks : null;
+  const packages = buildAgentServicePackages(agent);
+  return {
+    settledEarnings,
+    settledEarningsDisplay: settledEarnings > 0 ? `${settledEarnings.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No settled earnings yet",
+    paidTasks,
+    paidTasksDisplay: paidTasks > 0 ? String(paidTasks) : "No paid tasks completed yet",
+    pendingLockedValue,
+    pendingLockedDisplay: pendingLockedValue > 0 ? `${pendingLockedValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Pending value appears after funded assigned tasks exist.",
+    disputedLockedValue,
+    disputedLockedDisplay: disputedLockedValue > 0 ? `${disputedLockedValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No disputed locked value.",
+    approvalRateDisplay: typeof summary.approvalRate === "number" && (summary.tasksAttempted || summary.totalReviews || paidTasks) > 0 ? `${Math.round(summary.approvalRate * 100)}%` : "Not enough data yet",
+    averagePaidTaskValueDisplay: averagePaidTaskValue == null ? "Waiting for first approved task" : `${averagePaidTaskValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    packageStartingPriceDisplay: packages.length ? `${Math.min(...packages.map((item) => item.priceUsdc)).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No service package yet"
+  };
+}
+function buildAgentEarningsSummary(agents = [], taskCollections = {}) {
+  const breakdowns = agents.map((agent) => buildAgentEarningsBreakdown(agent, taskCollections));
+  const settledEarnings = breakdowns.reduce((sum, item) => sum + item.settledEarnings, 0);
+  const pendingLockedValue = breakdowns.reduce((sum, item) => sum + item.pendingLockedValue, 0);
+  const disputedLockedValue = breakdowns.reduce((sum, item) => sum + item.disputedLockedValue, 0);
+  const paidTasks = breakdowns.reduce((sum, item) => sum + item.paidTasks, 0);
+  return {
+    settledEarnings,
+    settledEarningsDisplay: settledEarnings > 0 ? `${settledEarnings.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No settled earnings yet",
+    pendingLockedValue,
+    pendingLockedDisplay: pendingLockedValue > 0 ? `${pendingLockedValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Pending value appears after funded assigned tasks exist.",
+    disputedLockedValue,
+    disputedLockedDisplay: disputedLockedValue > 0 ? `${disputedLockedValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No disputed locked value.",
+    paidTasks,
+    averagePaidTaskValueDisplay: paidTasks > 0 ? `${(settledEarnings / paidTasks).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Waiting for first approved task"
+  };
+}
+function buildAgentEarningsDashboardModel(agents = [], taskCollections = {}) {
+  return {
+    summary: buildAgentEarningsSummary(agents, taskCollections),
+    breakdowns: agents.map((agent) => ({
+      agentId: agent?.profile?.agentId || "",
+      slug: agent?.profile?.slug || "",
+      name: agent?.profile?.publicName || "Unnamed Agent",
+      typeLabel: agent?.profile?.originType === "external" ? "External Agent" : "Platform Agent",
+      ...buildAgentEarningsBreakdown(agent, taskCollections)
+    })),
+    activityRows: buildEarningsActivityRows(agents, taskCollections),
+    note: "Agent earnings from available Dispatch task data. Wallet-specific builder earnings require reliable ownership/account persistence."
+  };
 }
 function buildAgentBuilderAgentRowModel(agent, taskCollections = {}) {
   const display = buildAgentDisplayModel(agent, taskCollections);
@@ -48503,10 +48612,17 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
     rejectedTasks: state2.tasks?.rejectedTasks || [],
     disputedTasks: state2.tasks?.disputedTasks || []
   });
+  const earningsBreakdown = buildAgentEarningsDashboardModel([agent], {
+    myPostedTasks: state2.tasks?.myPostedTasks || [],
+    allOpenTasks: state2.tasks?.allOpenTasks || [],
+    activeTasks: state2.tasks?.activeTasks || [],
+    completedTasks: state2.tasks?.completedTasks || [],
+    rejectedTasks: state2.tasks?.rejectedTasks || [],
+    disputedTasks: state2.tasks?.disputedTasks || []
+  }).breakdowns[0];
   const bestFor = display.bestUseCases;
   const recentWork = display.recentWork;
   const servicePackages = display.servicePackages.map((item) => buildServicePackageDisplayModel(item, agent));
-  const pendingEarnings = agent.performanceSummary.pendingEarnings ?? 0;
   const payoutWallet = agent.profile.ownerWallet || null;
   el2.appRoot.innerHTML = `
     <section data-structure="agent-profile">
@@ -48533,7 +48649,8 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
           </div>
           <div class="task-summary">
             <div class="metric-card"><strong>${escapeHtml(display.totalEarnedDisplay)}</strong><span>Paid earnings</span></div>
-            <div class="metric-card"><strong>${formatCurrency(pendingEarnings)}</strong><span>Pending approved reward</span></div>
+            <div class="metric-card"><strong>${escapeHtml(earningsBreakdown.pendingLockedDisplay)}</strong><span>Pending/locked value</span></div>
+            <div class="metric-card"><strong>${escapeHtml(earningsBreakdown.disputedLockedDisplay)}</strong><span>Disputed/locked value</span></div>
             <div class="metric-card"><strong>${escapeHtml(display.completedTasksDisplay)}</strong><span>Paid funded tasks</span></div>
             <div class="metric-card"><strong>${escapeHtml(display.approvalRateDisplay)}</strong><span>Approval rate</span></div>
             <div class="metric-card"><strong>${escapeHtml(display.averageScoreDisplay)}</strong><span>Avg evaluation score</span></div>
@@ -48541,6 +48658,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
             <div class="metric-card"><strong>${escapeHtml(display.rankDisplay)}</strong><span>Marketplace rank</span></div>
             <div class="metric-card"><strong>${escapeHtml(display.reviewsDisplay)}</strong><span>Reviews</span></div>
             <div class="metric-card"><strong>${agent.performanceSummary.disputeCount || 0}</strong><span>Disputes</span></div>
+            <div class="metric-card"><strong>${escapeHtml(earningsBreakdown.packageStartingPriceDisplay)}</strong><span>Package from</span></div>
           </div>
           <p class="muted">${escapeHtml(display.trustNote)}</p>
           <div class="agent-tags">
@@ -48681,6 +48799,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
     disputedTasks: state2.tasks?.disputedTasks || []
   };
   const dashboard = buildAgentBuilderDashboardModel(state2.agents, taskCollections);
+  const earningsDashboard = buildAgentEarningsDashboardModel(state2.agents, taskCollections);
   const { summary, agentRows } = dashboard;
   const attentionItems = agentRows.flatMap((row) => row.attentionItems.map((item) => ({ ...item, agentName: row.name, agentSlug: row.slug })));
   el2.appRoot.innerHTML = `
@@ -48719,7 +48838,45 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                   <p class="muted">Next: ${escapeHtml(item.nextAction)} | ${escapeHtml(item.whoActsNext)}</p>
                   <footer><button data-route="/tasks/${item.taskId}">View Task</button></footer>
                 </article>
-              `).join("") || emptyState("No agent tasks need attention yet.") : state2.dashboardTab === "earnings" ? agentRows.map((row) => `<article class="task-row"><strong>${escapeHtml(row.name)}</strong><p>${escapeHtml(row.totalEarnedDisplay)} from real settled performance data.</p><p class="muted">${escapeHtml(row.completedTasksDisplay)} paid funded tasks | ${escapeHtml(row.approvalRateDisplay)} approval rate</p></article>`).join("") : agentRows.map((row) => `
+              `).join("") || emptyState("No agent tasks need attention yet.") : state2.dashboardTab === "earnings" ? `
+                <article class="shell-panel">
+                  <p class="mini-label">Earnings visibility</p>
+                  <h3>Agent earnings from available task data</h3>
+                  <p class="muted">${escapeHtml(earningsDashboard.note)}</p>
+                  <div class="task-summary" style="margin-top:14px;">
+                    <div class="metric-card"><strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong><span>Settled earnings</span></div>
+                    <div class="metric-card"><strong>${escapeHtml(earningsDashboard.summary.pendingLockedDisplay)}</strong><span>Pending/locked value</span></div>
+                    <div class="metric-card"><strong>${escapeHtml(earningsDashboard.summary.disputedLockedDisplay)}</strong><span>Disputed/locked value</span></div>
+                    <div class="metric-card"><strong>${earningsDashboard.summary.paidTasks}</strong><span>Paid funded tasks</span></div>
+                    <div class="metric-card"><strong>${escapeHtml(earningsDashboard.summary.averagePaidTaskValueDisplay)}</strong><span>Avg paid task value</span></div>
+                  </div>
+                </article>
+                ${earningsDashboard.breakdowns.map((item) => `
+                  <article class="task-row">
+                    <strong>${escapeHtml(item.name)}</strong>
+                    <p>${escapeHtml(item.settledEarningsDisplay)} settled | ${escapeHtml(item.paidTasksDisplay)} paid tasks</p>
+                    <p class="muted">Pending/locked: ${escapeHtml(item.pendingLockedDisplay)} | Disputed/locked: ${escapeHtml(item.disputedLockedDisplay)}</p>
+                    <p class="muted">Approval: ${escapeHtml(item.approvalRateDisplay)} | Avg paid task: ${escapeHtml(item.averagePaidTaskValueDisplay)} | Package from: ${escapeHtml(item.packageStartingPriceDisplay)}</p>
+                  </article>
+                `).join("")}
+                <article class="shell-panel">
+                  <p class="mini-label">Payment activity</p>
+                  <h3>Task-linked earning activity</h3>
+                  <div class="live-feed" style="margin-top:14px;">
+                    ${earningsDashboard.activityRows.map((item, index2) => `
+                      <article class="feed-card feed-card--${taskStatusTone(item.paymentState)}" style="animation-delay:${index2 * 70}ms">
+                        <span class="feed-card__pulse"></span>
+                        <div>
+                          <strong>${escapeHtml(item.title)}</strong>
+                          <p>${escapeHtml(item.agentName)} | ${escapeHtml(item.amountDisplay)} | ${escapeHtml(item.paymentState)} | ${escapeHtml(item.reviewState)}</p>
+                          <p class="muted">${escapeHtml(item.settlementState)} | ${escapeHtml(item.dateLabel)}</p>
+                          ${item.txLink ? `<p><a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a></p>` : ""}
+                        </div>
+                      </article>
+                    `).join("") || emptyState("No payment history yet. Payment data appears after approved funded tasks are released.")}
+                  </div>
+                </article>
+              ` : agentRows.map((row) => `
                   <article class="task-row">
                     <div class="agent-tags">
                       <span class="tag">${escapeHtml(row.typeLabel)}</span>

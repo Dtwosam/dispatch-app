@@ -11,6 +11,9 @@ import {
   buildAgentBuilderDashboardModel,
   buildAgentBuilderSummaryModel,
   buildAgentAttentionItems,
+  buildAgentEarningsDashboardModel,
+  buildAgentEarningsBreakdown,
+  buildEarningsActivityRows,
   buildServicePackageDisplayModel,
   buildTaskDraftFromServicePackage,
   buildTaskLifecycleModel,
@@ -307,6 +310,64 @@ test("builder attention items return empty state safely", () => {
   });
 
   assert.deepEqual(items, []);
+});
+
+test("agent earnings summary separates settled pending and disputed values", () => {
+  const agents = [
+    {
+      profile: { agentId: "agent_1", publicName: "Thread Writer", slug: "thread-writer", originType: "platform", skills: ["thread"] },
+      performanceSummary: { paidEarnings: 30, paidTasksCompleted: 2, approvalRate: 0.8, tasksAttempted: 3 },
+    },
+  ];
+  const model = buildAgentEarningsDashboardModel(agents, {
+    activeTasks: [
+      { taskId: "pending", title: "Pending", status: "SUBMITTED", selectedAgentId: "agent_1", rewardAmount: 12, transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:pending", reviewActions: [] },
+      { taskId: "dispute", title: "Dispute", status: "SUBMITTED", selectedAgentId: "agent_1", rewardAmount: 7, transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:dispute", disputeRecords: [{ reason: "Quality", details: "Weak" }], reviewActions: [] },
+    ],
+  });
+
+  assert.equal(model.summary.settledEarningsDisplay, "30 USDC");
+  assert.equal(model.summary.pendingLockedDisplay, "12 USDC");
+  assert.equal(model.summary.disputedLockedDisplay, "7 USDC");
+  assert.equal(model.summary.averagePaidTaskValueDisplay, "15 USDC");
+});
+
+test("agent earnings breakdown uses honest fallbacks with no paid work", () => {
+  const breakdown = buildAgentEarningsBreakdown({
+    profile: { agentId: "agent_empty", publicName: "New Agent", slug: "new-agent", originType: "external", skills: [] },
+    performanceSummary: {},
+  }, {});
+
+  assert.equal(breakdown.settledEarningsDisplay, "No settled earnings yet");
+  assert.equal(breakdown.paidTasksDisplay, "No paid tasks completed yet");
+  assert.equal(breakdown.pendingLockedDisplay, "Pending value appears after funded assigned tasks exist.");
+  assert.equal(breakdown.averagePaidTaskValueDisplay, "Waiting for first approved task");
+});
+
+test("earnings activity rows use strict transaction links and clean date fallbacks", () => {
+  const validTx = `0x${"d".repeat(64)}`;
+  const rows = buildEarningsActivityRows(
+    [{ profile: { agentId: "agent_1", publicName: "Thread Writer" }, performanceSummary: {} }],
+    {
+      activeTasks: [
+        { taskId: "funded", title: "Funded task", status: "SUBMITTED", selectedAgentId: "agent_1", rewardAmount: 10, transactionState: "accepted", settlementState: "reward_funded", onchainTaskRef: "0xescrow:funded", latestFundTxHash: "0x1234", reviewActions: [] },
+        { taskId: "settled", title: "Settled task", status: "SETTLED", selectedAgentId: "agent_1", rewardAmount: 20, transactionState: "accepted", settlementState: "settled", onchainTaskRef: "0xescrow:settled", latestSettlement: { outcome: "paid", txReference: validTx, settlementTimestamp: "2026-04-03T10:00:00.000Z" }, reviewActions: [] },
+      ],
+    },
+  );
+
+  assert.equal(rows.length, 2);
+  assert.equal(rows.find((item) => item.taskId === "funded").txLink, null);
+  assert.equal(rows.find((item) => item.taskId === "funded").dateLabel, "Waiting for update");
+  assert.equal(rows.find((item) => item.taskId === "settled").txLink, `https://testnet.arcscan.app/tx/${validTx}`);
+});
+
+test("empty tasks create no fake earnings activity rows", () => {
+  const rows = buildEarningsActivityRows([
+    { profile: { agentId: "agent_1", publicName: "Thread Writer" }, performanceSummary: { paidEarnings: 100 } },
+  ], {});
+
+  assert.deepEqual(rows, []);
 });
 
 test("suggested template mapping follows agent specialty without inventing agents", () => {

@@ -1045,6 +1045,33 @@ function taskBelongsToAgent(task, agentId) {
   return task?.selectedAgentId === agentId || (task?.participatingAgentIds || []).includes(agentId);
 }
 
+function readTaskReward(task) {
+  const value = Number(task?.rewardAmount);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function isTaskFundedForEarnings(task) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  return !["Not Funded", "Funding Pending", "Unknown"].includes(lifecycle.paymentDisplay.label);
+}
+
+function isTaskSettledForEarnings(task) {
+  const status = String(task?.status || "").toUpperCase();
+  const settlementState = String(task?.settlementState || "").toLowerCase();
+  return status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
+}
+
+function isTaskDisputedForEarnings(task) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  return lifecycle.isDisputed;
+}
+
+function isTaskPendingLockedForEarnings(task) {
+  const status = String(task?.status || "").toUpperCase();
+  if (isTaskSettledForEarnings(task) || isTaskDisputedForEarnings(task)) return false;
+  return isTaskFundedForEarnings(task) && ["ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(status);
+}
+
 export function buildAgentAttentionItems(agent, taskCollections = {}) {
   const agentId = agent?.profile?.agentId;
   if (!agentId) return [];
@@ -1070,6 +1097,114 @@ export function buildAgentAttentionItems(agent, taskCollections = {}) {
         whoActsNext: lifecycle.statusDisplay.whoActsNext,
       };
     });
+}
+
+export function buildEarningsActivityRows(agents = [], taskCollections = {}) {
+  const agentById = new Map(agents.map((agent) => [agent?.profile?.agentId, agent]));
+  return collectTaskBuckets(taskCollections)
+    .flatMap((task) => {
+      const agentIds = [
+        task?.selectedAgentId,
+        ...(task?.participatingAgentIds || []),
+      ].filter(Boolean);
+      return [...new Set(agentIds)].map((agentId) => ({ task, agent: agentById.get(agentId) || null, agentId }));
+    })
+    .filter(({ task }) => readTaskReward(task) > 0 && isTaskFundedForEarnings(task))
+    .map(({ task, agent, agentId }) => {
+      const lifecycle = buildTaskLifecycleModel(task);
+      const settlementTxLink = buildArcTransactionLink(task?.latestSettlement?.txReference);
+      const fundingTxLink = buildArcTransactionLink(task?.latestFundTxHash);
+      return {
+        taskId: task.taskId,
+        title: buildSafeTaskSummary(task),
+        agentId,
+        agentName: agent?.profile?.publicName || "Assigned agent",
+        amount: readTaskReward(task),
+        amountDisplay: `${readTaskReward(task).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`,
+        paymentState: lifecycle.paymentDisplay.label,
+        reviewState: lifecycle.reviewStateLabel,
+        settlementState: lifecycle.settlementLabel,
+        dateLabel: task?.latestSettlement?.settlementTimestamp || task?.updatedAt || task?.createdAt
+          ? new Date(task.latestSettlement?.settlementTimestamp || task.updatedAt || task.createdAt).toLocaleDateString()
+          : "Waiting for update",
+        txLink: settlementTxLink || fundingTxLink,
+        txLabel: settlementTxLink ? "Settlement tx" : fundingTxLink ? "Funding tx" : "No transaction link",
+      };
+    })
+    .sort((left, right) => {
+      if (left.dateLabel === "Waiting for update") return 1;
+      if (right.dateLabel === "Waiting for update") return -1;
+      return 0;
+    });
+}
+
+export function buildAgentEarningsBreakdown(agent, taskCollections = {}) {
+  const summary = agent?.performanceSummary || {};
+  const agentId = agent?.profile?.agentId || "";
+  const tasks = collectTaskBuckets(taskCollections).filter((task) => taskBelongsToAgent(task, agentId));
+  const paidTasks = Number(summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0);
+  const settledEarnings = Number(summary.paidEarnings ?? summary.totalEarnings ?? 0);
+  const pendingLockedValue = tasks
+    .filter(isTaskPendingLockedForEarnings)
+    .reduce((sum, task) => sum + readTaskReward(task), 0);
+  const disputedLockedValue = tasks
+    .filter((task) => isTaskDisputedForEarnings(task) && isTaskFundedForEarnings(task))
+    .reduce((sum, task) => sum + readTaskReward(task), 0);
+  const averagePaidTaskValue = paidTasks > 0 ? settledEarnings / paidTasks : null;
+  const packages = buildAgentServicePackages(agent);
+
+  return {
+    settledEarnings,
+    settledEarningsDisplay: settledEarnings > 0 ? `${settledEarnings.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC` : "No settled earnings yet",
+    paidTasks,
+    paidTasksDisplay: paidTasks > 0 ? String(paidTasks) : "No paid tasks completed yet",
+    pendingLockedValue,
+    pendingLockedDisplay: pendingLockedValue > 0 ? `${pendingLockedValue.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC` : "Pending value appears after funded assigned tasks exist.",
+    disputedLockedValue,
+    disputedLockedDisplay: disputedLockedValue > 0 ? `${disputedLockedValue.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC` : "No disputed locked value.",
+    approvalRateDisplay: typeof summary.approvalRate === "number" && (summary.tasksAttempted || summary.totalReviews || paidTasks) > 0
+      ? `${Math.round(summary.approvalRate * 100)}%`
+      : "Not enough data yet",
+    averagePaidTaskValueDisplay: averagePaidTaskValue == null
+      ? "Waiting for first approved task"
+      : `${averagePaidTaskValue.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`,
+    packageStartingPriceDisplay: packages.length
+      ? `${Math.min(...packages.map((item) => item.priceUsdc)).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`
+      : "No service package yet",
+  };
+}
+
+export function buildAgentEarningsSummary(agents = [], taskCollections = {}) {
+  const breakdowns = agents.map((agent) => buildAgentEarningsBreakdown(agent, taskCollections));
+  const settledEarnings = breakdowns.reduce((sum, item) => sum + item.settledEarnings, 0);
+  const pendingLockedValue = breakdowns.reduce((sum, item) => sum + item.pendingLockedValue, 0);
+  const disputedLockedValue = breakdowns.reduce((sum, item) => sum + item.disputedLockedValue, 0);
+  const paidTasks = breakdowns.reduce((sum, item) => sum + item.paidTasks, 0);
+  return {
+    settledEarnings,
+    settledEarningsDisplay: settledEarnings > 0 ? `${settledEarnings.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC` : "No settled earnings yet",
+    pendingLockedValue,
+    pendingLockedDisplay: pendingLockedValue > 0 ? `${pendingLockedValue.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC` : "Pending value appears after funded assigned tasks exist.",
+    disputedLockedValue,
+    disputedLockedDisplay: disputedLockedValue > 0 ? `${disputedLockedValue.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC` : "No disputed locked value.",
+    paidTasks,
+    averagePaidTaskValueDisplay: paidTasks > 0 ? `${(settledEarnings / paidTasks).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC` : "Waiting for first approved task",
+  };
+}
+
+export function buildAgentEarningsDashboardModel(agents = [], taskCollections = {}) {
+  return {
+    summary: buildAgentEarningsSummary(agents, taskCollections),
+    breakdowns: agents.map((agent) => ({
+      agentId: agent?.profile?.agentId || "",
+      slug: agent?.profile?.slug || "",
+      name: agent?.profile?.publicName || "Unnamed Agent",
+      typeLabel: agent?.profile?.originType === "external" ? "External Agent" : "Platform Agent",
+      ...buildAgentEarningsBreakdown(agent, taskCollections),
+    })),
+    activityRows: buildEarningsActivityRows(agents, taskCollections),
+    note: "Agent earnings from available Dispatch task data. Wallet-specific builder earnings require reliable ownership/account persistence.",
+  };
 }
 
 export function buildAgentBuilderAgentRowModel(agent, taskCollections = {}) {
