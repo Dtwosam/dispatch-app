@@ -7,6 +7,9 @@ import {
   buildRecentAgentWork,
   buildReviewPanelModel,
   buildSuggestedTaskTemplatesForAgent,
+  buildAgentServicePackages,
+  buildServicePackageDisplayModel,
+  buildTaskDraftFromServicePackage,
   buildTaskLifecycleModel,
   buildTaskDisputeDisplayModel,
   buildTaskPaymentDisplayModel,
@@ -145,6 +148,95 @@ test("agent display model uses honest fallbacks when metrics are missing", () =>
   assert.equal(model.reviewsDisplay, "No reviews yet");
   assert.equal(model.verificationLabel, "Not verified yet");
   assert.match(model.trustNote, /Not enough completed work yet/);
+});
+
+test("service packages build for known agent specialties without fake traction", () => {
+  const packages = buildAgentServicePackages({
+    profile: {
+      agentId: "thread_writer",
+      publicName: "Thread Writer",
+      slug: "thread-writer",
+      category: "writing",
+      skills: ["thread writing"],
+      capabilityTags: [],
+    },
+    performanceSummary: {
+      paidEarnings: 0,
+      paidTasksCompleted: 0,
+      totalReviews: 0,
+    },
+  });
+
+  assert.equal(packages.length, 3);
+  assert.deepEqual(packages.map((item) => item.tier), ["Basic", "Standard", "Pro"]);
+  assert.deepEqual(packages.map((item) => item.priceUsdc), [10, 20, 35]);
+  assert.equal(packages[0].templateId, "write_x_thread");
+  assert.ok(!("sales" in packages[0]));
+  assert.ok(!("reviews" in packages[0]));
+  assert.ok(!("earnings" in packages[0]));
+});
+
+test("service package display exposes honest price delivery and output labels", () => {
+  const servicePackage = buildAgentServicePackages({
+    profile: {
+      agentId: "summarizer",
+      publicName: "Summarizer",
+      slug: "summarizer",
+      category: "summarization",
+      skills: ["summarization"],
+      capabilityTags: [],
+    },
+    performanceSummary: {},
+  })[1];
+  const model = buildServicePackageDisplayModel(servicePackage, {
+    profile: { publicName: "Summarizer" },
+  });
+
+  assert.equal(model.tier, "Standard");
+  assert.equal(model.priceDisplay, "18 USDC");
+  assert.equal(model.agentName, "Summarizer");
+  assert.equal(model.templateName, "Summarize Article");
+  assert.match(model.expectedOutput, /summary/i);
+});
+
+test("service package task draft preselects agent and editable funded task fields", () => {
+  const agent = {
+    profile: {
+      agentId: "research_brief",
+      publicName: "Research Brief",
+      slug: "research-brief",
+      category: "research",
+      skills: ["research"],
+      capabilityTags: [],
+    },
+    performanceSummary: {},
+  };
+  const servicePackage = buildAgentServicePackages(agent)[2];
+  const draft = buildTaskDraftFromServicePackage(servicePackage, agent);
+
+  assert.equal(draft.hiringMode, "direct_hire");
+  assert.equal(draft.selectedAgentId, "research_brief");
+  assert.equal(draft.rewardAmount, "50");
+  assert.equal(draft.templateId, "research_project");
+  assert.match(draft.description, /Service Package: Pro - Research \+ comparison \+ risks/);
+  assert.match(draft.description, /You still fund/i);
+  assert.equal(draft.servicePackage.priceUsdc, 50);
+});
+
+test("unknown agents do not get fake service packages", () => {
+  const packages = buildAgentServicePackages({
+    profile: {
+      agentId: "generic",
+      publicName: "General Worker",
+      slug: "general-worker",
+      category: "operations",
+      skills: [],
+      capabilityTags: [],
+    },
+    performanceSummary: {},
+  });
+
+  assert.deepEqual(packages, []);
 });
 
 test("suggested template mapping follows agent specialty without inventing agents", () => {

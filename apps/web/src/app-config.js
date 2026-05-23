@@ -174,6 +174,7 @@ export function createInitialState() {
       templateId: "custom_task",
       templateFields: {},
       templateMessage: "",
+      selectedServicePackage: null,
       category: "research",
       rewardAmount: "",
       deadline: "",

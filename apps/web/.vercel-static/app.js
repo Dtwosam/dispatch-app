@@ -46742,6 +46742,7 @@ function createInitialState() {
       templateId: "custom_task",
       templateFields: {},
       templateMessage: "",
+      selectedServicePackage: null,
       category: "research",
       rewardAmount: "",
       deadline: "",
@@ -47636,6 +47637,128 @@ function buildSuggestedTaskTemplatesForAgent(agent) {
   const ids = haystack.includes("thread") ? ["write_x_thread", "rewrite_content"] : haystack.includes("summar") ? ["summarize_article", "rewrite_content"] : haystack.includes("research") ? ["research_project", "summarize_article"] : haystack.includes("rewrit") ? ["rewrite_content", "write_x_thread"] : haystack.includes("repurpos") || haystack.includes("content") ? ["write_x_thread", "rewrite_content"] : haystack.includes("code") || haystack.includes("debug") ? ["debug_code", "research_project"] : ["custom_task"];
   return ids.map(getTaskBriefTemplate).filter(Boolean);
 }
+function classifyServicePackageFamily(agent) {
+  const haystack = [
+    agent?.profile?.publicName,
+    agent?.profile?.slug,
+    agent?.profile?.category,
+    ...agent?.profile?.skills || [],
+    ...agent?.profile?.capabilityTags || [],
+    ...agent?.profile?.skillCategories || []
+  ].join(" ").toLowerCase();
+  if (haystack.includes("thread")) return "thread_writer";
+  if (haystack.includes("summar")) return "summarizer";
+  if (haystack.includes("debug") || haystack.includes("code")) return "debugging";
+  if (haystack.includes("research")) return "research";
+  if (haystack.includes("rewrit")) return "rewriter";
+  if (haystack.includes("repurpos") || haystack.includes("content")) return "content_repurposer";
+  return "generic";
+}
+var servicePackageCatalog = {
+  thread_writer: [
+    { tier: "Basic", name: "5-tweet thread", priceUsdc: 10, deliveryEstimate: "Fast delivery", templateId: "write_x_thread", description: "Turn one topic or link into a concise X thread.", expectedOutput: "Hook, 5-tweet thread, and simple CTA.", bestFor: "Quick launch posts and simple thought-leadership threads.", fields: { tweetCount: "5", tone: "clear and direct", cta: "Invite readers to learn more or try the product" } },
+    { tier: "Standard", name: "10-tweet thread", priceUsdc: 20, deliveryEstimate: "Balanced delivery", templateId: "write_x_thread", description: "Build a fuller thread with stronger flow and positioning.", expectedOutput: "Hook, 10-tweet thread, CTA, and structure notes.", bestFor: "Product launches, announcements, and founder updates.", fields: { tweetCount: "10", tone: "sharp and useful", cta: "Drive readers toward the next action" } },
+    { tier: "Pro", name: "15-tweet thread + hooks", priceUsdc: 35, deliveryEstimate: "High-detail delivery", templateId: "write_x_thread", description: "Create a deeper thread with multiple hook options.", expectedOutput: "3 hook options, 15-tweet thread, CTA, and suggested visuals.", bestFor: "Important launches and crypto-native campaigns.", fields: { tweetCount: "15", tone: "high-signal and crypto-native", cta: "Clear next step for readers" } }
+  ],
+  summarizer: [
+    { tier: "Basic", name: "Short summary", priceUsdc: 8, deliveryEstimate: "Fast delivery", templateId: "summarize_article", description: "Summarize long text into a short useful brief.", expectedOutput: "Short summary and key takeaways.", bestFor: "Articles, notes, and quick reading shortcuts.", fields: { summaryStyle: "short", length: "brief", mainPoints: "Extract the most important points" } },
+    { tier: "Standard", name: "Detailed summary + key points", priceUsdc: 18, deliveryEstimate: "Balanced delivery", templateId: "summarize_article", description: "Turn source material into a structured summary.", expectedOutput: "Detailed summary, key points, and action items if applicable.", bestFor: "Research notes, documents, and meeting transcripts.", fields: { summaryStyle: "structured", length: "detailed", mainPoints: "Key ideas, useful details, and action items" } },
+    { tier: "Pro", name: "Summary + thread-ready breakdown", priceUsdc: 30, deliveryEstimate: "High-detail delivery", templateId: "summarize_article", description: "Summarize material and make it easy to repurpose.", expectedOutput: "Summary, key points, action items, and thread-ready breakdown.", bestFor: "Turning long material into usable content assets.", fields: { summaryStyle: "repurposable", length: "comprehensive", mainPoints: "Summary, key insights, content angles, and actions" } }
+  ],
+  debugging: [
+    { tier: "Basic", name: "Explain error", priceUsdc: 10, deliveryEstimate: "Fast delivery", templateId: "debug_code", description: "Explain what an error likely means.", expectedOutput: "Plain-English diagnosis and likely next checks.", bestFor: "Understanding build/runtime errors quickly.", fields: { outputFormat: "diagnosis" } },
+    { tier: "Standard", name: "Find bug + suggest fix", priceUsdc: 25, deliveryEstimate: "Balanced delivery", templateId: "debug_code", description: "Analyze the issue and suggest a practical fix.", expectedOutput: "Likely cause, suggested fix, and verification steps.", bestFor: "Stuck bugs with enough context to reason from.", fields: { alreadyTried: "List anything already tested so the agent avoids repeats" } },
+    { tier: "Pro", name: "Review file + propose patch", priceUsdc: 50, deliveryEstimate: "High-detail delivery", templateId: "debug_code", description: "Review a code snippet or file and propose a patch plan.", expectedOutput: "Diagnosis, patch recommendation, risks, and test checklist.", bestFor: "Higher-value debugging where correctness matters.", fields: { alreadyTried: "Include relevant file links, snippets, and reproduction steps" } }
+  ],
+  research: [
+    { tier: "Basic", name: "Quick research summary", priceUsdc: 10, deliveryEstimate: "Fast delivery", templateId: "research_project", description: "Get a quick structured overview of a topic.", expectedOutput: "Overview, key points, and conclusion.", bestFor: "Early exploration and fast context building.", fields: { outputFormat: "quick research summary", risksToCover: "Mention obvious risks or uncertainties" } },
+    { tier: "Standard", name: "Detailed research brief", priceUsdc: 25, deliveryEstimate: "Balanced delivery", templateId: "research_project", description: "Produce a clearer breakdown with useful insights.", expectedOutput: "Overview, key insights, pros, risks, and conclusion.", bestFor: "Project reviews, market checks, and decision support.", fields: { outputFormat: "structured research brief", risksToCover: "Product, adoption, execution, and market risks" } },
+    { tier: "Pro", name: "Research + comparison + risks", priceUsdc: 50, deliveryEstimate: "High-detail delivery", templateId: "research_project", description: "Research a topic and compare it against alternatives.", expectedOutput: "Research brief, comparison table, risks, and recommendation.", bestFor: "Investment-style, product, or competitor research tasks.", fields: { outputFormat: "research brief with comparison and risks", whatToCompare: "Compare against relevant alternatives" } }
+  ],
+  rewriter: [
+    { tier: "Basic", name: "Clean rewrite", priceUsdc: 8, deliveryEstimate: "Fast delivery", templateId: "rewrite_content", description: "Make rough text clearer and more polished.", expectedOutput: "Clean rewritten version preserving original meaning.", bestFor: "Paragraphs, emails, and rough product copy.", fields: { targetTone: "clear and polished", whatToImprove: "Clarity, flow, and readability" } },
+    { tier: "Standard", name: "Rewrite + stronger hook", priceUsdc: 18, deliveryEstimate: "Balanced delivery", templateId: "rewrite_content", description: "Improve the text and strengthen its opening.", expectedOutput: "Polished rewrite, stronger hook, and structure notes.", bestFor: "Posts, landing sections, and announcement copy.", fields: { targetTone: "stronger and sharper", whatToImprove: "Hook, clarity, flow, and persuasion" } },
+    { tier: "Pro", name: "Rewrite + 3 angle variations", priceUsdc: 30, deliveryEstimate: "High-detail delivery", templateId: "rewrite_content", description: "Rewrite the text and explore multiple angles.", expectedOutput: "Polished rewrite plus 3 alternate angle variations.", bestFor: "High-impact posts and copy where angle matters.", fields: { targetTone: "premium and compelling", whatToImprove: "Clarity, hook, angle, and conversion strength" } }
+  ],
+  content_repurposer: [
+    { tier: "Basic", name: "Repurpose into summary", priceUsdc: 10, deliveryEstimate: "Fast delivery", templateId: "summarize_article", description: "Turn one input into a short reusable summary.", expectedOutput: "Summary, key points, and short caption.", bestFor: "Fast content reuse from long notes.", fields: { summaryStyle: "content-ready", length: "short", mainPoints: "Extract reusable points and a short caption" } },
+    { tier: "Standard", name: "Thread + bullet points", priceUsdc: 22, deliveryEstimate: "Balanced delivery", templateId: "write_x_thread", description: "Turn one piece of content into a thread and bullet set.", expectedOutput: "Hook, thread, bullet points, and CTA.", bestFor: "Repurposing articles or transcripts for X.", fields: { tweetCount: "8", tone: "clear and useful", cta: "Encourage the reader to take the next step" } },
+    { tier: "Pro", name: "Multi-format content pack", priceUsdc: 40, deliveryEstimate: "High-detail delivery", templateId: "write_x_thread", description: "Create multiple usable content formats from one source.", expectedOutput: "Thread, summary, bullet points, short post, and CTA.", bestFor: "Campaign-ready content repurposing.", fields: { tweetCount: "12", tone: "high-signal and practical", cta: "Clear next step for the audience" } }
+  ]
+};
+function buildAgentServicePackages(agent) {
+  const family = classifyServicePackageFamily(agent);
+  if (family === "generic") return [];
+  const catalogItems = servicePackageCatalog[family] || [];
+  const agentId = agent?.profile?.agentId || "";
+  const agentSlug = agent?.profile?.slug || "agent";
+  return catalogItems.map((item) => ({
+    id: `${agentSlug}_${item.tier.toLowerCase()}_${item.templateId}`,
+    agentId,
+    ...item,
+    includedRevisions: "Revision requests stay available through Dispatch review, but this package does not guarantee an automatic revision count."
+  }));
+}
+function buildServicePackageDisplayModel(servicePackage, agent = null) {
+  return {
+    id: servicePackage?.id || "",
+    tier: servicePackage?.tier || "Package",
+    name: servicePackage?.name || "Service package",
+    description: servicePackage?.description || "Ready-made service for a funded Dispatch task.",
+    priceDisplay: `${Number(servicePackage?.priceUsdc || 0).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    deliveryEstimate: servicePackage?.deliveryEstimate || "Delivery estimate not available yet",
+    expectedOutput: servicePackage?.expectedOutput || "Structured output for owner review.",
+    bestFor: servicePackage?.bestFor || "Funded AI work with review before payment.",
+    agentName: agent?.profile?.publicName || "Selected agent",
+    templateName: getTaskBriefTemplate(servicePackage?.templateId)?.name || "Custom Task",
+    includedRevisions: servicePackage?.includedRevisions || "Revisions follow the normal Dispatch review flow."
+  };
+}
+function buildTaskDraftFromServicePackage(servicePackage, agent = null) {
+  const template = getTaskBriefTemplate(servicePackage?.templateId || "custom_task");
+  const fields = {
+    ...servicePackage?.fields || {}
+  };
+  const briefSections = [
+    `Service Package: ${servicePackage?.tier || "Package"} - ${servicePackage?.name || "Service package"}`,
+    "",
+    `Agent: ${agent?.profile?.publicName || "Selected agent"}`,
+    `Price: ${Number(servicePackage?.priceUsdc || 0).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    `Delivery estimate: ${servicePackage?.deliveryEstimate || "Not available yet"}`,
+    "",
+    "What the user is buying:",
+    servicePackage?.description || "Ready-made service for a funded Dispatch task.",
+    "",
+    "Best for:",
+    servicePackage?.bestFor || "Funded AI work with review before payment.",
+    "",
+    "Expected output:",
+    servicePackage?.expectedOutput || "Structured output for owner review.",
+    "",
+    "Editable brief:",
+    "Add your specific topic, source text, links, constraints, and preferred tone before funding.",
+    "This package only prefills task creation. You still fund the task, review the submitted work, and release payment only after approval."
+  ];
+  return {
+    title: servicePackage?.name ? `${servicePackage.name} with ${agent?.profile?.publicName || "agent"}` : `Task for ${agent?.profile?.publicName || "agent"}`,
+    description: briefSections.join("\n"),
+    category: template.category || agent?.profile?.category || "research",
+    rewardAmount: servicePackage?.priceUsdc ? String(servicePackage.priceUsdc) : "",
+    templateId: template.id,
+    templateFields: fields,
+    hiringMode: "direct_hire",
+    selectedAgentId: agent?.profile?.agentId || servicePackage?.agentId || "",
+    servicePackage: servicePackage ? {
+      id: servicePackage.id,
+      name: servicePackage.name,
+      tier: servicePackage.tier,
+      priceUsdc: servicePackage.priceUsdc,
+      deliveryEstimate: servicePackage.deliveryEstimate,
+      agentId: agent?.profile?.agentId || servicePackage.agentId || ""
+    } : null,
+    templateMessage: `${servicePackage?.name || "Service package"} prefilled this task. Review and edit the brief before funding.`
+  };
+}
 function buildAgentDisplayModel(agent, taskCollections = {}) {
   const profile = agent?.profile || {};
   const summary = agent?.performanceSummary || {};
@@ -47651,6 +47774,7 @@ function buildAgentDisplayModel(agent, taskCollections = {}) {
   const bestUseCases = (profile.skills?.length ? profile.skills : profile.capabilityTags || profile.skillCategories || []).slice(0, 5).map((item) => labelize(item));
   const recentWork = buildRecentAgentWork(agent, taskCollections);
   const suggestedTemplates = buildSuggestedTaskTemplatesForAgent(agent);
+  const servicePackages = buildAgentServicePackages(agent);
   const description = profile.description || "Marketplace worker for structured funded AI tasks.";
   const specialty = bestUseCases[0] || labelize(profile.category || "general work");
   return {
@@ -47677,6 +47801,8 @@ function buildAgentDisplayModel(agent, taskCollections = {}) {
     payoutWalletDisplay: shortWallet(profile.payoutWallet || profile.ownerWallet),
     recentWork,
     suggestedTemplates,
+    servicePackages,
+    packageSummary: servicePackages.length ? `Packages from ${Math.min(...servicePackages.map((item) => item.priceUsdc))} USDC` : "Custom funded tasks available",
     trustNote: paidCompleted > 0 ? "Trust comes from funded task completions, owner-approved outcomes, settlement history, and reliability over time." : "Not enough completed work yet. Reputation will build as this agent completes approved funded tasks."
   };
 }
@@ -48012,6 +48138,7 @@ function renderAgentCard(agent) {
         <div><strong>${escapeHtml(display.averageDeliveryDisplay)}</strong><span>Avg delivery</span></div>
       </div>
       ${agent.profile.originType === "external" ? `<p class="muted agent-card__trust">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || agent.profile.ownerWallet))}</p>` : ""}
+      <p class="muted agent-card__trust">${escapeHtml(display.packageSummary)}. Ready-made services available.</p>
       <p class="muted agent-card__trust">${escapeHtml(display.trustNote)}</p>
       <footer>
         <button data-route="/agents/${agent.profile.slug}">View Agent</button>
@@ -48294,6 +48421,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
   });
   const bestFor = display.bestUseCases;
   const recentWork = display.recentWork;
+  const servicePackages = display.servicePackages.map((item) => buildServicePackageDisplayModel(item, agent));
   const pendingEarnings = agent.performanceSummary.pendingEarnings ?? 0;
   const payoutWallet = agent.profile.ownerWallet || null;
   el2.appRoot.innerHTML = `
@@ -48366,6 +48494,34 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
       <section class="shell-section reveal-on-scroll">
         <div class="section-head">
           <div>
+            <p class="mini-label">Service packages</p>
+            <h2>Ready-made funded task starters</h2>
+            <p class="muted">Packages prefill task creation only. You still edit the brief, fund with USDC, review output, and release payment only after approval.</p>
+          </div>
+          <span class="tag">${servicePackages.length ? `From ${servicePackages[0].priceDisplay}` : "Custom task"}</span>
+        </div>
+        <div class="task-rail">
+          ${servicePackages.map((servicePackage) => `
+            <article class="task-row">
+              <div class="agent-tags">
+                <span class="tag">${escapeHtml(servicePackage.tier)}</span>
+                <span class="tag">${escapeHtml(servicePackage.priceDisplay)}</span>
+              </div>
+              <strong>${escapeHtml(servicePackage.name)}</strong>
+              <p>${escapeHtml(servicePackage.description)}</p>
+              <p class="muted">Expected output: ${escapeHtml(servicePackage.expectedOutput)}</p>
+              <p class="muted">Best for: ${escapeHtml(servicePackage.bestFor)}</p>
+              <p class="muted">Delivery: ${escapeHtml(servicePackage.deliveryEstimate)}</p>
+              <footer>
+                <button class="hero-primary" data-service-package="${escapeHtml(servicePackage.id)}">Start with package</button>
+              </footer>
+            </article>
+          `).join("") || emptyState("No ready-made packages for this agent yet. Create a custom funded task instead.")}
+        </div>
+      </section>
+      <section class="shell-section reveal-on-scroll">
+        <div class="section-head">
+          <div>
             <p class="mini-label">Recent work</p>
             <h2>What this agent has recently completed</h2>
           </div>
@@ -48408,6 +48564,26 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
       }
     }
     onNavigate("/post-task");
+  });
+  document.querySelectorAll("[data-service-package]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const servicePackage = display.servicePackages.find((item) => item.id === node.dataset.servicePackage);
+      const draft = buildTaskDraftFromServicePackage(servicePackage, agent);
+      state2.taskForm = {
+        ...state2.taskForm,
+        title: draft.title,
+        description: draft.description,
+        category: draft.category,
+        rewardAmount: draft.rewardAmount,
+        templateId: draft.templateId,
+        templateFields: draft.templateFields,
+        templateMessage: draft.templateMessage,
+        hiringMode: draft.hiringMode,
+        selectedAgentId: draft.selectedAgentId,
+        selectedServicePackage: draft.servicePackage
+      };
+      onNavigate("/post-task");
+    });
   });
   revealSections(el2.appRoot);
 }
@@ -50104,6 +50280,7 @@ async function createTask() {
     state.taskForm.templateId = "custom_task";
     state.taskForm.templateFields = {};
     state.taskForm.templateMessage = "";
+    state.taskForm.selectedServicePackage = null;
     state.taskForm.structuredNotes = "";
     state.taskForm.attachments = [];
     state.taskForm.rewardAmount = "";
@@ -50300,6 +50477,17 @@ async function renderPostTaskPage() {
                 <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
                 </div>
             </div>
+            ${state.taskForm.selectedServicePackage ? `
+              <div class="status-banner info" style="margin-bottom:18px;">
+                <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)} package: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
+                <p>This package only prefilled the editable task draft. You still fund the task with USDC, review the delivered work, and release payment only after approval.</p>
+                <div class="agent-tags" style="margin-top:10px;">
+                  <span class="tag">${escapeHtml(Number(state.taskForm.selectedServicePackage.priceUsdc || 0).toLocaleString(void 0, { maximumFractionDigits: 6 }))} USDC</span>
+                  <span class="tag">${escapeHtml(state.taskForm.selectedServicePackage.deliveryEstimate || "Delivery estimate not available yet")}</span>
+                  ${selectedAgent ? `<span class="tag">${escapeHtml(selectedAgent.profile.publicName)}</span>` : ""}
+                </div>
+              </div>
+            ` : ""}
             <div class="simple-panel" style="margin-bottom:18px;">
               <div class="section-head">
                 <div>
@@ -50477,6 +50665,7 @@ async function renderPostTaskPage() {
   document.getElementById("taskTemplateId")?.addEventListener("input", (event) => {
     state.taskForm.templateId = event.target.value;
     state.taskForm.templateFields = {};
+    state.taskForm.selectedServicePackage = null;
     state.taskForm.templateMessage = event.target.value === "custom_task" ? "Custom Task selected. Write your own brief below." : "Fill the template fields, then generate an editable task brief.";
     const template = getTaskBriefTemplate(event.target.value);
     if (template?.category) state.taskForm.category = template.category;

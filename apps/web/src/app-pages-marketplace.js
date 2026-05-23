@@ -19,7 +19,13 @@ import {
   taskStatusTone,
   trustScore,
 } from "./app-ui.js";
-import { buildAgentDisplayModel, buildTaskLifecycleModel, shortWallet } from "./ui-models.js";
+import {
+  buildAgentDisplayModel,
+  buildServicePackageDisplayModel,
+  buildTaskDraftFromServicePackage,
+  buildTaskLifecycleModel,
+  shortWallet,
+} from "./ui-models.js";
 
 function topAgentBucket(state) {
   return (state.leaderboards?.buckets || []).find((item) => item.key === "top_earning_agents")
@@ -222,6 +228,7 @@ function renderAgentCard(agent) {
         <div><strong>${escapeHtml(display.averageDeliveryDisplay)}</strong><span>Avg delivery</span></div>
       </div>
       ${agent.profile.originType === "external" ? `<p class="muted agent-card__trust">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || agent.profile.ownerWallet))}</p>` : ""}
+      <p class="muted agent-card__trust">${escapeHtml(display.packageSummary)}. Ready-made services available.</p>
       <p class="muted agent-card__trust">${escapeHtml(display.trustNote)}</p>
       <footer>
         <button data-route="/agents/${agent.profile.slug}">View Agent</button>
@@ -582,6 +589,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
   });
   const bestFor = display.bestUseCases;
   const recentWork = display.recentWork;
+  const servicePackages = display.servicePackages.map((item) => buildServicePackageDisplayModel(item, agent));
   const pendingEarnings = agent.performanceSummary.pendingEarnings ?? 0;
   const payoutWallet = agent.profile.ownerWallet || null;
 
@@ -657,6 +665,34 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
       <section class="shell-section reveal-on-scroll">
         <div class="section-head">
           <div>
+            <p class="mini-label">Service packages</p>
+            <h2>Ready-made funded task starters</h2>
+            <p class="muted">Packages prefill task creation only. You still edit the brief, fund with USDC, review output, and release payment only after approval.</p>
+          </div>
+          <span class="tag">${servicePackages.length ? `From ${servicePackages[0].priceDisplay}` : "Custom task"}</span>
+        </div>
+        <div class="task-rail">
+          ${servicePackages.map((servicePackage) => `
+            <article class="task-row">
+              <div class="agent-tags">
+                <span class="tag">${escapeHtml(servicePackage.tier)}</span>
+                <span class="tag">${escapeHtml(servicePackage.priceDisplay)}</span>
+              </div>
+              <strong>${escapeHtml(servicePackage.name)}</strong>
+              <p>${escapeHtml(servicePackage.description)}</p>
+              <p class="muted">Expected output: ${escapeHtml(servicePackage.expectedOutput)}</p>
+              <p class="muted">Best for: ${escapeHtml(servicePackage.bestFor)}</p>
+              <p class="muted">Delivery: ${escapeHtml(servicePackage.deliveryEstimate)}</p>
+              <footer>
+                <button class="hero-primary" data-service-package="${escapeHtml(servicePackage.id)}">Start with package</button>
+              </footer>
+            </article>
+          `).join("") || emptyState("No ready-made packages for this agent yet. Create a custom funded task instead.")}
+        </div>
+      </section>
+      <section class="shell-section reveal-on-scroll">
+        <div class="section-head">
+          <div>
             <p class="mini-label">Recent work</p>
             <h2>What this agent has recently completed</h2>
           </div>
@@ -700,6 +736,27 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
       }
     }
     onNavigate("/post-task");
+  });
+
+  document.querySelectorAll("[data-service-package]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const servicePackage = display.servicePackages.find((item) => item.id === node.dataset.servicePackage);
+      const draft = buildTaskDraftFromServicePackage(servicePackage, agent);
+      state.taskForm = {
+        ...state.taskForm,
+        title: draft.title,
+        description: draft.description,
+        category: draft.category,
+        rewardAmount: draft.rewardAmount,
+        templateId: draft.templateId,
+        templateFields: draft.templateFields,
+        templateMessage: draft.templateMessage,
+        hiringMode: draft.hiringMode,
+        selectedAgentId: draft.selectedAgentId,
+        selectedServicePackage: draft.servicePackage,
+      };
+      onNavigate("/post-task");
+    });
   });
 
   revealSections(el.appRoot);

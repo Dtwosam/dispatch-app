@@ -1022,6 +1022,7 @@ async function createTask() {
     state.taskForm.templateId = "custom_task";
     state.taskForm.templateFields = {};
     state.taskForm.templateMessage = "";
+    state.taskForm.selectedServicePackage = null;
     state.taskForm.structuredNotes = "";
     state.taskForm.attachments = [];
     state.taskForm.rewardAmount = "";
@@ -1252,6 +1253,17 @@ async function renderPostTaskPage() {
                 <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
                 </div>
             </div>
+            ${state.taskForm.selectedServicePackage ? `
+              <div class="status-banner info" style="margin-bottom:18px;">
+                <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)} package: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
+                <p>This package only prefilled the editable task draft. You still fund the task with USDC, review the delivered work, and release payment only after approval.</p>
+                <div class="agent-tags" style="margin-top:10px;">
+                  <span class="tag">${escapeHtml(Number(state.taskForm.selectedServicePackage.priceUsdc || 0).toLocaleString(undefined, { maximumFractionDigits: 6 }))} USDC</span>
+                  <span class="tag">${escapeHtml(state.taskForm.selectedServicePackage.deliveryEstimate || "Delivery estimate not available yet")}</span>
+                  ${selectedAgent ? `<span class="tag">${escapeHtml(selectedAgent.profile.publicName)}</span>` : ""}
+                </div>
+              </div>
+            ` : ""}
             <div class="simple-panel" style="margin-bottom:18px;">
               <div class="section-head">
                 <div>
@@ -1438,6 +1450,7 @@ async function renderPostTaskPage() {
   document.getElementById("taskTemplateId")?.addEventListener("input", (event) => {
     state.taskForm.templateId = event.target.value;
     state.taskForm.templateFields = {};
+    state.taskForm.selectedServicePackage = null;
     state.taskForm.templateMessage = event.target.value === "custom_task"
       ? "Custom Task selected. Write your own brief below."
       : "Fill the template fields, then generate an editable task brief.";
