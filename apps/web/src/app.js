@@ -57,6 +57,7 @@ import {
 import {
   buildPostTaskChecklist,
   buildReviewPanelModel,
+  buildTaskDisputeDisplayModel,
   buildTaskResultModel,
   buildTaskRevisionDisplayModel,
   buildTaskTemplateBrief,
@@ -73,6 +74,10 @@ let activeTaskDetailRenderToken = 0;
 
 function persistRevisionRequests() {
   localStorage.setItem("dispatchRevisionRequests", JSON.stringify(state.revisionRequests || {}));
+}
+
+function persistDisputeRecords() {
+  localStorage.setItem("dispatchDisputeRecords", JSON.stringify(state.disputeRecords || {}));
 }
 
 function loadAttachmentIngestionModule() {
@@ -1755,6 +1760,52 @@ async function requestRevision(taskId, trigger) {
   }
 }
 
+async function openLocalDispute(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Opening");
+    requireWallet();
+    const reason = document.getElementById("disputeReason")?.value?.trim() || "";
+    const details = document.getElementById("disputeDetails")?.value?.trim() || "";
+    const requestedResolution = document.getElementById("disputeResolution")?.value?.trim() || "Request platform review";
+    if (!reason) {
+      updateStatus("Dispute reason needed", "Choose a reason before opening a dispute.", "warn");
+      return;
+    }
+    if (!details) {
+      updateStatus("Dispute details needed", "Add evidence or details so the dispute can be reviewed.", "warn");
+      return;
+    }
+
+    const existing = state.disputeRecords?.[taskId] || [];
+    const disputeRecord = {
+      id: `dispute_${Date.now()}`,
+      taskId,
+      reason,
+      details,
+      requestedResolution,
+      status: "under_review",
+      openedAt: new Date().toISOString(),
+      openedBy: state.wallet,
+    };
+    state.disputeRecords = {
+      ...(state.disputeRecords || {}),
+      [taskId]: [disputeRecord, ...existing],
+    };
+    persistDisputeRecords();
+
+    updateStatus(
+      "Dispute opened",
+      "The dispute was saved locally. Payment remains funded and locked; no refund, payout, or settlement transaction was created.",
+      "warn",
+    );
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus("Dispute failed", statusMessage(error, "Dispute failed"), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
+
 async function runImproveAgain(taskId, trigger) {
   try {
     setButtonLoading(trigger, true, "Improving");
@@ -1813,7 +1864,8 @@ async function renderTaskDetail(taskId) {
 
   const task = state.task;
   const localRevisionRequests = state.revisionRequests?.[task.taskId] || [];
-  const displayTask = { ...task, revisionRequests: localRevisionRequests };
+  const localDisputeRecords = state.disputeRecords?.[task.taskId] || [];
+  const displayTask = { ...task, revisionRequests: localRevisionRequests, disputeRecords: localDisputeRecords };
   const shouldProbeOnchainTask = Boolean(task.onchainTaskRef)
     || ["pending_wallet", "pending_chain"].includes(task.transactionState)
     || Boolean(task.latestCreateTxHash)
@@ -1828,6 +1880,7 @@ async function renderTaskDetail(taskId) {
     reviewModel,
     resultModel: buildTaskResultModel(displayTask, []),
     revisionModel: buildTaskRevisionDisplayModel(displayTask),
+    disputeModel: buildTaskDisputeDisplayModel(displayTask),
   });
   bindTaskDetailActions(displayTask);
 
@@ -1859,6 +1912,7 @@ async function renderTaskDetail(taskId) {
       reviewModel,
       resultModel: buildTaskResultModel(displayTask, taskRuns.items || []),
       revisionModel: buildTaskRevisionDisplayModel(displayTask),
+      disputeModel: buildTaskDisputeDisplayModel(displayTask),
     });
     bindTaskDetailActions(displayTask);
   });
@@ -1879,6 +1933,12 @@ function bindTaskDetailActions(task) {
   });
   document.querySelectorAll("[data-request-revision-toggle]").forEach((node) => {
     node.addEventListener("click", () => document.getElementById("revisionChangeRequest")?.focus());
+  });
+  document.querySelectorAll("[data-open-dispute]").forEach((node) => {
+    node.addEventListener("click", () => openLocalDispute(node.dataset.openDispute || task.taskId, node));
+  });
+  document.querySelectorAll("[data-open-dispute-toggle]").forEach((node) => {
+    node.addEventListener("click", () => document.getElementById("disputeReason")?.focus());
   });
   document.querySelectorAll("[data-platform-improve]").forEach((node) => {
     node.addEventListener("click", () => runImproveAgain(task.taskId, node));

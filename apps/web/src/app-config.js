@@ -128,6 +128,7 @@ export function createInitialState() {
     task: null,
     history: { items: [] },
     revisionRequests: readJsonStorage("dispatchRevisionRequests", {}),
+    disputeRecords: readJsonStorage("dispatchDisputeRecords", {}),
     mobileNavOpen: false,
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },

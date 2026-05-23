@@ -290,10 +290,11 @@ function renderFeed(state) {
   `;
 }
 
-function renderTaskRow(task, agentRegistry = new Map(), revisionRequestsByTask = {}) {
+function renderTaskRow(task, agentRegistry = new Map(), localTaskState = {}) {
   const displayTask = {
     ...task,
-    revisionRequests: revisionRequestsByTask[task.taskId] || task.revisionRequests || [],
+    revisionRequests: localTaskState.revisionRequests?.[task.taskId] || task.revisionRequests || [],
+    disputeRecords: localTaskState.disputeRecords?.[task.taskId] || task.disputeRecords || [],
   };
   const lifecycle = buildTaskLifecycleModel(displayTask);
   const payment = lifecycle.paymentDisplay;
@@ -392,7 +393,7 @@ export function renderHomePage({ el, state, onNavigate }) {
             title: "Your funded tasks waiting on wallet or Arc confirmation",
             tasks: pendingTasks,
             emptyMessage: "No pending funded tasks.",
-            renderTask: (task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {}),
+            renderTask: (task) => renderTaskRow(task, agentRegistry, state),
           })}
         </section>
       ` : ""}
@@ -441,21 +442,21 @@ export function renderHomePage({ el, state, onNavigate }) {
           title: "Open funded work agents can pick up",
           tasks: availableTasks,
           emptyMessage: "No open funded tasks yet.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {}),
+          renderTask: (task) => renderTaskRow(task, agentRegistry, state),
         })}
         ${renderTaskRail({
           eyebrow: "Funded Tasks",
           title: "USDC-backed work already in motion",
           tasks: fundedTasks,
           emptyMessage: "No funded work in motion yet.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {}),
+          renderTask: (task) => renderTaskRow(task, agentRegistry, state),
         })}
         ${renderTaskRail({
           eyebrow: "Completed Tasks",
           title: "Recently approved marketplace outcomes",
           tasks: recentCompletedTasks,
           emptyMessage: "No approved outcomes yet. Completed funded tasks will appear here after owner approval and settlement.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {}),
+          renderTask: (task) => renderTaskRow(task, agentRegistry, state),
         })}
       </section>
     </section>
@@ -742,7 +743,7 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
             ? myAgents.map((agent) => renderAgentCard(agent)).join("")
             : state.dashboardTab === "earnings"
               ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned from approved funded work</p></article>`).join("")
-              : myTasks.map((task) => renderTaskRow(task, agentRegistry, state.revisionRequests || {})).join("") || emptyState("No funded work here yet.")}
+              : myTasks.map((task) => renderTaskRow(task, agentRegistry, state)).join("") || emptyState("No funded work here yet.")}
         </div>
       </section>
     </section>

@@ -36,6 +36,10 @@ export function buildTaskLifecycleModel(task, options = {}) {
     ...(Array.isArray(task?.revisionRequests) ? task.revisionRequests : []),
     ...(Array.isArray(options.revisionRequests) ? options.revisionRequests : []),
   ];
+  const disputeRecords = [
+    ...(Array.isArray(task?.disputeRecords) ? task.disputeRecords : []),
+    ...(Array.isArray(options.disputeRecords) ? options.disputeRecords : []),
+  ];
   const assignedAgents = task?.selectedAgents || [];
   const assignedAgent = assignedAgents[0] || null;
   const participatingAgentIds = task?.participatingAgentIds || [];
@@ -61,7 +65,11 @@ export function buildTaskLifecycleModel(task, options = {}) {
     || resultStatus === "approved"
     || finalOutcome === "accepted"
     || (settlementState === "pending_settlement" && !rejected);
-  const disputed = status === "DISPUTED" || settlementState === "disputed" || finalOutcome === "disputed" || task?.disputeRecord?.status === "open";
+  const disputed = status === "DISPUTED"
+    || settlementState === "disputed"
+    || finalOutcome === "disputed"
+    || task?.disputeRecord?.status === "open"
+    || disputeRecords.some((record) => String(record?.status || "under_review").toLowerCase() !== "resolved");
   const unresolved = status === "UNRESOLVED" || settlementState === "unresolved" || finalOutcome === "unresolved";
   const cancelled = ["CANCELLED", "CANCELED", "CANCELLED_BY_OWNER", "CANCELED_BY_OWNER"].includes(status)
     || ["cancelled", "canceled"].includes(resultStatus)
@@ -70,7 +78,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
   const settled = status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
   const completed = status === "COMPLETED" || resultStatus === "completed";
   const settlementReady = Boolean(settlementSummary?.canReleasePayment)
-    || (!settled && !refunded && approved
+    || (!settled && !refunded && !disputed && approved
       && (settlementState === "pending_settlement" || (task?.reviewActions || []).includes("settle") || settlementState === "reward_funded"));
   const refundReady = Boolean(settlementSummary?.canRefund);
   const revisionRequested = Boolean(revisionRequests.length)
@@ -191,6 +199,8 @@ export function buildTaskLifecycleModel(task, options = {}) {
     ? "Payment released"
     : refunded
       ? "Reward refunded"
+      : disputed
+        ? "Payment locked"
       : settlementReady
         ? "Payment ready"
         : refundReady
@@ -370,8 +380,10 @@ export function buildTaskLifecycleModel(task, options = {}) {
       ? "Payment has been released to the agent after owner approval."
       : refunded
         ? "The task reward has been refunded instead of released."
-        : disputed || unresolved
-          ? "Payment is paused while the task is disputed or unresolved."
+        : disputed
+          ? "Payment remains funded and locked while the dispute is under review."
+          : unresolved
+            ? "Payment is paused while the task is unresolved."
           : releasePending
             ? "Transaction submitted. Waiting for confirmation."
             : settlementReady
@@ -395,8 +407,10 @@ export function buildTaskLifecycleModel(task, options = {}) {
       ? "No payment action needed."
       : refunded
         ? "No release action is available after refund."
-        : disputed || unresolved
-          ? "Resolve the dispute before payment can move."
+        : disputed
+          ? "Wait for dispute review before payment can move."
+          : unresolved
+            ? "Resolve the review state before payment can move."
           : releasePending
             ? "Wait for Arc Testnet confirmation."
             : settlementReady
@@ -642,6 +656,49 @@ export function buildTaskRevisionDisplayModel(task, options = {}) {
       ? "Payment remains funded and locked until the owner approves revised work."
       : "Revision history will appear here after changes are requested.",
     emptyMessage: "No revision requested. Review actions appear after the agent submits work.",
+  };
+}
+
+export function buildTaskDisputeDisplayModel(task, options = {}) {
+  const sourceItems = [
+    ...(Array.isArray(task?.disputeRecords) ? task.disputeRecords : []),
+    ...(Array.isArray(options.disputeRecords) ? options.disputeRecords : []),
+    task?.disputeRecord || null,
+  ];
+  const normalizedItems = sourceItems
+    .filter(Boolean)
+    .map((item, index) => {
+      const reason = String(item.reason || item.disputeReason || "").trim();
+      const details = String(item.details || item.evidence || item.description || "").trim();
+      const requestedResolution = String(item.requestedResolution || item.resolution || "").trim();
+      const status = String(item.status || "under_review").trim();
+      return {
+        id: item.id || `dispute_${index + 1}`,
+        reason: reason || "Dispute reason not provided.",
+        details: details || "No evidence details provided yet.",
+        requestedResolution: requestedResolution || "Request platform review",
+        status: status || "under_review",
+        statusLabel: labelize(status || "under_review"),
+        openedAt: item.openedAt || item.createdAt || item.requestedAt || null,
+        openedBy: item.openedBy || item.actorWallet || "Task owner",
+      };
+    })
+    .sort((left, right) => new Date(right.openedAt || 0).getTime() - new Date(left.openedAt || 0).getTime());
+  const hasOpenDispute = normalizedItems.some((item) => String(item.status || "").toLowerCase() !== "resolved")
+    || String(task?.status || "").toUpperCase() === "DISPUTED"
+    || String(task?.settlementState || "").toLowerCase() === "disputed";
+
+  return {
+    hasOpenDispute,
+    items: normalizedItems,
+    latestDispute: normalizedItems[0] || null,
+    headline: hasOpenDispute
+      ? "Dispute under review"
+      : "No dispute open",
+    description: hasOpenDispute
+      ? "Payment remains funded and locked while the dispute is reviewed. No refund or payout is created by this local dispute record."
+      : "Dispute details will appear here if the owner opens a dispute.",
+    emptyMessage: "No dispute open. Use disputes only when approval or revision cannot safely resolve the task.",
   };
 }
 
@@ -997,12 +1054,16 @@ export function buildReviewPanelModel(task) {
   const revisionRequested = Boolean(task?.revisionRequests?.length)
     || String(task?.resultStatus || "").toLowerCase() === "needs_revision"
     || task?.userReview?.decision === "needs_human_review";
-  const canDispute = ["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task?.status);
+  const disputeOpen = Boolean(task?.disputeRecords?.length)
+    || task?.disputeRecord?.status === "open"
+    || String(task?.status || "").toUpperCase() === "DISPUTED"
+    || String(task?.settlementState || "").toLowerCase() === "disputed";
+  const canDispute = !disputeOpen && ["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task?.status);
   const canAppeal = ["DISPUTED", "REJECTED", "UNRESOLVED"].includes(task?.status);
-  const settlementReady = task?.status === "APPROVED" || (task?.reviewActions || []).includes("settle");
+  const settlementReady = !disputeOpen && (task?.status === "APPROVED" || (task?.reviewActions || []).includes("settle"));
   const finalOutcome = task?.latestEvaluation?.finalOutcome || null;
   return {
-    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult && !revisionRequested ? ["approve", "request_revision"] : [],
+    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult && !revisionRequested && !disputeOpen ? ["approve", "request_revision"] : [],
     advancedActions: [
       ...(canReviewSubmittedResult ? ["assisted", "hybrid"] : []),
       ...(canDispute ? ["dispute"] : []),
@@ -1010,7 +1071,7 @@ export function buildReviewPanelModel(task) {
     ],
     headline: settlementReady
       ? "This task is ready for Arc Testnet USDC settlement."
-      : finalOutcome === "disputed"
+        : disputeOpen || finalOutcome === "disputed"
         ? "A dispute paused payout and opened an escalation path."
         : finalOutcome === "unresolved" || task?.status === "UNRESOLVED"
           ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths."

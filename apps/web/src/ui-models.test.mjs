@@ -8,6 +8,7 @@ import {
   buildReviewPanelModel,
   buildSuggestedTaskTemplatesForAgent,
   buildTaskLifecycleModel,
+  buildTaskDisputeDisplayModel,
   buildTaskPaymentDisplayModel,
   buildTaskRevisionDisplayModel,
   buildTaskResultModel,
@@ -541,6 +542,59 @@ test("revision display uses safe fallbacks when details are thin", () => {
   assert.equal(model.items[0].changeRequest, "Revision details were not provided.");
   assert.equal(model.items[0].missingDetails, "Not specified.");
   assert.equal(model.items[0].requestedBy, "Task owner");
+});
+
+test("local dispute maps task status and payment into locked under-review state", () => {
+  const dispute = {
+    id: "dispute_1",
+    reason: "Agent did not follow revision request",
+    details: "The revised output still ignored the required CTA.",
+    requestedResolution: "Request platform review",
+    status: "under_review",
+    openedAt: "2026-04-04T10:00:00.000Z",
+    openedBy: "0xowner",
+  };
+  const task = {
+    taskId: "task_dispute_local",
+    status: "SUBMITTED",
+    resultStatus: "submitted",
+    transactionState: "accepted",
+    settlementState: "reward_funded",
+    onchainTaskRef: "0xescrow:task_dispute_local",
+    rewardAmount: 10,
+    disputeRecords: [dispute],
+    reviewActions: ["approve", "reject", "settle"],
+    timeline: [],
+  };
+  const lifecycle = buildTaskLifecycleModel(task);
+  const payment = buildTaskPaymentDisplayModel(task);
+  const disputeModel = buildTaskDisputeDisplayModel(task);
+  const reviewModel = buildReviewPanelModel(task);
+
+  assert.equal(lifecycle.statusDisplay.label, "Disputed");
+  assert.equal(lifecycle.paymentStateLabel, "Payment locked");
+  assert.equal(lifecycle.primaryAction.label, "View Dispute");
+  assert.equal(payment.label, "Disputed");
+  assert.match(payment.description, /locked while the dispute is under review/);
+  assert.equal(payment.fundingTxLink, null);
+  assert.equal(payment.settlementTxLink, null);
+  assert.equal(disputeModel.hasOpenDispute, true);
+  assert.equal(disputeModel.items[0].reason, dispute.reason);
+  assert.deepEqual(reviewModel.primaryActions, []);
+  assert.ok(!reviewModel.advancedActions.includes("dispute"));
+});
+
+test("dispute display uses clean fallback values when details are missing", () => {
+  const model = buildTaskDisputeDisplayModel({
+    taskId: "task_dispute_fallback",
+    disputeRecords: [{ id: "dispute_empty" }],
+  });
+
+  assert.equal(model.hasOpenDispute, true);
+  assert.equal(model.items[0].reason, "Dispute reason not provided.");
+  assert.equal(model.items[0].details, "No evidence details provided yet.");
+  assert.equal(model.items[0].requestedResolution, "Request platform review");
+  assert.equal(model.items[0].statusLabel, "Under Review");
 });
 
 test("task lifecycle keeps waiting stages explicit while agent works", () => {

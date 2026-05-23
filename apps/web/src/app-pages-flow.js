@@ -62,6 +62,7 @@ export function renderTaskDetailPageView({
   reviewModel,
   resultModel,
   revisionModel,
+  disputeModel,
 }) {
   const agents = task.selectedAgents || [];
   const reviewActions = task.reviewActions || [];
@@ -365,12 +366,79 @@ export function renderTaskDetailPageView({
               ${resultModel?.improveAgainUnavailableReason ? `<p class="muted">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
-              ${reviewModel.advancedActions.includes("dispute") ? `<button data-task-action="dispute" data-task-id="${task.taskId}">Open dispute</button>` : ""}
+              ${reviewModel.advancedActions.includes("dispute") ? `<button data-open-dispute-toggle>Open dispute</button>` : ""}
               ${reviewModel.advancedActions.includes("appeal") ? `<button data-task-action="appeal" data-task-id="${task.taskId}">Appeal</button>` : ""}
             </div>
+            ${reviewModel.advancedActions.includes("dispute") ? `
+              <div class="simple-panel" data-dispute-form style="margin-top:14px;">
+                <strong>Open dispute</strong>
+                <p class="muted">Use this only when approval or revision cannot safely resolve the task. Payment stays locked; this does not process a refund or settlement.</p>
+                <label class="field-stack" style="margin-top:12px;">
+                  <span class="muted">Reason</span>
+                  <select id="disputeReason">
+                    <option value="">Select reason</option>
+                    <option value="Work does not match brief">Work does not match brief</option>
+                    <option value="Output is incomplete">Output is incomplete</option>
+                    <option value="Quality is too low">Quality is too low</option>
+                    <option value="Agent did not follow revision request">Agent did not follow revision request</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+                <label class="field-stack"><span class="muted">Evidence/details</span><textarea id="disputeDetails" rows="4" placeholder="Describe what happened and include useful evidence or context."></textarea></label>
+                <label class="field-stack">
+                  <span class="muted">Requested resolution</span>
+                  <select id="disputeResolution">
+                    <option value="Request platform review">Request platform review</option>
+                    <option value="Ask agent for final revision">Ask agent for final revision</option>
+                    <option value="Request refund review">Request refund review</option>
+                  </select>
+                </label>
+                <button data-open-dispute="${task.taskId}">Save dispute</button>
+              </div>
+            ` : ""}
             <div class="secondary-actions">
               ${additionalReviewActions.map((action) => `<button data-task-action="${action}" data-task-id="${task.taskId}">${escapeHtml(labelize(action))}</button>`).join("")}
             </div>
+          </article>
+        </aside>
+      </section>
+
+      <section class="task-grid reveal-on-scroll">
+        <article class="task-main shell-section">
+          <div class="section-head">
+            <div>
+              <p class="mini-label">Dispute status</p>
+              <h2>Trust review</h2>
+            </div>
+            <span class="tag">${escapeHtml(disputeModel?.headline || "No dispute open")}</span>
+          </div>
+          <div class="status-banner ${disputeModel?.hasOpenDispute ? "warning" : "info"}">
+            <strong>${escapeHtml(disputeModel?.headline || "No dispute open")}</strong>
+            <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
+          </div>
+          <div class="live-feed" style="margin-top:16px;">
+            ${(disputeModel?.items || []).map((item, index) => `
+              <article class="feed-card feed-card--warning" style="animation-delay:${index * 70}ms">
+                <span class="feed-card__pulse"></span>
+                <div>
+                  <strong>${escapeHtml(item.reason)}</strong>
+                  <p>${escapeHtml(item.details)}</p>
+                  <p>Requested resolution: ${escapeHtml(item.requestedResolution)}</p>
+                  <div class="agent-tags" style="margin-top:10px;">
+                    <span class="tag">${escapeHtml(item.statusLabel)}</span>
+                    <span class="tag">${escapeHtml(item.openedBy)}</span>
+                    ${item.openedAt ? `<span class="tag">${escapeHtml(new Date(item.openedAt).toLocaleString())}</span>` : ""}
+                  </div>
+                </div>
+              </article>
+            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.")}
+          </div>
+        </article>
+        <aside class="task-side">
+          <article class="shell-panel">
+            <p class="mini-label">Dispute payment rule</p>
+            <h3>Payment stays locked</h3>
+            <p class="muted">Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash. It only pauses the task UX for review.</p>
           </article>
         </aside>
       </section>

@@ -46696,6 +46696,7 @@ function createInitialState() {
     task: null,
     history: { items: [] },
     revisionRequests: readJsonStorage("dispatchRevisionRequests", {}),
+    disputeRecords: readJsonStorage("dispatchDisputeRecords", {}),
     mobileNavOpen: false,
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
@@ -47250,6 +47251,10 @@ function buildTaskLifecycleModel(task, options = {}) {
     ...Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
     ...Array.isArray(options.revisionRequests) ? options.revisionRequests : []
   ];
+  const disputeRecords = [
+    ...Array.isArray(task?.disputeRecords) ? task.disputeRecords : [],
+    ...Array.isArray(options.disputeRecords) ? options.disputeRecords : []
+  ];
   const assignedAgents = task?.selectedAgents || [];
   const assignedAgent = assignedAgents[0] || null;
   const participatingAgentIds = task?.participatingAgentIds || [];
@@ -47263,13 +47268,13 @@ function buildTaskLifecycleModel(task, options = {}) {
   const underReview = status === "UNDER_REVIEW" || submitted && !["APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status) && Boolean(task?.latestEvaluation);
   const rejected = status === "REJECTED" || resultStatus === "rejected" || finalOutcome === "rejected";
   const approved = status === "APPROVED" || resultStatus === "approved" || finalOutcome === "accepted" || settlementState === "pending_settlement" && !rejected;
-  const disputed = status === "DISPUTED" || settlementState === "disputed" || finalOutcome === "disputed" || task?.disputeRecord?.status === "open";
+  const disputed = status === "DISPUTED" || settlementState === "disputed" || finalOutcome === "disputed" || task?.disputeRecord?.status === "open" || disputeRecords.some((record) => String(record?.status || "under_review").toLowerCase() !== "resolved");
   const unresolved = status === "UNRESOLVED" || settlementState === "unresolved" || finalOutcome === "unresolved";
   const cancelled = ["CANCELLED", "CANCELED", "CANCELLED_BY_OWNER", "CANCELED_BY_OWNER"].includes(status) || ["cancelled", "canceled"].includes(resultStatus) || ["cancelled", "canceled"].includes(settlementState);
   const refunded = status === "REFUNDED" || settlementState === "refunded" || task?.latestSettlement?.outcome === "refunded";
   const settled = status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
   const completed = status === "COMPLETED" || resultStatus === "completed";
-  const settlementReady = Boolean(settlementSummary?.canReleasePayment) || !settled && !refunded && approved && (settlementState === "pending_settlement" || (task?.reviewActions || []).includes("settle") || settlementState === "reward_funded");
+  const settlementReady = Boolean(settlementSummary?.canReleasePayment) || !settled && !refunded && !disputed && approved && (settlementState === "pending_settlement" || (task?.reviewActions || []).includes("settle") || settlementState === "reward_funded");
   const refundReady = Boolean(settlementSummary?.canRefund);
   const revisionRequested = Boolean(revisionRequests.length) || resultStatus === "needs_revision" || task?.userReview?.decision === "needs_human_review" || rejected && !refunded && !disputed && !unresolved;
   const needsRevision = revisionRequested && !refunded;
@@ -47283,7 +47288,7 @@ function buildTaskLifecycleModel(task, options = {}) {
   const fundingTxLink = buildArcTransactionLink(task?.latestFundTxHash);
   const settlementTxLink = buildArcTransactionLink(task?.latestSettlement?.txReference);
   const releasePending = Boolean(settlementTxLink) && !settled && !refunded;
-  const paymentStateLabel = settled ? "Payment released" : refunded ? "Reward refunded" : settlementReady ? "Payment ready" : refundReady ? "Refund ready" : fundingConfirmed ? "USDC funded" : fundingPending ? "Funding syncing" : "Funding required";
+  const paymentStateLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Payment locked" : settlementReady ? "Payment ready" : refundReady ? "Refund ready" : fundingConfirmed ? "USDC funded" : fundingPending ? "Funding syncing" : "Funding required";
   const reviewStateLabel = approved ? "Owner approved" : revisionRequested ? "Revision requested" : rejected ? "Owner rejected" : disputed ? "Disputed" : underReview ? "AI guidance attached" : submitted ? "Needs owner review" : noSubmission ? "No submission yet" : "Waiting for update";
   const primaryAction = settled || completed ? { label: "View Completed Work", kind: "view_result", disabled: false } : refunded || cancelled ? { label: "View Task", kind: "view_result", disabled: false } : disputed || unresolved ? { label: "View Dispute", kind: "dispute", disabled: false } : settlementReady ? { label: "Release Payment", kind: "settle", disabled: false } : revisionRequested ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : rejected ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : submitted || underReview ? { label: "Review Submission", kind: "review", disabled: false } : executing ? { label: "Waiting for Agent", kind: "wait", disabled: true } : assigned ? { label: "Waiting for Agent", kind: "wait", disabled: true } : fundingConfirmed ? { label: "Assign Agent", kind: "assign", disabled: false } : fundingPending ? { label: "Waiting for Funding", kind: "funding", disabled: true } : { label: "Fund Task", kind: "fund", disabled: false };
   const statusDisplay = {
@@ -47304,8 +47309,8 @@ function buildTaskLifecycleModel(task, options = {}) {
   };
   const paymentDisplay = {
     label: settled ? "Released" : refunded ? "Refunded" : disputed || unresolved ? "Disputed" : releasePending ? "Release Pending" : settlementReady ? "Ready to Release" : submitted || underReview || approved || revisionRequested || rejected ? "Locked Until Approval" : fundingConfirmed ? "Funded" : fundingPending ? "Funding Pending" : fundingFailed ? "Unknown" : task ? "Not Funded" : "Unknown",
-    description: settled ? "Payment has been released to the agent after owner approval." : refunded ? "The task reward has been refunded instead of released." : disputed || unresolved ? "Payment is paused while the task is disputed or unresolved." : releasePending ? "Transaction submitted. Waiting for confirmation." : settlementReady ? "Work has been approved. Payment is ready to release." : revisionRequested || rejected ? "Payment is funded and locked while the requested changes are pending. Approval is still required before release." : submitted || underReview ? "Payment is funded but locked. The owner must review the submitted work before release." : approved ? "Owner approval is recorded. Payment can move to release." : fundingConfirmed ? "Payment is funded but not released yet." : fundingPending ? "Funding transaction is being confirmed on Arc Testnet." : fundingFailed ? "Funding status is unclear after a failed wallet or chain update." : task ? "This task has not been funded yet." : "Payment state is not available yet.",
-    nextPaymentAction: settled ? "No payment action needed." : refunded ? "No release action is available after refund." : disputed || unresolved ? "Resolve the dispute before payment can move." : releasePending ? "Wait for Arc Testnet confirmation." : settlementReady ? "Release payment." : revisionRequested || rejected ? "Wait for revised output before approval." : submitted || underReview ? "Review the submitted work." : approved ? "Prepare payment release." : fundingConfirmed ? "Wait for output and owner approval." : fundingPending ? "Wait for funding confirmation." : "Fund the task with testnet USDC.",
+    description: settled ? "Payment has been released to the agent after owner approval." : refunded ? "The task reward has been refunded instead of released." : disputed ? "Payment remains funded and locked while the dispute is under review." : unresolved ? "Payment is paused while the task is unresolved." : releasePending ? "Transaction submitted. Waiting for confirmation." : settlementReady ? "Work has been approved. Payment is ready to release." : revisionRequested || rejected ? "Payment is funded and locked while the requested changes are pending. Approval is still required before release." : submitted || underReview ? "Payment is funded but locked. The owner must review the submitted work before release." : approved ? "Owner approval is recorded. Payment can move to release." : fundingConfirmed ? "Payment is funded but not released yet." : fundingPending ? "Funding transaction is being confirmed on Arc Testnet." : fundingFailed ? "Funding status is unclear after a failed wallet or chain update." : task ? "This task has not been funded yet." : "Payment state is not available yet.",
+    nextPaymentAction: settled ? "No payment action needed." : refunded ? "No release action is available after refund." : disputed ? "Wait for dispute review before payment can move." : unresolved ? "Resolve the review state before payment can move." : releasePending ? "Wait for Arc Testnet confirmation." : settlementReady ? "Release payment." : revisionRequested || rejected ? "Wait for revised output before approval." : submitted || underReview ? "Review the submitted work." : approved ? "Prepare payment release." : fundingConfirmed ? "Wait for output and owner approval." : fundingPending ? "Wait for funding confirmation." : "Fund the task with testnet USDC.",
     variant: settled ? "success" : refunded || disputed || unresolved || fundingFailed ? "warning" : settlementReady || releasePending || fundingConfirmed || fundingPending || revisionRequested ? "info" : "neutral",
     amountDisplay,
     networkDisplay: "Arc Testnet",
@@ -47439,6 +47444,38 @@ function buildTaskRevisionDisplayModel(task, options = {}) {
     headline: hasRevisionRequested ? "Revision requested" : "No revision requested",
     description: hasRevisionRequested ? "Payment remains funded and locked until the owner approves revised work." : "Revision history will appear here after changes are requested.",
     emptyMessage: "No revision requested. Review actions appear after the agent submits work."
+  };
+}
+function buildTaskDisputeDisplayModel(task, options = {}) {
+  const sourceItems = [
+    ...Array.isArray(task?.disputeRecords) ? task.disputeRecords : [],
+    ...Array.isArray(options.disputeRecords) ? options.disputeRecords : [],
+    task?.disputeRecord || null
+  ];
+  const normalizedItems = sourceItems.filter(Boolean).map((item, index2) => {
+    const reason = String(item.reason || item.disputeReason || "").trim();
+    const details = String(item.details || item.evidence || item.description || "").trim();
+    const requestedResolution = String(item.requestedResolution || item.resolution || "").trim();
+    const status = String(item.status || "under_review").trim();
+    return {
+      id: item.id || `dispute_${index2 + 1}`,
+      reason: reason || "Dispute reason not provided.",
+      details: details || "No evidence details provided yet.",
+      requestedResolution: requestedResolution || "Request platform review",
+      status: status || "under_review",
+      statusLabel: labelize(status || "under_review"),
+      openedAt: item.openedAt || item.createdAt || item.requestedAt || null,
+      openedBy: item.openedBy || item.actorWallet || "Task owner"
+    };
+  }).sort((left, right) => new Date(right.openedAt || 0).getTime() - new Date(left.openedAt || 0).getTime());
+  const hasOpenDispute = normalizedItems.some((item) => String(item.status || "").toLowerCase() !== "resolved") || String(task?.status || "").toUpperCase() === "DISPUTED" || String(task?.settlementState || "").toLowerCase() === "disputed";
+  return {
+    hasOpenDispute,
+    items: normalizedItems,
+    latestDispute: normalizedItems[0] || null,
+    headline: hasOpenDispute ? "Dispute under review" : "No dispute open",
+    description: hasOpenDispute ? "Payment remains funded and locked while the dispute is reviewed. No refund or payout is created by this local dispute record." : "Dispute details will appear here if the owner opens a dispute.",
+    emptyMessage: "No dispute open. Use disputes only when approval or revision cannot safely resolve the task."
   };
 }
 var taskBriefTemplates = [
@@ -47718,18 +47755,19 @@ function buildReviewPanelModel(task) {
   const hasEvaluation = Boolean(task?.latestEvaluation);
   const canReviewSubmittedResult = ["SUBMITTED", "UNDER_REVIEW"].includes(task?.status);
   const revisionRequested = Boolean(task?.revisionRequests?.length) || String(task?.resultStatus || "").toLowerCase() === "needs_revision" || task?.userReview?.decision === "needs_human_review";
-  const canDispute = ["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task?.status);
+  const disputeOpen = Boolean(task?.disputeRecords?.length) || task?.disputeRecord?.status === "open" || String(task?.status || "").toUpperCase() === "DISPUTED" || String(task?.settlementState || "").toLowerCase() === "disputed";
+  const canDispute = !disputeOpen && ["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task?.status);
   const canAppeal = ["DISPUTED", "REJECTED", "UNRESOLVED"].includes(task?.status);
-  const settlementReady = task?.status === "APPROVED" || (task?.reviewActions || []).includes("settle");
+  const settlementReady = !disputeOpen && (task?.status === "APPROVED" || (task?.reviewActions || []).includes("settle"));
   const finalOutcome = task?.latestEvaluation?.finalOutcome || null;
   return {
-    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult && !revisionRequested ? ["approve", "request_revision"] : [],
+    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult && !revisionRequested && !disputeOpen ? ["approve", "request_revision"] : [],
     advancedActions: [
       ...canReviewSubmittedResult ? ["assisted", "hybrid"] : [],
       ...canDispute ? ["dispute"] : [],
       ...canAppeal ? ["appeal"] : []
     ],
-    headline: settlementReady ? "This task is ready for Arc Testnet USDC settlement." : finalOutcome === "disputed" ? "A dispute paused payout and opened an escalation path." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths." : revisionRequested ? "The owner requested changes. Payment stays funded and locked until revised work is approved." : canReviewSubmittedResult ? hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether USDC payout moves." : "Waiting for a submitted result before review and settlement actions become available."
+    headline: settlementReady ? "This task is ready for Arc Testnet USDC settlement." : disputeOpen || finalOutcome === "disputed" ? "A dispute paused payout and opened an escalation path." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths." : revisionRequested ? "The owner requested changes. Payment stays funded and locked until revised work is approved." : canReviewSubmittedResult ? hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether USDC payout moves." : "Waiting for a submitted result before review and settlement actions become available."
   };
 }
 function buildTaskResultModel(task, executionRuns = []) {
@@ -47982,10 +48020,11 @@ function renderAgentCard(agent) {
     </article>
   `;
 }
-function renderTaskRow(task, agentRegistry = /* @__PURE__ */ new Map(), revisionRequestsByTask = {}) {
+function renderTaskRow(task, agentRegistry = /* @__PURE__ */ new Map(), localTaskState = {}) {
   const displayTask = {
     ...task,
-    revisionRequests: revisionRequestsByTask[task.taskId] || task.revisionRequests || []
+    revisionRequests: localTaskState.revisionRequests?.[task.taskId] || task.revisionRequests || [],
+    disputeRecords: localTaskState.disputeRecords?.[task.taskId] || task.disputeRecords || []
   };
   const lifecycle = buildTaskLifecycleModel(displayTask);
   const payment = lifecycle.paymentDisplay;
@@ -48073,7 +48112,7 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
     title: "Your funded tasks waiting on wallet or Arc confirmation",
     tasks: pendingTasks,
     emptyMessage: "No pending funded tasks.",
-    renderTask: (task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})
+    renderTask: (task) => renderTaskRow(task, agentRegistry, state2)
   })}
         </section>
       ` : ""}
@@ -48122,21 +48161,21 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
     title: "Open funded work agents can pick up",
     tasks: availableTasks,
     emptyMessage: "No open funded tasks yet.",
-    renderTask: (task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})
+    renderTask: (task) => renderTaskRow(task, agentRegistry, state2)
   })}
         ${renderTaskRail({
     eyebrow: "Funded Tasks",
     title: "USDC-backed work already in motion",
     tasks: fundedTasks,
     emptyMessage: "No funded work in motion yet.",
-    renderTask: (task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})
+    renderTask: (task) => renderTaskRow(task, agentRegistry, state2)
   })}
         ${renderTaskRail({
     eyebrow: "Completed Tasks",
     title: "Recently approved marketplace outcomes",
     tasks: recentCompletedTasks,
     emptyMessage: "No approved outcomes yet. Completed funded tasks will appear here after owner approval and settlement.",
-    renderTask: (task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})
+    renderTask: (task) => renderTaskRow(task, agentRegistry, state2)
   })}
       </section>
     </section>
@@ -48403,7 +48442,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
       </section>
       <section class="shell-section reveal-on-scroll">
         <div class="steps-grid">
-          ${state2.dashboardTab === "my_agents" ? myAgents.map((agent) => renderAgentCard(agent)).join("") : state2.dashboardTab === "earnings" ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned from approved funded work</p></article>`).join("") : myTasks.map((task) => renderTaskRow(task, agentRegistry, state2.revisionRequests || {})).join("") || emptyState("No funded work here yet.")}
+          ${state2.dashboardTab === "my_agents" ? myAgents.map((agent) => renderAgentCard(agent)).join("") : state2.dashboardTab === "earnings" ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned from approved funded work</p></article>`).join("") : myTasks.map((task) => renderTaskRow(task, agentRegistry, state2)).join("") || emptyState("No funded work here yet.")}
         </div>
       </section>
     </section>
@@ -48462,7 +48501,8 @@ function renderTaskDetailPageView({
   onchainSnapshot,
   reviewModel,
   resultModel,
-  revisionModel
+  revisionModel,
+  disputeModel
 }) {
   const agents = task.selectedAgents || [];
   const reviewActions = task.reviewActions || [];
@@ -48730,12 +48770,79 @@ function renderTaskDetailPageView({
               ${resultModel?.improveAgainUnavailableReason ? `<p class="muted">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
-              ${reviewModel.advancedActions.includes("dispute") ? `<button data-task-action="dispute" data-task-id="${task.taskId}">Open dispute</button>` : ""}
+              ${reviewModel.advancedActions.includes("dispute") ? `<button data-open-dispute-toggle>Open dispute</button>` : ""}
               ${reviewModel.advancedActions.includes("appeal") ? `<button data-task-action="appeal" data-task-id="${task.taskId}">Appeal</button>` : ""}
             </div>
+            ${reviewModel.advancedActions.includes("dispute") ? `
+              <div class="simple-panel" data-dispute-form style="margin-top:14px;">
+                <strong>Open dispute</strong>
+                <p class="muted">Use this only when approval or revision cannot safely resolve the task. Payment stays locked; this does not process a refund or settlement.</p>
+                <label class="field-stack" style="margin-top:12px;">
+                  <span class="muted">Reason</span>
+                  <select id="disputeReason">
+                    <option value="">Select reason</option>
+                    <option value="Work does not match brief">Work does not match brief</option>
+                    <option value="Output is incomplete">Output is incomplete</option>
+                    <option value="Quality is too low">Quality is too low</option>
+                    <option value="Agent did not follow revision request">Agent did not follow revision request</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+                <label class="field-stack"><span class="muted">Evidence/details</span><textarea id="disputeDetails" rows="4" placeholder="Describe what happened and include useful evidence or context."></textarea></label>
+                <label class="field-stack">
+                  <span class="muted">Requested resolution</span>
+                  <select id="disputeResolution">
+                    <option value="Request platform review">Request platform review</option>
+                    <option value="Ask agent for final revision">Ask agent for final revision</option>
+                    <option value="Request refund review">Request refund review</option>
+                  </select>
+                </label>
+                <button data-open-dispute="${task.taskId}">Save dispute</button>
+              </div>
+            ` : ""}
             <div class="secondary-actions">
               ${additionalReviewActions.map((action) => `<button data-task-action="${action}" data-task-id="${task.taskId}">${escapeHtml(labelize(action))}</button>`).join("")}
             </div>
+          </article>
+        </aside>
+      </section>
+
+      <section class="task-grid reveal-on-scroll">
+        <article class="task-main shell-section">
+          <div class="section-head">
+            <div>
+              <p class="mini-label">Dispute status</p>
+              <h2>Trust review</h2>
+            </div>
+            <span class="tag">${escapeHtml(disputeModel?.headline || "No dispute open")}</span>
+          </div>
+          <div class="status-banner ${disputeModel?.hasOpenDispute ? "warning" : "info"}">
+            <strong>${escapeHtml(disputeModel?.headline || "No dispute open")}</strong>
+            <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
+          </div>
+          <div class="live-feed" style="margin-top:16px;">
+            ${(disputeModel?.items || []).map((item, index2) => `
+              <article class="feed-card feed-card--warning" style="animation-delay:${index2 * 70}ms">
+                <span class="feed-card__pulse"></span>
+                <div>
+                  <strong>${escapeHtml(item.reason)}</strong>
+                  <p>${escapeHtml(item.details)}</p>
+                  <p>Requested resolution: ${escapeHtml(item.requestedResolution)}</p>
+                  <div class="agent-tags" style="margin-top:10px;">
+                    <span class="tag">${escapeHtml(item.statusLabel)}</span>
+                    <span class="tag">${escapeHtml(item.openedBy)}</span>
+                    ${item.openedAt ? `<span class="tag">${escapeHtml(new Date(item.openedAt).toLocaleString())}</span>` : ""}
+                  </div>
+                </div>
+              </article>
+            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.")}
+          </div>
+        </article>
+        <aside class="task-side">
+          <article class="shell-panel">
+            <p class="mini-label">Dispute payment rule</p>
+            <h3>Payment stays locked</h3>
+            <p class="muted">Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash. It only pauses the task UX for review.</p>
           </article>
         </aside>
       </section>
@@ -49155,6 +49262,9 @@ var pendingTaskAutoChecks = /* @__PURE__ */ new Set();
 var activeTaskDetailRenderToken = 0;
 function persistRevisionRequests() {
   localStorage.setItem("dispatchRevisionRequests", JSON.stringify(state.revisionRequests || {}));
+}
+function persistDisputeRecords() {
+  localStorage.setItem("dispatchDisputeRecords", JSON.stringify(state.disputeRecords || {}));
 }
 function loadAttachmentIngestionModule() {
   if (!attachmentIngestionModulePromise) {
@@ -50664,6 +50774,49 @@ async function requestRevision(taskId, trigger) {
     setButtonLoading(trigger, false);
   }
 }
+async function openLocalDispute(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Opening");
+    requireWallet2();
+    const reason = document.getElementById("disputeReason")?.value?.trim() || "";
+    const details = document.getElementById("disputeDetails")?.value?.trim() || "";
+    const requestedResolution = document.getElementById("disputeResolution")?.value?.trim() || "Request platform review";
+    if (!reason) {
+      updateStatus2("Dispute reason needed", "Choose a reason before opening a dispute.", "warn");
+      return;
+    }
+    if (!details) {
+      updateStatus2("Dispute details needed", "Add evidence or details so the dispute can be reviewed.", "warn");
+      return;
+    }
+    const existing = state.disputeRecords?.[taskId] || [];
+    const disputeRecord = {
+      id: `dispute_${Date.now()}`,
+      taskId,
+      reason,
+      details,
+      requestedResolution,
+      status: "under_review",
+      openedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      openedBy: state.wallet
+    };
+    state.disputeRecords = {
+      ...state.disputeRecords || {},
+      [taskId]: [disputeRecord, ...existing]
+    };
+    persistDisputeRecords();
+    updateStatus2(
+      "Dispute opened",
+      "The dispute was saved locally. Payment remains funded and locked; no refund, payout, or settlement transaction was created.",
+      "warn"
+    );
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus2("Dispute failed", statusMessage(error, "Dispute failed"), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
 async function runImproveAgain(taskId, trigger) {
   try {
     setButtonLoading(trigger, true, "Improving");
@@ -50718,7 +50871,8 @@ async function renderTaskDetail(taskId) {
   }
   const task = state.task;
   const localRevisionRequests = state.revisionRequests?.[task.taskId] || [];
-  const displayTask = { ...task, revisionRequests: localRevisionRequests };
+  const localDisputeRecords = state.disputeRecords?.[task.taskId] || [];
+  const displayTask = { ...task, revisionRequests: localRevisionRequests, disputeRecords: localDisputeRecords };
   const shouldProbeOnchainTask = Boolean(task.onchainTaskRef) || ["pending_wallet", "pending_chain"].includes(task.transactionState) || Boolean(task.latestCreateTxHash) || Boolean(task.latestFundTxHash) || Boolean(task.latestAssignTxHash);
   const reviewModel = buildReviewPanelModel(displayTask);
   renderTaskDetailPageView({
@@ -50728,7 +50882,8 @@ async function renderTaskDetail(taskId) {
     onchainSnapshot: null,
     reviewModel,
     resultModel: buildTaskResultModel(displayTask, []),
-    revisionModel: buildTaskRevisionDisplayModel(displayTask)
+    revisionModel: buildTaskRevisionDisplayModel(displayTask),
+    disputeModel: buildTaskDisputeDisplayModel(displayTask)
   });
   bindTaskDetailActions(displayTask);
   const shouldAutoCheckFunding = ["pending_wallet", "pending_chain"].includes(task.transactionState) && (task.latestCreateTxHash || task.latestFundTxHash || task.latestAssignTxHash) && !pendingTaskAutoChecks.has(task.taskId);
@@ -50755,7 +50910,8 @@ async function renderTaskDetail(taskId) {
       onchainSnapshot,
       reviewModel,
       resultModel: buildTaskResultModel(displayTask, taskRuns.items || []),
-      revisionModel: buildTaskRevisionDisplayModel(displayTask)
+      revisionModel: buildTaskRevisionDisplayModel(displayTask),
+      disputeModel: buildTaskDisputeDisplayModel(displayTask)
     });
     bindTaskDetailActions(displayTask);
   });
@@ -50775,6 +50931,12 @@ function bindTaskDetailActions(task) {
   });
   document.querySelectorAll("[data-request-revision-toggle]").forEach((node) => {
     node.addEventListener("click", () => document.getElementById("revisionChangeRequest")?.focus());
+  });
+  document.querySelectorAll("[data-open-dispute]").forEach((node) => {
+    node.addEventListener("click", () => openLocalDispute(node.dataset.openDispute || task.taskId, node));
+  });
+  document.querySelectorAll("[data-open-dispute-toggle]").forEach((node) => {
+    node.addEventListener("click", () => document.getElementById("disputeReason")?.focus());
   });
   document.querySelectorAll("[data-platform-improve]").forEach((node) => {
     node.addEventListener("click", () => runImproveAgain(task.taskId, node));
