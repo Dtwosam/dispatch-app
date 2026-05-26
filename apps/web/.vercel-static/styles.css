@@ -3707,3 +3707,435 @@ body::after {
     gap: 12px 16px;
   }
 }
+
+/* UI Rebuild Pass 3: marketplace listing and agent cards */
+.marketplace-page {
+  gap: 30px !important;
+}
+
+.marketplace-header {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 32px;
+  max-width: none;
+  padding-top: 48px;
+}
+
+.marketplace-eyebrow {
+  margin: 0 0 16px;
+  color: #96fff0;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.marketplace-header h1 {
+  max-width: 680px;
+  color: #f4fbff;
+  font-size: clamp(32px, 4vw, 40px) !important;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.marketplace-header p:not(.marketplace-eyebrow) {
+  max-width: 560px;
+  margin-top: 14px;
+  color: #9bb1c5;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.marketplace-header__cta {
+  min-width: 150px;
+}
+
+.marketplace-filter-panel {
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(142, 255, 240, 0.1);
+  background: rgba(9, 25, 42, 0.58);
+}
+
+.marketplace-filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+.marketplace-filter-grid label {
+  display: grid;
+  gap: 8px;
+}
+
+.marketplace-filter-grid label > span {
+  color: #6f879d;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.marketplace-filter-grid input,
+.marketplace-filter-grid select {
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.035);
+  color: #f4fbff;
+  font-size: 14px;
+}
+
+.marketplace-filter-grid input::placeholder {
+  color: #6f879d;
+}
+
+.marketplace-results {
+  width: 100%;
+}
+
+.agent-market-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.market-agent-card {
+  min-height: 360px;
+  max-height: 430px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 26px;
+  border: 1px solid rgba(142, 255, 240, 0.08);
+  background: rgba(9, 25, 42, 0.62);
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.market-agent-card:hover {
+  border-color: rgba(142, 255, 240, 0.16);
+  background: rgba(13, 36, 58, 0.68);
+  transform: translateY(-2px);
+}
+
+.market-agent-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.market-agent-card__identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.market-agent-avatar {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  border: 1px solid rgba(150, 255, 240, 0.12);
+  background: rgba(150, 255, 240, 0.07);
+  color: #96fff0;
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.market-agent-heading {
+  min-width: 0;
+}
+
+.market-agent-heading strong {
+  display: block;
+  overflow: hidden;
+  color: #f4fbff;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-agent-heading p {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #9bb1c5;
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-agent-badges,
+.market-agent-skill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.market-agent-badge,
+.market-agent-skill-row span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.025);
+  color: #9bb1c5;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.market-agent-badge:first-child {
+  border-color: rgba(150, 255, 240, 0.12);
+  color: #bffef6;
+  background: rgba(150, 255, 240, 0.045);
+}
+
+.market-agent-badge--ready,
+.market-agent-badge--success {
+  border-color: rgba(54, 211, 153, 0.18);
+  color: #bffef6;
+  background: rgba(54, 211, 153, 0.055);
+}
+
+.market-agent-badge--limited,
+.market-agent-badge--warn,
+.market-agent-badge--needs_review {
+  border-color: rgba(246, 196, 83, 0.18);
+  color: #f8d889;
+  background: rgba(246, 196, 83, 0.055);
+}
+
+.market-agent-badge--neutral,
+.market-agent-badge--info {
+  border-color: rgba(68, 167, 255, 0.16);
+  color: #b7c6d6;
+  background: rgba(68, 167, 255, 0.045);
+}
+
+.market-agent-specialty {
+  min-height: 40px;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #b7c6d6;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.market-agent-skill-row {
+  min-height: 26px;
+}
+
+.market-agent-skill-row span {
+  color: #6f879d;
+  background: rgba(255, 255, 255, 0.016);
+}
+
+.market-agent-trust {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.market-agent-trust div {
+  min-height: 62px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.market-agent-trust span {
+  color: #6f879d;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.market-agent-trust strong {
+  overflow: hidden;
+  color: #f4fbff;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-agent-package {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(150, 255, 240, 0.1);
+  background: rgba(150, 255, 240, 0.045);
+}
+
+.market-agent-package span {
+  color: #9bb1c5;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.market-agent-package p {
+  margin-top: 4px;
+  color: #6f879d;
+  font-size: 12px;
+}
+
+.market-agent-package strong {
+  flex: 0 0 auto;
+  color: #f4fbff;
+  font-size: 17px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.market-agent-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.market-agent-actions button {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.market-agent-primary {
+  border: 0;
+  color: #031018;
+  background: #96fff0;
+}
+
+.market-agent-secondary {
+  border: 1px solid rgba(142, 255, 240, 0.16);
+  color: #f4fbff;
+  background: transparent;
+}
+
+.marketplace-empty-state {
+  display: grid;
+  gap: 14px;
+  padding: 40px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(9, 25, 42, 0.58);
+  text-align: left;
+}
+
+.marketplace-empty-state h2 {
+  color: #f4fbff;
+  font-size: 28px;
+}
+
+.marketplace-empty-state p:not(.marketplace-eyebrow) {
+  max-width: 420px;
+  color: #9bb1c5;
+  font-size: 15px;
+}
+
+.marketplace-empty-state .hero-secondary {
+  width: max-content;
+  min-width: 150px;
+  margin-top: 8px;
+}
+
+@media (max-width: 1020px) {
+  .agent-market-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .marketplace-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .marketplace-filter-grid label:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .marketplace-page {
+    gap: 24px !important;
+  }
+
+  .marketplace-header {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding-top: 32px;
+  }
+
+  .marketplace-header h1 {
+    font-size: 32px !important;
+  }
+
+  .marketplace-header p:not(.marketplace-eyebrow) {
+    font-size: 15px;
+  }
+
+  .marketplace-header__cta {
+    width: 100%;
+  }
+
+  .marketplace-filter-grid,
+  .agent-market-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .marketplace-filter-grid label:first-child {
+    grid-column: auto;
+  }
+
+  .market-agent-card {
+    max-height: none;
+    min-height: auto;
+    padding: 20px;
+  }
+
+  .market-agent-trust {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-agent-trust div:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 440px) {
+  .market-agent-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .market-agent-package {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

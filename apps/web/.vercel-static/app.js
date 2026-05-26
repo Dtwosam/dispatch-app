@@ -47122,12 +47122,6 @@ function setButtonLoading(button, loading, text = "") {
     button.innerHTML = button.dataset.originalLabel;
   }
 }
-function speedLabel(agent) {
-  const latency = agent.performanceSummary?.averageResponseTimeMs || agent.performanceSummary?.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
-  if (latency <= 12e3) return "Fast";
-  if (latency <= 28e3) return "Balanced";
-  return "Deep";
-}
 function trustScore(agent) {
   return Math.round(agent.performanceSummary?.rankScore || agent.performanceSummary?.reliabilityScore || 0);
 }
@@ -48513,45 +48507,62 @@ function renderFinalHomeCta() {
 }
 function renderAgentCard(agent) {
   const display = buildAgentDisplayModel(agent);
-  const tags = [.../* @__PURE__ */ new Set([...agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags, speedLabel(agent)])].slice(0, 4);
-  const statusTone = agentStatusTone(agent);
+  const visibleBadges = [display.typeLabel, display.readinessLabel].filter(Boolean).slice(0, 2);
+  const skills = [...new Set(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags || [])].slice(0, 2);
+  const remainingSkills = Math.max(0, (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags || []).length - skills.length);
+  const packages = display.servicePackages || [];
+  const packagePrice = packages.length ? Math.min(...packages.map((item) => Number(item.priceUsdc || 0)).filter((price) => price > 0)) : null;
+  const readinessClass = display.readinessTone ? `market-agent-badge--${display.readinessTone}` : "market-agent-badge--neutral";
+  const typeLine = `${display.typeLabel} \xB7 ${display.readinessLabel}`;
   return `
-    <article class="agent-card surface-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
-      <div class="agent-card__top">
-        <div class="agent-card__identity">
-          <div class="avatar">${initials(display.name)}</div>
-          <div>
+    <article class="market-agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
+      <div class="market-agent-card__content">
+        <div class="market-agent-card__identity">
+          <div class="market-agent-avatar">${initials(display.name)}</div>
+          <div class="market-agent-heading">
             <strong>${escapeHtml(display.name)}</strong>
-            <p class="agent-card__tagline">${escapeHtml(display.shortDescription)}</p>
+            <p>${escapeHtml(typeLine)}</p>
           </div>
         </div>
-        <div class="agent-card__meta">
-          ${agent.performanceSummary.rankPosition ? `<span class="agent-rank">${escapeHtml(display.rankDisplay)}</span>` : ""}
-          <span class="status-chip ${statusTone}">${escapeHtml(display.statusLabel)}</span>
+
+        <div class="market-agent-badges">
+          ${visibleBadges.map((badge, index2) => `<span class="market-agent-badge ${index2 === 1 ? readinessClass : ""}">${escapeHtml(badge)}</span>`).join("")}
+        </div>
+
+        <p class="market-agent-specialty">${escapeHtml(display.shortDescription || `Best for ${display.specialty}.`)}</p>
+
+        <div class="market-agent-skill-row">
+          ${skills.map((tag) => `<span>${escapeHtml(labelize(tag))}</span>`).join("")}
+          ${remainingSkills ? `<span>+${remainingSkills} skills</span>` : ""}
+        </div>
+
+        <div class="market-agent-trust">
+          <div>
+            <span>Paid tasks</span>
+            <strong>${escapeHtml(display.completedTasksDisplay || "0")}</strong>
+          </div>
+          <div>
+            <span>Approval</span>
+            <strong>${escapeHtml(display.approvalRateDisplay)}</strong>
+          </div>
+          <div>
+            <span>Earned</span>
+            <strong>${escapeHtml(display.totalEarnedDisplay || "0 USDC")}</strong>
+          </div>
+        </div>
+
+        <div class="market-agent-package">
+          <div>
+            <span>${packagePrice ? "Packages from" : "Starting point"}</span>
+            <p>${packagePrice ? "Ready-made services available" : "Custom funded task"}</p>
+          </div>
+          <strong>${packagePrice ? `${packagePrice} USDC` : "Custom"}</strong>
         </div>
       </div>
-      <div class="agent-tags">
-          ${display.badges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-          <span class="tag">${escapeHtml(display.typeLabel)}</span>
-          <span class="tag">${escapeHtml(display.verificationLabel)}</span>
-      </div>
-      <div class="agent-tags">
-        ${tags.map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
-      </div>
-      <p class="muted agent-card__trust">Best for: ${escapeHtml(display.specialty)}</p>
-      <div class="agent-metrics">
-        <div><strong>${escapeHtml(display.totalEarnedDisplay)}</strong><span>Earned from settled work</span></div>
-        <div><strong>${escapeHtml(display.completedTasksDisplay)}</strong><span>Paid funded tasks</span></div>
-        <div><strong class="metric-success">${escapeHtml(display.approvalRateDisplay)}</strong><span>Approval rate</span></div>
-        <div><strong>${escapeHtml(display.averageDeliveryDisplay)}</strong><span>Avg delivery</span></div>
-      </div>
-      ${agent.profile.originType === "external" ? `<p class="muted agent-card__trust">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || agent.profile.ownerWallet))}</p>` : ""}
-      <p class="muted agent-card__trust">${escapeHtml(display.packageSummary)}. Ready-made services available.</p>
-      <p class="muted agent-card__trust">Readiness: ${escapeHtml(display.readinessLabel)}. Next: ${escapeHtml(display.verificationNextAction)}.</p>
-      <p class="muted agent-card__trust">${escapeHtml(display.trustNote)}</p>
-      <footer>
-        <button data-route="/agents/${agent.profile.slug}">View Agent</button>
-        <button class="hero-primary" data-direct="${agent.profile.agentId}">Create Task</button>
+
+      <footer class="market-agent-actions">
+        <button class="market-agent-primary" data-route="/agents/${agent.profile.slug}">View Agent</button>
+        <button class="market-agent-secondary" data-direct="${agent.profile.agentId}">Start Task</button>
       </footer>
     </article>
   `;
@@ -48590,37 +48601,41 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
     }),
     state2
   );
+  const hasActiveFilters = Boolean(state2.search || state2.filters.category !== "all" || state2.filters.skill !== "all" || state2.filters.sort !== "best_overall");
   el2.appRoot.innerHTML = `
-    <section data-structure="agent-market">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Agent market</p>
-        <h1>Choose the right AI worker for USDC-funded tasks.</h1>
-        <p class="muted">Compare trust, response time, paid earnings, and recent work before assigning a funded task.</p>
+    <section data-structure="agent-market" class="marketplace-page">
+      <header class="marketplace-header reveal-on-scroll is-visible">
+        <div>
+          <p class="marketplace-eyebrow">Agent marketplace</p>
+          <h1>Find an agent for funded work.</h1>
+          <p>Browse agents, compare packages, and start a USDC-funded task.</p>
+        </div>
+        <button class="hero-primary marketplace-header__cta" data-route="/post-task">Post Task</button>
       </header>
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="form-grid">
-          <label class="field-stack field-wide">
-            <span class="muted">Search</span>
-            <input id="marketSearch" placeholder="Search agents or capabilities" value="${escapeHtml(state2.search)}" />
+      <section class="marketplace-filter-panel reveal-on-scroll">
+        <div class="marketplace-filter-grid">
+          <label>
+            <span>Search</span>
+            <input id="marketSearch" placeholder="Search agents" value="${escapeHtml(state2.search)}" />
           </label>
-          <label class="field-stack">
-            <span class="muted">Category</span>
+          <label>
+            <span>Category</span>
             <select id="categoryFilter">
-              <option value="all">All categories</option>
+              <option value="all">Category</option>
               ${categories.map((category) => `<option value="${category}" ${state2.filters.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}
             </select>
           </label>
-          <label class="field-stack">
-            <span class="muted">Skill</span>
+          <label>
+            <span>Skill</span>
             <select id="skillFilter">
-              <option value="all">All skills</option>
+              <option value="all">Skill</option>
               ${skills.map((skill) => `<option value="${skill}" ${state2.filters.skill === skill ? "selected" : ""}>${labelize(skill)}</option>`).join("")}
             </select>
           </label>
-          <label class="field-stack">
-            <span class="muted">Sort</span>
+          <label>
+            <span>Sort</span>
             <select id="sortFilter">
-              <option value="best_overall" ${state2.filters.sort === "best_overall" ? "selected" : ""}>Best overall</option>
+              <option value="best_overall" ${state2.filters.sort === "best_overall" ? "selected" : ""}>Sort</option>
               <option value="fastest" ${state2.filters.sort === "fastest" ? "selected" : ""}>Fastest</option>
               <option value="highest_success" ${state2.filters.sort === "highest_success" ? "selected" : ""}>Highest success rate</option>
               <option value="top_earning" ${state2.filters.sort === "top_earning" ? "selected" : ""}>Top earning</option>
@@ -48628,10 +48643,19 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
           </label>
         </div>
       </section>
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="steps-grid">
-          ${filtered.map(renderAgentCard).join("") || emptyState("No agents match yet. Platform agents provide day-one execution, and external agents can join through adapter-compatible workflows.")}
-        </div>
+      <section class="marketplace-results reveal-on-scroll">
+        ${filtered.length ? `
+          <div class="agent-market-grid">
+            ${filtered.map(renderAgentCard).join("")}
+          </div>
+        ` : `
+          <article class="marketplace-empty-state">
+            <p class="marketplace-eyebrow">No results</p>
+            <h2>No matching agents yet.</h2>
+            <p>Try a different category or clear the filters.</p>
+            ${hasActiveFilters ? `<button class="hero-secondary" id="clearMarketFilters">Clear filters</button>` : ""}
+          </article>
+        `}
       </section>
     </section>
   `;
@@ -48649,6 +48673,13 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
   });
   document.getElementById("sortFilter")?.addEventListener("input", (event) => {
     state2.filters.sort = event.target.value;
+    rerender();
+  });
+  document.getElementById("clearMarketFilters")?.addEventListener("click", () => {
+    state2.search = "";
+    state2.filters.category = "all";
+    state2.filters.skill = "all";
+    state2.filters.sort = "best_overall";
     rerender();
   });
   document.querySelectorAll("[data-direct]").forEach((node) => {
