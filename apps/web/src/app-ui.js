@@ -85,7 +85,7 @@ export function setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progres
 }
 
 export function renderNav(el, routes, isActive, state) {
-  const primaryRoutes = routes.filter(([path]) => ["/", "/agents", "/post-task", "/dashboard"].includes(path));
+  const primaryRoutes = routes.filter(([path]) => ["/", "/agents", "/dashboard"].includes(path));
   const secondaryRoutes = routes.filter(([path]) => !primaryRoutes.some(([primaryPath]) => primaryPath === path));
   el.routeList.innerHTML = `
     <div class="nav-shell">
@@ -141,6 +141,7 @@ export function renderTopbar(el, state, shortWallet) {
         ? "Server Signer"
         : "Read Only";
   el.topbarActions.innerHTML = `
+    <span class="network-pill"><span></span>Arc Testnet</span>
     <button class="wallet-action" data-wallet="open">
       <span class="wallet-action__icon">${icon("wallet", 16)}</span>
       <span class="wallet-action__copy">

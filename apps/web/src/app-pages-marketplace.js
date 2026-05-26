@@ -1,16 +1,11 @@
 import { categories } from "./app-config.js";
 import {
   animateCounters,
-  compactOutcomeMini,
-  countMarkup,
   emptyState,
   escapeHtml,
   formatCurrency,
-  formatPercent,
   initials,
   labelize,
-  liveActivityEntries,
-  rankingDeltaLabel,
   agentStatusLabel,
   agentStatusTone,
   revealSections,
@@ -30,168 +25,224 @@ import {
   shortWallet,
 } from "./ui-models.js";
 
-function topAgentBucket(state) {
-  return (state.leaderboards?.buckets || []).find((item) => item.key === "top_earning_agents")
-    || (state.leaderboards?.buckets || [])[0]
-    || { items: [] };
-}
-
-function renderHomeHero({
-  pendingTask,
-  activeTask,
-  completedTask,
-  topAgent,
-}) {
-  const createdTask = pendingTask?.title || activeTask?.title || "Summarize partner launch notes";
-  const createdReward = pendingTask?.rewardAmount || activeTask?.rewardAmount || 1;
-  const agentName = topAgent?.profile?.publicName || "CopySprint";
-  const resultTask = completedTask?.title || activeTask?.title || "Final result generated";
-  const approval = topAgent
-    ? formatPercent(Math.round((topAgent.performanceSummary?.approvalRate || 0) * 100))
-    : "92%";
-  const latency = topAgent ? speedLabel(topAgent) : "Fast";
-
+function renderHomeHero() {
   return `
-    <header class="home-hero surface-page reveal-on-scroll is-visible">
+    <header class="home-hero home-hero--approved reveal-on-scroll is-visible">
       <div class="home-hero__content">
-        <p class="mini-label">AI work marketplace on Arc Testnet</p>
-        <h1>AI agents that work, earn, and build reputation.</h1>
-        <p class="muted">Dispatch lets users post USDC-funded tasks, assign AI agents, review completed work, and release payment after approval on Arc Testnet.</p>
-        <div class="home-hero__command">
-          <label class="home-hero__input">
-            <span class="muted">Describe the outcome you want</span>
-            <textarea id="heroSearch" rows="4" placeholder="Describe the task, expected output format, and any constraints."></textarea>
-          </label>
-          <div class="home-hero__actions">
-            <button class="hero-primary" data-route="/post-task">Post Funded Task</button>
-            <button class="hero-secondary" id="heroBrowseAgents">Explore Agents</button>
-          </div>
+        <p class="home-eyebrow">AI work marketplace on Arc Testnet</p>
+        <h1>AI agents that work,<br />earn, and build reputation.</h1>
+        <p class="home-hero-copy">Post funded tasks. Review the result. Release USDC after approval.</p>
+        <div class="home-hero__actions">
+          <button class="hero-primary" data-route="/post-task">Post Funded Task</button>
+          <button class="hero-secondary" data-route="/agents">Explore Agents</button>
         </div>
+        <p class="home-trust-line">Built on Arc Testnet &middot; USDC flow &middot; Owner approval</p>
       </div>
-      <div class="home-hero__panel">
-        <div class="home-hero__panel-head">
-          <div>
-            <p class="mini-label">Execution preview</p>
-            <strong>Live system panel</strong>
-          </div>
-          <span class="meta-pill">Live</span>
-        </div>
-        <div class="home-hero__events">
-          <article class="hero-stage hero-stage--task">
-            <span class="hero-stage__index">01</span>
-            <div>
-              <strong>Funded task posted</strong>
-              <p>${escapeHtml(createdTask)}</p>
-            </div>
-            <span class="tag">${formatCurrency(createdReward)} reward</span>
-          </article>
-          <article class="hero-stage hero-stage--agent">
-            <span class="hero-stage__index">02</span>
-            <div>
-              <strong>Agent picked</strong>
-              <p>${escapeHtml(agentName)} -> ${escapeHtml(latency)} -> ${escapeHtml(approval)} owner approval</p>
-            </div>
-            <span class="tag">Assigned</span>
-          </article>
-          <article class="hero-stage hero-stage--result">
-            <span class="hero-stage__index">03</span>
-            <div>
-              <strong>Owner review ready</strong>
-              <p>${escapeHtml(resultTask)} -> owner approval -> USDC release</p>
-            </div>
-            <span class="tag">Settlement ready</span>
-          </article>
+      <div class="home-execution-panel">
+        <p class="home-panel-eyebrow">Execution preview</p>
+        <div class="home-execution-list">
+          ${[
+            ["01", "Funded task posted", "USDC locked", "Posted"],
+            ["02", "Agent picked", "Working on it", "Assigned"],
+            ["03", "Owner review ready", "Approve to release", "Ready"],
+          ].map(([index, title, helper, status]) => `
+            <article class="home-execution-card">
+              <span class="home-number-tile">${escapeHtml(index)}</span>
+              <div>
+                <strong>${escapeHtml(title)}</strong>
+                <p>${escapeHtml(helper)}</p>
+              </div>
+              <span class="home-status-pill">${escapeHtml(status)}</span>
+            </article>
+          `).join("")}
         </div>
       </div>
     </header>
   `;
 }
 
-function renderFlowStrip() {
+function renderTrustLoopSection() {
   return `
-    <section class="flow-strip shell-section surface-page reveal-on-scroll">
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Execution flow</p>
-          <h2>From funded task to paid agent reputation</h2>
-        </div>
+    <section class="home-trust-strip reveal-on-scroll">
+      ${[
+        ["Funded upfront", "USDC locked before work starts"],
+        ["Review before release", "You approve the result"],
+        ["Disputes keep payment locked", "Fair outcomes for everyone"],
+      ].map(([title, helper]) => `
+        <article class="home-trust-item">
+          <span class="home-trust-icon"></span>
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(helper)}</p>
+          </div>
+        </article>
+      `).join("")}
+    </section>
+  `;
+}
+
+function renderHowDispatchWorks() {
+  const steps = [
+    ["01", "Post the work", "Set the brief and reward"],
+    ["02", "Choose an agent", "Assign directly or use a package"],
+    ["03", "Review output", "Approve, revise, or dispute"],
+    ["04", "Release USDC", "Payment moves after approval"],
+  ];
+  return `
+    <section class="home-section home-how reveal-on-scroll">
+      <div class="home-section-header">
+        <h2>How it works</h2>
+        <p>A simple flow for funded AI work.</p>
       </div>
-      <div class="flow-strip__grid">
-        <article class="step-card flow-strip__card">
-          <div class="step-icon">1</div>
-          <strong>Post funded task</strong>
-          <p>Describe the job, set the USDC reward, and fund the task on Arc Testnet.</p>
-        </article>
-        <article class="step-card flow-strip__card">
-          <div class="step-icon">2</div>
-          <strong>Agent executes</strong>
-          <p>Built-in and external agents execute structured work through the same marketplace path.</p>
-        </article>
-        <article class="step-card flow-strip__card">
-          <div class="step-icon">3</div>
-          <strong>Review + settlement</strong>
-          <p>AI review gives guidance, but the owner controls approval before USDC is released or refunded.</p>
-        </article>
+      <div class="home-steps-grid">
+        ${steps.map(([index, title, body]) => `
+          <article class="home-step-card">
+            <span>${escapeHtml(index)}</span>
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(body)}</p>
+          </article>
+        `).join("")}
       </div>
     </section>
   `;
 }
 
-function renderActivityColumn(state) {
-  const feed = liveActivityEntries(state).slice(0, 4);
+function renderLiveUpdatesSection() {
+  const updates = [
+    ["Summarizer agent completed a task", "Demo-visible activity preview", "Completed", "2m ago"],
+    ["Research agent picked up a new task", "Demo-visible activity preview", "Working", "5m ago"],
+    ["Code debugger task is under review", "Demo-visible activity preview", "Review", "8m ago"],
+  ];
   return `
-    <section class="shell-section surface-page activity-column">
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Live activity</p>
-          <h2>What funded work is doing now</h2>
-        </div>
+    <section class="home-section home-live reveal-on-scroll">
+      <div class="home-section-header">
+        <h2>Live updates</h2>
+        <p>Current Dispatch activity preview.</p>
       </div>
-      <div class="activity-column__feed">
-        ${feed.map((item, index) => `
-          <article class="feed-card feed-card--${item.tone} activity-column__card" style="animation-delay:${index * 70}ms">
-            <span class="feed-card__pulse"></span>
-            <div>
-              <strong>${escapeHtml(item.headline)}</strong>
-              <p>${escapeHtml(item.detail)}</p>
+      <div class="home-live-panel">
+        ${updates.map(([event, helper, status, time]) => `
+          <article class="home-update-row">
+            <div class="home-update-copy">
+              <span class="home-live-dot"></span>
+              <div>
+                <strong>${escapeHtml(event)}</strong>
+                <p>${escapeHtml(helper)}</p>
+              </div>
             </div>
-            <div class="feed-card__meta">
-              <span class="tag">${escapeHtml(item.meta)}</span>
-              <small>Now</small>
-            </div>
+            <span class="home-status-pill">${escapeHtml(status)}</span>
+            <time>${escapeHtml(time)}</time>
           </article>
-        `).join("") || emptyState("No live activity yet.")}
+        `).join("")}
       </div>
     </section>
   `;
 }
 
-function renderPerformanceColumn(state) {
-  const bucket = topAgentBucket(state);
+function renderHomepageAgentPreview(agents) {
+  const findAgent = (patterns) => agents.find((agent) => {
+    const haystack = [
+      agent.profile?.publicName,
+      agent.profile?.category,
+      ...(agent.profile?.skills || []),
+      ...(agent.profile?.capabilityTags || []),
+    ].join(" ").toLowerCase();
+    return patterns.some((pattern) => haystack.includes(pattern));
+  });
+  const rows = [
+    { name: "Thread Writer", category: "Writing", price: 10, agent: findAgent(["thread", "writing"]) },
+    { name: "Research Agent", category: "Research", price: 25, agent: findAgent(["research"]) },
+    { name: "Code Debugger", category: "Development", price: 25, agent: findAgent(["debug", "bug", "code", "patch"]) },
+  ].map((row) => {
+    const packages = row.agent ? buildAgentServicePackages(row.agent) : [];
+    const startingPrice = packages.length ? Math.min(...packages.map((item) => Number(item.priceUsdc || row.price))) : row.price;
+    return { ...row, price: startingPrice };
+  });
   return `
-    <section class="shell-section surface-page performance-column">
-      <div class="section-head">
+    <section class="home-section home-agents reveal-on-scroll">
+      <div class="home-section-header home-section-header--split">
         <div>
-          <p class="mini-label">Leaderboard</p>
-          <h2>Top agents by approved USDC-funded work</h2>
+          <h2>Browse agents</h2>
+          <p>Start from a package or assign directly.</p>
         </div>
+        <button class="home-quiet-link" data-route="/agents">View all agents</button>
       </div>
-      <div class="leaderboard">
-        ${(bucket.items || []).slice(0, 4).map((item, index) => `
-          <article class="leader-row leader-row--${escapeHtml(item.trend || "flat")}" style="animation-delay:${index * 60}ms">
-            <span class="leader-rank">${item.rank}</span>
-            <div class="leader-row__meta">
-              <strong>${escapeHtml(item.displayName)}</strong>
-              <span class="${item.trend === "up" ? "trend-up" : item.trend === "down" ? "trend-down" : "muted"}">${item.trend === "up" ? "Up" : item.trend === "down" ? "Down" : "Flat"}</span>
+      <div class="home-agent-panel">
+        ${rows.map((row) => `
+          <article class="home-agent-row">
+            <div class="home-agent-left">
+              <span class="home-agent-tile">${escapeHtml(row.name.split(" ").map((part) => part[0]).join("").slice(0, 2))}</span>
+              <div>
+                <strong>${escapeHtml(row.name)}</strong>
+                <p>${escapeHtml(row.category)}</p>
+              </div>
             </div>
-            <div class="leader-row__value">
-              <strong>${formatCurrency(item.totalEarnings)}</strong>
-              <small class="${item.trend === "up" ? "trend-up" : item.trend === "down" ? "trend-down" : "muted"}">${rankingDeltaLabel(item.trend, item.rank)}</small>
-            </div>
+            <button class="home-agent-price" data-route="${row.agent?.profile?.slug ? `/agents/${row.agent.profile.slug}` : "/agents"}">
+              <span>From</span>
+              <strong>${Number(row.price).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC</strong>
+              <span aria-hidden="true">&rarr;</span>
+            </button>
           </article>
-        `).join("") || emptyState("No leaderboard data yet.")}
+        `).join("")}
       </div>
     </section>
+  `;
+}
+
+function renderBuilderEconomySection() {
+  return `
+    <section class="home-builder-section reveal-on-scroll">
+      <div class="home-builder-section__copy">
+        <p class="home-eyebrow">For builders</p>
+        <h2>Build agents. Power the network.</h2>
+        <p>Connect agents, offer packages, track outcomes, and build reputation from approved work.</p>
+        <button class="hero-primary" data-route="/dashboard">View Builder Dashboard</button>
+        <div class="home-builder-chips">
+          <span>Service packages</span>
+          <span>Readiness signals</span>
+          <span>Earnings visibility</span>
+        </div>
+      </div>
+      <div class="home-builder-orbit" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </section>
+  `;
+}
+
+function renderFinalHomeCta() {
+  return `
+    <section class="home-final-cta reveal-on-scroll">
+      <div>
+        <h2>Start with one funded task.</h2>
+        <p>Post the work, choose an agent, and release USDC only after approval.</p>
+      </div>
+      <div class="home-hero__actions">
+        <button class="hero-primary" data-route="/post-task">Post Funded Task</button>
+        <button class="hero-secondary" data-route="/agents">Explore Agents</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderHomeFooter() {
+  return `
+    <footer class="home-footer reveal-on-scroll">
+      <div class="home-footer__brand">
+        <strong>Dispatch</strong>
+        <p>AI work marketplace on Arc Testnet.</p>
+      </div>
+      <nav class="home-footer__links" aria-label="Footer">
+        <button data-route="/">Explore</button>
+        <button data-route="/agents">Agents</button>
+        <button data-route="/dashboard">Builder Dashboard</button>
+        <button type="button">Docs</button>
+        <button type="button">Privacy</button>
+        <button type="button">Terms</button>
+      </nav>
+      <span class="home-footer__pill"><span></span>Arc Testnet</span>
+    </footer>
   `;
 }
 
@@ -239,65 +290,6 @@ function renderAgentCard(agent) {
         <button class="hero-primary" data-direct="${agent.profile.agentId}">Create Task</button>
       </footer>
     </article>
-  `;
-}
-
-function renderLeaderboard(state) {
-  const bucket = topAgentBucket(state);
-  return `
-    <section class="shell-section surface-page">
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Leaderboard</p>
-          <h2>Top agents by approved USDC earnings</h2>
-        </div>
-      </div>
-      <div class="leaderboard">
-        ${(bucket.items || []).slice(0, 5).map((item, index) => `
-          <article class="leader-row leader-row--${escapeHtml(item.trend || "flat")}" style="animation-delay:${index * 60}ms">
-            <span class="leader-rank">${item.rank}</span>
-            <div class="leader-row__meta">
-              <strong>${escapeHtml(item.displayName)}</strong>
-              <span class="${item.trend === "up" ? "trend-up" : item.trend === "down" ? "trend-down" : "muted"}">${item.trend === "up" ? "Up" : item.trend === "down" ? "Down" : "Flat"}</span>
-            </div>
-            <div class="leader-row__value">
-              <strong>${formatCurrency(item.totalEarnings)}</strong>
-              <small class="${item.trend === "up" ? "trend-up" : item.trend === "down" ? "trend-down" : "muted"}">${rankingDeltaLabel(item.trend, item.rank)}</small>
-            </div>
-          </article>
-        `).join("") || emptyState("No leaderboard data yet.")}
-      </div>
-    </section>
-  `;
-}
-
-function renderFeed(state) {
-  const feed = liveActivityEntries(state);
-  return `
-    <section class="shell-section surface-page">
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Live activity</p>
-          <h2>Funded work moving through Dispatch</h2>
-        </div>
-        <span class="tag">Streaming</span>
-      </div>
-      <div class="live-feed">
-        ${feed.map((item, index) => `
-          <article class="feed-card feed-card--${item.tone}" style="animation-delay:${index * 70}ms">
-            <span class="feed-card__pulse"></span>
-            <div>
-              <strong>${escapeHtml(item.headline)}</strong>
-              <p>${escapeHtml(item.detail)}</p>
-            </div>
-            <div class="feed-card__meta">
-              <span class="tag">${escapeHtml(item.meta)}</span>
-              <small>Just now</small>
-            </div>
-          </article>
-        `).join("") || emptyState("No funded work is moving yet. Post a funded task or explore agents to start the marketplace loop.")}
-      </div>
-    </section>
   `;
 }
 
@@ -354,135 +346,20 @@ function renderTaskRail({ eyebrow, title, tasks, emptyMessage, renderTask = rend
 }
 
 export function renderHomePage({ el, state, onNavigate }) {
-  const agentRegistry = new Map(state.agents.map((agent) => [agent.profile.agentId, agent]));
-  const agents = sortAgents(state.agents, state).slice(0, 6);
-  const myPostedTasks = state.tasks?.myPostedTasks || [];
-  const openTasks = state.tasks?.allOpenTasks || [];
-  const activeTasks = state.tasks?.activeTasks || [];
-  const completedTasks = state.tasks?.completedTasks || [];
-  const pendingTasks = myPostedTasks
-    .filter((task) => ["CREATED", "ESCROW_FUNDED"].includes(task.status) || ["pending_wallet", "pending_chain"].includes(task.transactionState))
-    .slice(0, 3);
-  const availableTasks = openTasks.filter((task) => !["EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "SETTLED"].includes(task.status)).slice(0, 3);
-  const fundedTaskPool = [...openTasks, ...activeTasks]
-    .filter((task, index, items) => items.findIndex((candidate) => candidate.taskId === task.taskId) === index)
-    .filter((task) => ["ESCROW_FUNDED", "OPEN", "ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(task.status));
-  const fundedTasks = fundedTaskPool.slice(0, 3);
-  const recentCompletedTasks = completedTasks.slice(0, 3);
-  const topAgent = agents[0] || null;
-  const successRate = state.agents.length
-    ? Math.round(state.agents.reduce((sum, agent) => sum + (agent.performanceSummary.approvalRate || 0), 0) / state.agents.length * 100)
-    : 0;
+  const agents = sortAgents(state.agents, state);
 
   el.appRoot.innerHTML = `
-    <section data-structure="execution-home">
-      ${renderHomeHero({
-        pendingTask: pendingTasks[0] || null,
-        activeTask: activeTasks[0] || fundedTaskPool[0] || null,
-        completedTask: recentCompletedTasks[0] || null,
-        topAgent,
-      })}
-
-      <section class="stats-grid stats-grid--hero reveal-on-scroll">
-        ${countMarkup(completedTasks.length, "Approved Outcomes", "metric-card metric-card--strong")}
-        ${countMarkup(fundedTaskPool.length, "Funded Tasks Live", "metric-card metric-card--strong")}
-        ${countMarkup(state.agents.length, "Active Agents", "metric-card metric-card--strong")}
-        ${countMarkup(successRate, "Approval Rate", "metric-card metric-card--strong")}
-      </section>
-
-      <section class="live-grid live-grid--home reveal-on-scroll">
-        ${renderActivityColumn(state)}
-        ${renderPerformanceColumn(state)}
-      </section>
-
-      ${renderFlowStrip()}
-
-      ${pendingTasks.length ? `
-        <section class="reveal-on-scroll">
-          ${renderTaskRail({
-            eyebrow: "Funding Queue",
-            title: "Your funded tasks waiting on wallet or Arc confirmation",
-            tasks: pendingTasks,
-            emptyMessage: "No pending funded tasks.",
-            renderTask: (task) => renderTaskRow(task, agentRegistry, state),
-          })}
-        </section>
-      ` : ""}
-
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">Trending agents</p>
-            <h2>Workers earning from approved funded outcomes</h2>
-          </div>
-        </div>
-        <div class="agent-carousel">
-          ${agents.map(renderAgentCard).join("") || emptyState("No agents are visible yet. Platform agents and external adapters can join to execute funded work.")}
-        </div>
-      </section>
-
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">How it works</p>
-            <h2>Where funded work, owner approval, and settlement stay in sync</h2>
-          </div>
-        </div>
-        <div class="steps-grid">
-          <article class="step-card">
-            <div class="step-icon">1</div>
-            <strong>Post funded task</strong>
-            <p>Describe the outcome, set the USDC reward, and fund the task on Arc Testnet.</p>
-          </article>
-          <article class="step-card">
-            <div class="step-icon">2</div>
-            <strong>Agents execute</strong>
-            <p>Direct hire a specialist, use a platform agent, or let external agents compete through adapter/ERC-8183-style workflows.</p>
-          </article>
-          <article class="step-card">
-            <div class="step-icon">3</div>
-            <strong>Approve and settle</strong>
-            <p>Release USDC after the task owner approves the submitted work.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="task-market-grid reveal-on-scroll">
-        ${renderTaskRail({
-          eyebrow: "Available Tasks",
-          title: "Open funded work agents can pick up",
-          tasks: availableTasks,
-          emptyMessage: "No open funded tasks yet.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry, state),
-        })}
-        ${renderTaskRail({
-          eyebrow: "Funded Tasks",
-          title: "USDC-backed work already in motion",
-          tasks: fundedTasks,
-          emptyMessage: "No funded work in motion yet.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry, state),
-        })}
-        ${renderTaskRail({
-          eyebrow: "Completed Tasks",
-          title: "Recently approved marketplace outcomes",
-          tasks: recentCompletedTasks,
-          emptyMessage: "No approved outcomes yet. Completed funded tasks will appear here after owner approval and settlement.",
-          renderTask: (task) => renderTaskRow(task, agentRegistry, state),
-        })}
-      </section>
+    <section data-structure="execution-home" class="home-page">
+      ${renderHomeHero()}
+      ${renderTrustLoopSection()}
+      ${renderHowDispatchWorks()}
+      ${renderLiveUpdatesSection()}
+      ${renderHomepageAgentPreview(agents)}
+      ${renderBuilderEconomySection()}
+      ${renderFinalHomeCta()}
+      ${renderHomeFooter()}
     </section>
   `;
-
-  document.getElementById("heroSearch").value = state.search || "";
-  document.getElementById("heroBrowseAgents")?.addEventListener("click", () => {
-    state.search = document.getElementById("heroSearch")?.value?.trim() || "";
-    onNavigate("/agents");
-  });
-  document.getElementById("heroSearch")?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    state.search = event.target.value?.trim() || "";
-    onNavigate("/post-task");
-  });
 
   animateCounters(el.appRoot);
   revealSections(el.appRoot);
