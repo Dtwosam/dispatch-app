@@ -85,8 +85,15 @@ export function setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progres
 }
 
 export function renderNav(el, routes, isActive, state) {
-  const primaryRoutes = routes.filter(([path]) => ["/", "/agents", "/dashboard"].includes(path));
-  const secondaryRoutes = routes.filter(([path]) => !primaryRoutes.some(([primaryPath]) => primaryPath === path));
+  const primaryOrder = ["/", "/agents", "/post-task", "/dashboard"];
+  const secondaryOrder = ["/connect-agent", "/create-agent", "/arc-demo", "/admin"];
+  const byPath = new Map(routes);
+  const primaryRoutes = primaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
+  const secondaryRoutes = [
+    ...secondaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]),
+    ...routes.filter(([path]) => !primaryOrder.includes(path) && !secondaryOrder.includes(path)),
+  ];
+  const walletLabel = state.wallet?.trim() ? "Wallet Connected" : "Connect Wallet";
   el.routeList.innerHTML = `
     <div class="nav-shell">
       <nav class="desktop-nav" aria-label="Primary">
@@ -114,12 +121,37 @@ export function renderNav(el, routes, isActive, state) {
           </div>
           <button type="button" data-menu="close" aria-label="Close navigation">${icon("plus", 14)}</button>
         </div>
+        <div class="mobile-drawer__status">
+          <span class="network-pill"><span></span>Arc Testnet</span>
+          <button class="wallet-action wallet-action--drawer" type="button" data-wallet="open">
+            <span class="wallet-action__copy"><strong>${escapeHtml(walletLabel)}</strong></span>
+          </button>
+        </div>
         <nav class="mobile-drawer__nav" aria-label="Mobile">
-          ${routes
+          ${[...primaryRoutes, ...secondaryRoutes]
             .map(([path, label]) => `<a href="${path}" data-route="${path}" ${isActive(path) ? 'aria-current="page"' : ""}>${label}</a>`)
             .join("")}
         </nav>
       </aside>
+    </div>
+  `;
+}
+
+export function renderAppFooter(el, routes) {
+  if (!el.appFooter) return;
+  const footerPaths = ["/", "/agents", "/post-task", "/dashboard", "/connect-agent", "/create-agent"];
+  const byPath = new Map(routes);
+  const footerRoutes = footerPaths.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
+  el.appFooter.innerHTML = `
+    <div class="app-footer__inner">
+      <div class="app-footer__brand">
+        <strong>Dispatch</strong>
+        <p>AI work marketplace on Arc Testnet.</p>
+      </div>
+      <nav class="app-footer__links" aria-label="Footer">
+        ${footerRoutes.map(([path, label]) => `<button type="button" data-route="${path}">${escapeHtml(label)}</button>`).join("")}
+      </nav>
+      <span class="app-footer__pill"><span></span>Arc Testnet</span>
     </div>
   `;
 }

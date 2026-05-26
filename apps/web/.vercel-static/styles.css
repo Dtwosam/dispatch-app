@@ -3328,3 +3328,382 @@ body::after {
     gap: 14px;
   }
 }
+
+/* UI Rebuild Pass 2: global app shell, navigation, and footer */
+#appRoot {
+  padding-top: 56px;
+}
+
+#appRoot > section[data-structure] {
+  gap: 64px;
+}
+
+#appRoot > section[data-structure]:not(.home-page) h1 {
+  max-width: 760px;
+  font-size: clamp(32px, 4vw, 42px);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+#appRoot > section[data-structure]:not(.home-page) h2,
+#appRoot .section-head h2 {
+  font-size: clamp(24px, 2.6vw, 28px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+#appRoot > section[data-structure]:not(.home-page) h3 {
+  font-size: clamp(18px, 1.8vw, 22px);
+}
+
+#appRoot > section[data-structure]:not(.home-page) [data-structure] > header p:not(.mini-label),
+#appRoot > section[data-structure]:not(.home-page) .hero-copy__intro .muted {
+  max-width: 640px;
+  color: #9bb1c5;
+  font-size: clamp(15px, 1.4vw, 16px);
+  line-height: 1.55;
+}
+
+.home-page {
+  padding-top: 96px;
+}
+
+#appRoot > .home-page {
+  margin-top: -56px;
+}
+
+#appHeader {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(0, 1fr) minmax(190px, auto);
+  align-items: center;
+  gap: 32px;
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+.desktop-nav {
+  justify-self: center;
+}
+
+.desktop-nav__more > summary .ui-icon {
+  opacity: 0.7;
+}
+
+.desktop-nav__menu {
+  min-width: 220px;
+  padding: 10px;
+  border-radius: 18px;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(18px);
+}
+
+.desktop-nav__menu a {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  color: #b7c6d6;
+  font-size: 14px;
+  font-weight: 550;
+  border-radius: 12px;
+}
+
+.mobile-nav-toggle {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border-color: rgba(142, 255, 240, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.mobile-nav-toggle span {
+  width: 18px;
+  height: 1.5px;
+  background: #dcebee;
+}
+
+.mobile-drawer__backdrop {
+  background: rgba(3, 10, 18, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.mobile-drawer__panel {
+  gap: 20px;
+  padding: 22px;
+  border-color: rgba(142, 255, 240, 0.12);
+  background:
+    radial-gradient(circle at 88% 4%, rgba(150, 255, 240, 0.1), transparent 32%),
+    rgba(3, 10, 18, 0.98);
+}
+
+.mobile-drawer__top button {
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 14px;
+  border-color: rgba(142, 255, 240, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  transform: rotate(45deg);
+}
+
+.mobile-drawer__status {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(142, 255, 240, 0.08);
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.mobile-drawer__status .network-pill,
+.wallet-action--drawer {
+  width: 100%;
+  justify-content: center;
+}
+
+.wallet-action--drawer {
+  min-height: 44px;
+}
+
+.mobile-drawer__nav {
+  gap: 8px;
+}
+
+.mobile-drawer__nav a {
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 16px;
+  color: #dcebee;
+  font-size: 15px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.024);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mobile-drawer__nav a[aria-current="page"] {
+  color: #031018;
+  background: #96fff0;
+  border-color: transparent;
+}
+
+.wallet-sheet-panel {
+  border-color: rgba(142, 255, 240, 0.12);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(150, 255, 240, 0.1), transparent 34%),
+    rgba(3, 10, 18, 0.98);
+}
+
+.wallet-sheet-hero {
+  gap: 20px;
+}
+
+.wallet-sheet-hero h3,
+.wallet-session-card h3 {
+  font-size: clamp(20px, 2.5vw, 26px);
+}
+
+.wallet-flow-card,
+.wallet-session-card {
+  border-color: rgba(142, 255, 240, 0.08);
+  background: rgba(255, 255, 255, 0.024);
+}
+
+.wallet-session-actions > button:not(.hero-primary) {
+  border: 1px solid rgba(142, 255, 240, 0.14);
+  color: #f4fbff;
+  background: rgba(255, 255, 255, 0.026);
+}
+
+.app-footer {
+  margin-top: 56px;
+  padding: 32px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.app-footer__inner {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  align-items: center;
+  gap: 28px;
+}
+
+.app-footer__brand {
+  display: grid;
+  gap: 6px;
+}
+
+.app-footer__brand strong {
+  color: #f4fbff;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.app-footer__brand p,
+.app-footer__links button {
+  color: #6f879d;
+  font-size: 13px;
+}
+
+.app-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+.app-footer__links button {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-weight: 550;
+}
+
+.app-footer__links button:hover {
+  color: #f4fbff;
+}
+
+.app-footer__pill {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(142, 255, 240, 0.1);
+  color: #9bb1c5;
+  font-size: 12px;
+}
+
+.app-footer__pill span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #36d399;
+  box-shadow: 0 0 14px rgba(54, 211, 153, 0.65);
+}
+
+@media (max-width: 1180px) {
+  #appHeader {
+    grid-template-columns: minmax(170px, auto) minmax(0, 1fr) minmax(170px, auto);
+    gap: 24px;
+  }
+
+  .desktop-nav {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 900px) {
+  #appRoot {
+    padding-top: 40px;
+  }
+
+  #appRoot > .home-page {
+    margin-top: -40px;
+  }
+
+  #appHeader {
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+  }
+
+  .mobile-nav-toggle {
+    justify-self: end;
+  }
+
+  #topbarActions {
+    justify-content: end;
+  }
+
+  .wallet-action {
+    min-width: 0;
+  }
+
+  .wallet-action__copy strong {
+    max-width: 116px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-drawer__status .network-pill {
+    display: inline-flex;
+  }
+
+  .app-footer__inner {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 18px;
+  }
+
+  .app-footer__links {
+    justify-content: flex-start;
+  }
+
+  .app-footer__pill {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  #appRoot {
+    padding-top: 36px;
+  }
+
+  #appRoot > .home-page {
+    margin-top: -36px;
+  }
+
+  #appRoot > section[data-structure] {
+    gap: 44px;
+  }
+
+  #appRoot > section[data-structure]:not(.home-page) h1 {
+    font-size: 32px;
+  }
+
+  #appRoot > section[data-structure]:not(.home-page) h2,
+  #appRoot .section-head h2 {
+    font-size: 24px;
+  }
+
+  #appHeader {
+    min-height: 64px;
+  }
+
+  #topbarActions .wallet-action {
+    padding: 0 12px;
+  }
+
+  #topbarActions .wallet-action__copy strong {
+    max-width: 98px;
+  }
+
+  .mobile-drawer__panel {
+    inset: 8px;
+    width: auto;
+    padding: 20px;
+    border-radius: 24px;
+  }
+
+  .app-footer {
+    margin-top: 44px;
+    padding-top: 26px;
+  }
+
+  .app-footer__links {
+    gap: 12px 16px;
+  }
+}

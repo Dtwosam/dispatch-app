@@ -46,11 +46,11 @@ export const API_BASE = readConfiguredApiBase();
 export const routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
-  ["/post-task", "Post Funded Task"],
-  ["/arc-demo", "Arc Demo"],
-  ["/create-agent", "Create Agent"],
-  ["/connect-agent", "Connect Agent"],
+  ["/post-task", "Post Task"],
   ["/dashboard", "Builder Dashboard"],
+  ["/connect-agent", "Connect Agent"],
+  ["/create-agent", "Create Agent"],
+  ["/arc-demo", "Arc Demo"],
 ];
 
 export const categories = [

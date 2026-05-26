@@ -46618,11 +46618,11 @@ var API_BASE = readConfiguredApiBase();
 var routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
-  ["/post-task", "Post Funded Task"],
-  ["/arc-demo", "Arc Demo"],
-  ["/create-agent", "Create Agent"],
+  ["/post-task", "Post Task"],
+  ["/dashboard", "Builder Dashboard"],
   ["/connect-agent", "Connect Agent"],
-  ["/dashboard", "Builder Dashboard"]
+  ["/create-agent", "Create Agent"],
+  ["/arc-demo", "Arc Demo"]
 ];
 var categories = [
   "research",
@@ -46857,6 +46857,7 @@ function getAppElements() {
     routeList: document.getElementById("routeList"),
     statusToast: document.getElementById("statusToast"),
     appRoot: document.getElementById("appRoot"),
+    appFooter: document.getElementById("appFooter"),
     topbarActions: document.getElementById("topbarActions"),
     walletSheet: document.getElementById("walletSheet"),
     burstLayer: document.getElementById("burstLayer")
@@ -46930,8 +46931,15 @@ function setChrome(el2, eyebrow, title, sidebarTitle, sidebarLead, progress) {
   `;
 }
 function renderNav(el2, routes2, isActive2, state2) {
-  const primaryRoutes = routes2.filter(([path]) => ["/", "/agents", "/dashboard"].includes(path));
-  const secondaryRoutes = routes2.filter(([path]) => !primaryRoutes.some(([primaryPath]) => primaryPath === path));
+  const primaryOrder = ["/", "/agents", "/post-task", "/dashboard"];
+  const secondaryOrder = ["/connect-agent", "/create-agent", "/arc-demo", "/admin"];
+  const byPath = new Map(routes2);
+  const primaryRoutes = primaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
+  const secondaryRoutes = [
+    ...secondaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]),
+    ...routes2.filter(([path]) => !primaryOrder.includes(path) && !secondaryOrder.includes(path))
+  ];
+  const walletLabel = state2.wallet?.trim() ? "Wallet Connected" : "Connect Wallet";
   el2.routeList.innerHTML = `
     <div class="nav-shell">
       <nav class="desktop-nav" aria-label="Primary">
@@ -46957,10 +46965,34 @@ function renderNav(el2, routes2, isActive2, state2) {
           </div>
           <button type="button" data-menu="close" aria-label="Close navigation">${icon("plus", 14)}</button>
         </div>
+        <div class="mobile-drawer__status">
+          <span class="network-pill"><span></span>Arc Testnet</span>
+          <button class="wallet-action wallet-action--drawer" type="button" data-wallet="open">
+            <span class="wallet-action__copy"><strong>${escapeHtml(walletLabel)}</strong></span>
+          </button>
+        </div>
         <nav class="mobile-drawer__nav" aria-label="Mobile">
-          ${routes2.map(([path, label]) => `<a href="${path}" data-route="${path}" ${isActive2(path) ? 'aria-current="page"' : ""}>${label}</a>`).join("")}
+          ${[...primaryRoutes, ...secondaryRoutes].map(([path, label]) => `<a href="${path}" data-route="${path}" ${isActive2(path) ? 'aria-current="page"' : ""}>${label}</a>`).join("")}
         </nav>
       </aside>
+    </div>
+  `;
+}
+function renderAppFooter(el2, routes2) {
+  if (!el2.appFooter) return;
+  const footerPaths = ["/", "/agents", "/post-task", "/dashboard", "/connect-agent", "/create-agent"];
+  const byPath = new Map(routes2);
+  const footerRoutes = footerPaths.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
+  el2.appFooter.innerHTML = `
+    <div class="app-footer__inner">
+      <div class="app-footer__brand">
+        <strong>Dispatch</strong>
+        <p>AI work marketplace on Arc Testnet.</p>
+      </div>
+      <nav class="app-footer__links" aria-label="Footer">
+        ${footerRoutes.map(([path, label]) => `<button type="button" data-route="${path}">${escapeHtml(label)}</button>`).join("")}
+      </nav>
+      <span class="app-footer__pill"><span></span>Arc Testnet</span>
     </div>
   `;
 }
@@ -48479,25 +48511,6 @@ function renderFinalHomeCta() {
     </section>
   `;
 }
-function renderHomeFooter() {
-  return `
-    <footer class="home-footer reveal-on-scroll">
-      <div class="home-footer__brand">
-        <strong>Dispatch</strong>
-        <p>AI work marketplace on Arc Testnet.</p>
-      </div>
-      <nav class="home-footer__links" aria-label="Footer">
-        <button data-route="/">Explore</button>
-        <button data-route="/agents">Agents</button>
-        <button data-route="/dashboard">Builder Dashboard</button>
-        <button type="button">Docs</button>
-        <button type="button">Privacy</button>
-        <button type="button">Terms</button>
-      </nav>
-      <span class="home-footer__pill"><span></span>Arc Testnet</span>
-    </footer>
-  `;
-}
 function renderAgentCard(agent) {
   const display = buildAgentDisplayModel(agent);
   const tags = [.../* @__PURE__ */ new Set([...agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags, speedLabel(agent)])].slice(0, 4);
@@ -48554,7 +48567,6 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
       ${renderHomepageAgentPreview(agents)}
       ${renderBuilderEconomySection()}
       ${renderFinalHomeCta()}
-      ${renderHomeFooter()}
     </section>
   `;
   animateCounters(el2.appRoot);
@@ -49905,6 +49917,8 @@ document.addEventListener("click", (event) => {
   }
   const walletToggle = event.target.closest("[data-wallet]");
   if (walletToggle) {
+    state.mobileNavOpen = false;
+    renderNav2();
     renderWalletSheet2(walletToggle.dataset.wallet === "open");
   }
   const menuToggle = event.target.closest("[data-menu]");
@@ -50040,6 +50054,9 @@ function renderNav2() {
 }
 function renderTopbar2() {
   return renderTopbar(el, state, shortWallet);
+}
+function renderFooter() {
+  return renderAppFooter(el, routes);
 }
 function setChrome2(eyebrow, title, sidebarTitle, sidebarLead, progress) {
   return setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progress);
@@ -52009,6 +52026,7 @@ async function renderAdmin() {
 async function render() {
   renderNav2();
   renderTopbar2();
+  renderFooter();
   if (!state.tasks) {
     el.appRoot.innerHTML = `
       <section data-structure="app-loading" class="loading-shell">

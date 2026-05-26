@@ -226,26 +226,6 @@ function renderFinalHomeCta() {
   `;
 }
 
-function renderHomeFooter() {
-  return `
-    <footer class="home-footer reveal-on-scroll">
-      <div class="home-footer__brand">
-        <strong>Dispatch</strong>
-        <p>AI work marketplace on Arc Testnet.</p>
-      </div>
-      <nav class="home-footer__links" aria-label="Footer">
-        <button data-route="/">Explore</button>
-        <button data-route="/agents">Agents</button>
-        <button data-route="/dashboard">Builder Dashboard</button>
-        <button type="button">Docs</button>
-        <button type="button">Privacy</button>
-        <button type="button">Terms</button>
-      </nav>
-      <span class="home-footer__pill"><span></span>Arc Testnet</span>
-    </footer>
-  `;
-}
-
 function renderAgentCard(agent) {
   const display = buildAgentDisplayModel(agent);
   const tags = [...new Set([...(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags), speedLabel(agent)])].slice(0, 4);
@@ -357,7 +337,6 @@ export function renderHomePage({ el, state, onNavigate }) {
       ${renderHomepageAgentPreview(agents)}
       ${renderBuilderEconomySection()}
       ${renderFinalHomeCta()}
-      ${renderHomeFooter()}
     </section>
   `;
 

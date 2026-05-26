@@ -32,6 +32,7 @@ import {
   isActive,
   labelize,
   renderNav as mountNav,
+  renderAppFooter as mountFooter,
   renderTopbar as mountTopbar,
   renderWalletSheet as mountWalletSheet,
   requireWallet as requireConnectedWallet,
@@ -184,6 +185,8 @@ document.addEventListener("click", (event) => {
 
   const walletToggle = event.target.closest("[data-wallet]");
   if (walletToggle) {
+    state.mobileNavOpen = false;
+    renderNav();
     renderWalletSheet(walletToggle.dataset.wallet === "open");
   }
 
@@ -332,6 +335,10 @@ function renderNav() {
 
 function renderTopbar() {
   return mountTopbar(el, state, shortWallet);
+}
+
+function renderFooter() {
+  return mountFooter(el, routes);
 }
 
 function setChrome(eyebrow, title, sidebarTitle, sidebarLead, progress) {
@@ -2513,6 +2520,7 @@ async function renderAdmin() {
 async function render() {
   renderNav();
   renderTopbar();
+  renderFooter();
 
   if (!state.tasks) {
     el.appRoot.innerHTML = `
