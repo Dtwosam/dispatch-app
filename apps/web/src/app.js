@@ -1215,102 +1215,102 @@ async function renderPostTaskPage() {
             }
         : null;
   el.appRoot.innerHTML = `
-    <section data-structure="task-composer">
-      <header>
-        <p class="mini-label">Funded Execution Input</p>
-        <h1>Post a USDC-funded task for AI agents.</h1>
-        <p>Describe the work, pick or open the agent assignment, fund in testnet USDC, then review the submitted output before payment is released.</p>
+    <section data-structure="task-composer" class="post-task-page">
+      <header class="post-task-header reveal-on-scroll is-visible">
+        <p class="post-task-eyebrow">Post funded task</p>
+        <h1>Create funded work for an AI agent.</h1>
+        <p>Set the brief, choose an agent, and fund the task in USDC.</p>
+        <span>Arc Testnet | USDC payment flow | Owner approval</span>
       </header>
-      <section class="composer-grid">
-        <div class="composer-main">
-          <article class="composer-intro surface-page reveal-on-scroll">
-            <div class="composer-title-row">
-              <div>
-                <p class="mini-label">Funded command</p>
-                <h2>Turn a request into funded work with a clear payout path.</h2>
-              </div>
-              <div class="composer-badges">
-                <span class="meta-pill">${escapeHtml(state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market")}</span>
-                <span class="meta-pill">${walletReady ? "Wallet connected" : "Connect wallet to fund"}</span>
-              </div>
-            </div>
-            <p class="muted">Write the task once, route it cleanly, and keep funding, owner review, and settlement obvious. This surface is optimized for real AI work, not a generic prompt box.</p>
+
+      <section class="post-task-flow reveal-on-scroll">
+        ${[
+          ["01", "Brief", "Write or generate the task brief"],
+          ["02", "Agent", "Choose a package or route"],
+          ["03", "Fund", "Lock USDC before work starts"],
+          ["04", "Review", "Approve before payment release"],
+        ].map(([number, title, helper]) => `
+          <article>
+            <strong>${number}</strong>
+            <h3>${title}</h3>
+            <p>${helper}</p>
           </article>
+        `).join("")}
+      </section>
+
+      <section class="post-task-layout">
+        <div class="post-task-main">
           ${chainBanner ? `
-            <article class="status-banner surface-alert ${chainBanner.tone} reveal-on-scroll">
+            <article class="post-task-alert post-task-alert--${chainBanner.tone} reveal-on-scroll">
               <strong>${escapeHtml(chainBanner.title)}</strong>
               <p>${escapeHtml(chainBanner.body)}</p>
             </article>
           ` : ""}
-          <article class="status-banner surface-alert info reveal-on-scroll">
-            <strong>3-minute Arc Testnet demo</strong>
-            <p>Start a polished Thread Writer demo task with 10 USDC demo funding, structured output, owner approval, demo payment release, reputation update, and external-agent context.</p>
-            <div class="secondary-actions" style="margin-top:12px;">
-              <button type="button" data-start-demo-flow>Start Demo Flow</button>
-            </div>
-          </article>
-          <article class="shell-section surface-page reveal-on-scroll">
-              <div class="section-head">
+
+          <article class="post-task-composer reveal-on-scroll">
+            <div class="post-task-section-head">
               <div>
-                <p class="mini-label">Composer</p>
-                <h2>Funded task brief</h2>
+                <p class="post-task-eyebrow">Task brief</p>
+                <h2>Describe the outcome.</h2>
+                <p>Describe the outcome the agent should deliver.</p>
               </div>
-                <div class="meta-inline">
-                <span class="meta-pill">${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
-                <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
-                </div>
+              <div class="post-task-meta">
+                <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
+                <span>${state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market"}</span>
+              </div>
             </div>
+
             ${state.taskForm.selectedServicePackage ? `
-              <div class="status-banner surface-alert info" style="margin-bottom:18px;">
-                <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)} package: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
-                <p>This package only prefilled the editable task draft. You still fund the task with USDC, review the delivered work, and release payment only after approval.</p>
-                <div class="agent-tags" style="margin-top:10px;">
-                  <span class="tag">${escapeHtml(Number(state.taskForm.selectedServicePackage.priceUsdc || 0).toLocaleString(undefined, { maximumFractionDigits: 6 }))} USDC</span>
-                  <span class="tag">${escapeHtml(state.taskForm.selectedServicePackage.deliveryEstimate || "Delivery estimate not available yet")}</span>
-                  ${selectedAgent ? `<span class="tag">${escapeHtml(selectedAgent.profile.publicName)}</span>` : ""}
+              <div class="post-package-summary">
+                <div>
+                  <span>Selected package</span>
+                  <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)}: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
+                  <p>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Agent selected from package"} | You can edit the brief before funding.</p>
                 </div>
+                <strong>${escapeHtml(Number(state.taskForm.selectedServicePackage.priceUsdc || 0).toLocaleString(undefined, { maximumFractionDigits: 6 }))} USDC</strong>
               </div>
             ` : ""}
-            <div class="simple-panel surface-panel" style="margin-bottom:18px;">
-              <div class="section-head">
+
+            <section class="post-template-section">
+              <div class="post-task-section-head post-task-section-head--compact">
                 <div>
-                  <p class="mini-label">Template</p>
-                  <h3>Start with a task template</h3>
-                  <p class="muted">Choose a common task shape, fill the useful details, then generate an editable brief for the existing funded task flow.</p>
+                  <p class="post-task-eyebrow">Template</p>
+                  <h3>Start from a task shape.</h3>
                 </div>
-                <span class="meta-pill">${escapeHtml(selectedTemplate.name)}</span>
+                <span>${escapeHtml(selectedTemplate.name)}</span>
               </div>
-              <label class="field-stack field-wide">
-                <span class="muted">Task template</span>
-                <select id="taskTemplateId">
-                  ${taskBriefTemplates.map((template) => `<option value="${template.id}" ${selectedTemplate.id === template.id ? "selected" : ""}>${escapeHtml(template.name)}</option>`).join("")}
-                </select>
-              </label>
+              <div class="post-template-grid">
+                ${taskBriefTemplates.map((template) => `
+                  <button type="button" data-template-card="${template.id}" class="${selectedTemplate.id === template.id ? "is-selected" : ""}">
+                    <strong>${escapeHtml(template.name)}</strong>
+                    <span>${escapeHtml(template.category ? labelize(template.category) : "Custom brief")}</span>
+                  </button>
+                `).join("")}
+              </div>
               ${selectedTemplate.id === "custom_task" ? `
-                <p class="muted" style="margin-top:12px;">Custom Task keeps the original blank composer. Write directly in the title and description fields below.</p>
+                <p class="post-helper">Custom Task keeps the blank composer. Write directly below.</p>
               ` : `
-                <div class="form-grid field-stack" style="margin-top:14px;">
+                <div class="post-template-fields">
                   ${selectedTemplate.fields.map((field) => {
                     const value = state.taskForm.templateFields?.[field.key] || "";
                     return field.multiline
-                      ? `<label class="field-wide"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><textarea data-template-field="${field.key}" rows="4" placeholder="${escapeHtml(field.label)}">${escapeHtml(value)}</textarea></label>`
-                      : `<label><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><input data-template-field="${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.label)}" /></label>`;
+                      ? `<label class="post-field post-field--wide"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><textarea data-template-field="${field.key}" rows="3" placeholder="${escapeHtml(field.label)}">${escapeHtml(value)}</textarea></label>`
+                      : `<label class="post-field"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><input data-template-field="${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.label)}" /></label>`;
                   }).join("")}
                 </div>
-                <div class="secondary-actions" style="margin-top:14px;">
-                  <button type="button" id="generateTaskBrief">Generate / Update Brief</button>
-                </div>
-                ${state.taskForm.templateMessage ? `<div class="status-banner surface-alert ${templateResult.missingFields.length ? "warning" : "info"}" style="margin-top:12px;"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
+                <button type="button" class="post-quiet-button" id="generateTaskBrief">Generate / Update Brief</button>
+                ${state.taskForm.templateMessage ? `<div class="post-task-alert post-task-alert--${templateResult.missingFields.length ? "warning" : "info"}"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
               `}
-            </div>
-            <div class="form-grid field-stack">
-              <label class="field-wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
-              <label class="field-wide"><strong>Final editable brief</strong><textarea id="taskDescription" rows="9" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
-              <label><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
-              <label><strong>Reward (USDC)</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /></label>
-              <label><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
-              <div class="field-wide">
-                <p class="mini-label">Route</p>
+            </section>
+
+            <section class="post-brief-fields">
+              <label class="post-field post-field--wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
+              <label class="post-field post-field--wide"><strong>Final editable brief</strong><textarea id="taskDescription" rows="9" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
+              <label class="post-field"><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
+              <label class="post-field"><strong>USDC reward</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /><span>This amount is locked before the agent starts.</span></label>
+              <label class="post-field"><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
+              <div class="post-route-control">
+                <p class="post-task-eyebrow">Agent route</p>
                 <div class="segmented">
                   <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Direct Hire</button>
                   <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Open Market</button>
@@ -1318,7 +1318,7 @@ async function renderPostTaskPage() {
               </div>
               ${state.taskForm.hiringMode === "direct_hire"
                 ? `
-                  <label class="field-wide"><strong>Selected agent</strong>
+                  <label class="post-field post-field--wide"><strong>Selected agent</strong>
                     <select id="selectedAgentId">
                       <option value="">Choose an agent</option>
                       ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} trust</option>`).join("")}
@@ -1326,37 +1326,32 @@ async function renderPostTaskPage() {
                   </label>
                 `
                 : `
-                  <label class="field-wide"><strong>Max participants</strong><input id="taskParticipants" type="number" min="1" max="20" value="${state.taskForm.maxParticipants}" /></label>
+                  <label class="post-field post-field--wide"><strong>Max participants</strong><input id="taskParticipants" type="number" min="1" max="20" value="${state.taskForm.maxParticipants}" /></label>
                 `}
-            </div>
+            </section>
           </article>
-          <details class="shell-section surface-page disclosure-panel reveal-on-scroll">
-            <summary>Advanced options</summary>
-            <div class="disclosure-panel__body">
-              <div class="section-head">
-                <div>
-                  <p class="mini-label">Advanced</p>
-                  <h2>Review settings and extra context</h2>
-                </div>
-                <span class="meta-pill">${state.taskForm.attachments.length ? `${state.taskForm.attachments.length} attachment${state.taskForm.attachments.length === 1 ? "" : "s"}` : "Optional"}</span>
-              </div>
-              <div class="form-grid field-stack">
-                <label><strong>Evaluation preference</strong>
+
+          <details class="post-advanced reveal-on-scroll">
+            <summary>
+              <span>Advanced options</span>
+              <small>Optional evaluation and attachment settings</small>
+            </summary>
+            <div class="post-advanced__body">
+              <div class="post-advanced-grid">
+                <label class="post-field"><strong>Evaluation preference</strong>
                   <select id="taskEvaluationPreference">
                     <option value="user_review_only" ${state.taskForm.evaluationPreference === "user_review_only" ? "selected" : ""}>User review only</option>
                     <option value="assisted_evaluation" ${state.taskForm.evaluationPreference === "assisted_evaluation" ? "selected" : ""}>Assisted evaluation</option>
                     <option value="hybrid_review" ${state.taskForm.evaluationPreference === "hybrid_review" ? "selected" : ""}>Hybrid review</option>
                   </select>
                 </label>
-                <label class="field-wide"><strong>Structured notes</strong><textarea id="taskStructuredNotes" rows="4" placeholder="Formatting rules, references, or approval hints.">${escapeHtml(state.taskForm.structuredNotes)}</textarea></label>
-                <label><strong>Attachment title</strong><input id="attachmentTitle" placeholder="Product brief" /></label>
-                <label><strong>Attachment pointer</strong><input id="attachmentPointer" placeholder="https://... or ipfs://..." /></label>
-                <label class="field-wide"><strong>Attachment text</strong><textarea id="attachmentText" rows="5" placeholder="Paste source text here if you want grounded summarization, extraction, or clause review."></textarea></label>
-                <label class="field-wide"><strong>Upload file</strong><input id="attachmentFile" type="file" accept=".txt,.md,.csv,.json,.pdf,.docx,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/json,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp" /></label>
+                <label class="post-field post-field--wide"><strong>Structured notes</strong><textarea id="taskStructuredNotes" rows="4" placeholder="Formatting rules, references, or approval hints.">${escapeHtml(state.taskForm.structuredNotes)}</textarea></label>
+                <label class="post-field"><strong>Attachment title</strong><input id="attachmentTitle" placeholder="Product brief" /></label>
+                <label class="post-field"><strong>Attachment pointer</strong><input id="attachmentPointer" placeholder="https://... or ipfs://..." /></label>
+                <label class="post-field post-field--wide"><strong>Attachment text</strong><textarea id="attachmentText" rows="5" placeholder="Paste source text here if you want grounded summarization, extraction, or clause review."></textarea></label>
+                <label class="post-field post-field--wide"><strong>Upload file</strong><input id="attachmentFile" type="file" accept=".txt,.md,.csv,.json,.pdf,.docx,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/json,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp" /></label>
               </div>
-              <div class="ops-actions">
-                <button type="button" id="addAttachment">Add Attachment</button>
-              </div>
+              <button type="button" class="post-quiet-button" id="addAttachment">Add Attachment</button>
               <div class="attachment-list">
                 ${state.taskForm.attachments.length
                   ? state.taskForm.attachments.map((attachment) => `
@@ -1372,64 +1367,71 @@ async function renderPostTaskPage() {
             </div>
           </details>
         </div>
-        <aside class="composer-side">
-          <article class="shell-panel surface-panel task-preview reveal-on-scroll">
-            <p class="mini-label">Preview</p>
-            <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
-              <p class="muted">${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
-              <div class="preview-tags">
-                <span class="meta-pill">${labelize(state.taskForm.category)}</span>
-                <span class="meta-pill">${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
-                <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
-              </div>
-          </article>
-          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Readiness</p>
-            <h3>Ready to route</h3>
-            <p class="muted">${escapeHtml(taskChecklist.summary)}</p>
-            <div class="tag-cloud">${taskChecklist.items.map((item) => `<span class="tag ${item.complete ? "tag-success" : "tag-muted"}">${escapeHtml(item.label)}</span>`).join("")}</div>
-          </article>
-          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Assignment</p>
-            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Open execution path"}</h3>
-            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the funded task through the same owner-approved work loop."}</p>
-            ${selectedAgent ? `
-              <div class="tag-cloud">
-                ${selectedAgentBestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}
-              </div>
-              <div class="attachment-list">
-                ${selectedAgentIdeas.map((idea, index) => `
-                  <button type="button" class="task-row surface-flat suggested-task" data-suggested-task="${index}">
-                    <strong>Starter idea ${index + 1}</strong>
-                    <p>${escapeHtml(idea)}</p>
-                  </button>
-                `).join("")}
-              </div>
-            ` : ""}
-          </article>
-          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Funding state</p>
-            <h3>${escapeHtml(primaryActionLabel)}</h3>
-            <p class="muted">${escapeHtml(fundingHint)} Wallet mode uses Arc Testnet ERC-20 USDC for task funding; payment is released only after owner approval. Demo settlement stays separate from wallet-funded tasks.</p>
-            ${walletReady ? `
-              <div class="agent-tags" style="margin-top:12px;">
-                <span class="tag">Network: ${escapeHtml(state.walletNetwork?.isArcTestnet ? "Arc Testnet" : state.walletNetwork?.chainId ? `Wrong network ${state.walletNetwork.chainId}` : "Unknown")}</span>
-                <span class="tag">Testnet USDC balance: ${escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>
-                ${state.walletNetwork?.nativeGasBalance == null ? "" : `<span class="tag">Native USDC gas: ${escapeHtml(Number(state.walletNetwork.nativeGasBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>`}
-              </div>
-              ${!walletOnArc ? `<div class="secondary-actions" style="margin-top:12px;"><button type="button" id="switchArcFromPost">Switch to Arc Testnet</button></div>` : ""}
-            ` : ""}
+
+        <aside class="post-task-side">
+          <article class="post-funding-summary reveal-on-scroll">
+            <p class="post-task-eyebrow">Funding summary</p>
+            <h2>${escapeHtml(primaryActionLabel)}</h2>
+            <div class="post-summary-list">
+              <div><span>Reward</span><strong>${state.taskForm.rewardAmount ? formatCurrency(state.taskForm.rewardAmount) : "Not set"}</strong></div>
+              <div><span>Network</span><strong>Arc Testnet</strong></div>
+              <div><span>Payment token</span><strong>USDC</strong></div>
+              <div><span>Wallet</span><strong>${walletReady ? shortWallet(state.wallet) : "Required"}</strong></div>
+              <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
+              <div><span>Agent route</span><strong>${state.taskForm.hiringMode === "direct_hire" ? (selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose agent") : "Open market"}</strong></div>
+              <div><span>Package</span><strong>${state.taskForm.selectedServicePackage ? escapeHtml(state.taskForm.selectedServicePackage.name) : "Custom task"}</strong></div>
+            </div>
+            ${!walletOnArc && walletReady ? `<button type="button" class="hero-secondary post-switch-button" id="switchArcFromPost">Switch to Arc Testnet</button>` : ""}
             ${state.chainTransaction?.state && state.chainTransaction.state !== "idle" ? `
-              <div class="status-banner surface-alert ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
+              <div class="post-task-alert post-task-alert--${state.chainTransaction.state === "failed" ? "warning" : "info"}">
                 <strong>${escapeHtml(labelize(state.chainTransaction.state))}</strong>
                 <p>${escapeHtml(state.chainTransaction.message)}</p>
               </div>
             ` : ""}
             <button class="hero-primary" id="fundTaskButton" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
+            <p class="post-funding-hint">${escapeHtml(fundingHint)}</p>
+          </article>
+
+          <article class="post-route-summary reveal-on-scroll">
+            <p class="post-task-eyebrow">Agent route</p>
+            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose an agent or open market"}</h3>
+            <p>${selectedAgent ? escapeHtml(selectedAgent.profile.description) : "Choose an agent directly or post to available agents."}</p>
+            ${selectedAgent ? `
+              <div class="post-route-tags">
+                ${selectedAgentBestFor.slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+              </div>
+              <div class="post-suggested-list">
+                ${selectedAgentIdeas.slice(0, 2).map((idea, index) => `
+                  <button type="button" data-suggested-task="${index}">
+                    <strong>Starter idea ${index + 1}</strong>
+                    <span>${escapeHtml(idea)}</span>
+                  </button>
+                `).join("")}
+              </div>
+            ` : ""}
+          </article>
+
+          <article class="post-preview-card reveal-on-scroll">
+            <p class="post-task-eyebrow">Preview</p>
+            <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
+            <p>${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
+            <div>
+              <span>${labelize(state.taskForm.category)}</span>
+              <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
+              <span>${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
+            </div>
+          </article>
+
+          <article class="post-demo-card reveal-on-scroll">
+            <strong>Arc Testnet demo mode</strong>
+            <p>Demo flow stays separate from wallet-funded tasks.</p>
+            <button type="button" data-start-demo-flow>Start Demo Flow</button>
           </article>
         </aside>
       </section>
-      <section class="mobile-action">
+
+      <section class="mobile-action post-mobile-action">
+        <span>${state.taskForm.rewardAmount ? formatCurrency(state.taskForm.rewardAmount) : "Reward not set"}</span>
         <button id="fundTaskMobile" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
       </section>
     </section>
@@ -1464,6 +1466,21 @@ async function renderPostTaskPage() {
     const template = getTaskBriefTemplate(event.target.value);
     if (template?.category) state.taskForm.category = template.category;
     renderPostTaskPage();
+  });
+
+  document.querySelectorAll("[data-template-card]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const templateId = node.dataset.templateCard;
+      state.taskForm.templateId = templateId;
+      state.taskForm.templateFields = {};
+      state.taskForm.selectedServicePackage = null;
+      state.taskForm.templateMessage = templateId === "custom_task"
+        ? "Custom Task selected. Write your own brief below."
+        : "Fill the template fields, then generate an editable task brief.";
+      const template = getTaskBriefTemplate(templateId);
+      if (template?.category) state.taskForm.category = template.category;
+      renderPostTaskPage();
+    });
   });
 
   document.querySelectorAll("[data-template-field]").forEach((node) => {
