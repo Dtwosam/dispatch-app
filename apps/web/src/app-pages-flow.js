@@ -6,7 +6,6 @@ import {
   formatCurrency,
   labelize,
   revealSections,
-  taskStatusTone,
 } from "./app-ui.js";
 import { buildArcTransactionLink, buildTaskLifecycleModel } from "./ui-models.js";
 
@@ -109,418 +108,289 @@ export function renderTaskDetailPageView({
     : browserTxHashes.length
       ? "Funding Syncing"
       : "Awaiting Funding";
-  const executionHeadline = task.status === "EXECUTING"
-    ? "Agent is actively working and this task surface is waiting for the next result update."
-    : task.status === "SUBMITTED"
-      ? "Execution finished and the result is ready for a review decision."
-      : fundingConfirmed
-        ? "The task is staged and waiting for the next execution event."
-        : browserTxHashes.length
-          ? "Signed wallet transactions were captured and the marketplace is syncing the latest onchain state."
-          : "This task has not been funded onchain yet.";
-  const nextStepSummary = task.status === "SUBMITTED"
-    ? "Review the output, then approve and settle if it looks good."
-    : task.status === "EXECUTING"
-      ? "The assigned agent is still working. This page will update as execution moves."
-      : fundingConfirmed
-        ? "This task is waiting for the next marketplace action."
-        : browserTxHashes.length
-          ? "The wallet signing flow completed and the marketplace is finalizing funding and assignment status."
-          : "Fund this task onchain before it can move into assignment and execution.";
   const payment = lifecycle.paymentDisplay;
   const taskStatus = lifecycle.statusDisplay;
-  const paymentBannerTone = payment.variant === "success"
-    ? "success"
-    : payment.variant === "warning"
-      ? "warning"
-      : "info";
 
   el.appRoot.innerHTML = `
-    <section data-structure="task-detail">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Task</p>
-        <h1>${escapeHtml(task.title)}</h1>
-        <p class="muted">${escapeHtml(task.description)}</p>
+    <section data-structure="task-detail" class="task-detail-page">
+      <header class="task-detail-hero reveal-on-scroll is-visible">
+        <div class="task-detail-hero__main">
+          <button class="task-back-link" data-route="/dashboard">Back to dashboard</button>
+          <p class="task-detail-eyebrow">Funded task</p>
+          <h1>${escapeHtml(task.title)}</h1>
+          <p>${escapeHtml(task.description || "Task details will appear here when available.")}</p>
+          <div class="task-detail-badges">
+            <span>${escapeHtml(taskStatus.label)}</span>
+            <span>${escapeHtml(payment.label)}</span>
+            ${(disputeModel?.hasOpenDispute || revisionModel?.hasRevisionRequested)
+              ? `<span>${escapeHtml(disputeModel?.hasOpenDispute ? "Dispute open" : "Revision requested")}</span>`
+              : `<span>${escapeHtml(lifecycle.reviewStateLabel)}</span>`}
+          </div>
+        </div>
+        <aside class="task-next-panel">
+          <p class="task-detail-eyebrow">Next action</p>
+          <h2>${escapeHtml(taskStatus.primaryCtaText)}</h2>
+          <div class="task-next-rows">
+            <div><span>Who acts next</span><strong>${escapeHtml(lifecycle.nextActor)}</strong></div>
+            <div><span>Required action</span><strong>${escapeHtml(taskStatus.nextActionText)}</strong></div>
+            <div><span>Reward</span><strong>${formatCurrency(task.rewardAmount || 0)}</strong></div>
+            <div><span>Assigned agent</span><strong>${agents.length ? escapeHtml(agents[0].displayName) : "Not assigned yet"}</strong></div>
+          </div>
+          <button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>
+        </aside>
       </header>
 
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">Lifecycle</p>
-            <h2>Funded work progress</h2>
-          </div>
-          <span class="tag">${escapeHtml(taskStatus.label)}</span>
-        </div>
-        <div class="task-summary">
-          <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>USDC reward</span></div>
-          <div class="metric-card"><strong>${escapeHtml(taskStatus.label)}</strong><span>Current status</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.fundingLabel)}</strong><span>Funding</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.reviewStateLabel)}</strong><span>Review</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.nextActor)}</strong><span>Who acts next</span></div>
-        </div>
-        <div class="status-banner surface-alert ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
-          <strong>${escapeHtml(taskStatus.label)}</strong>
-          <p>${escapeHtml(taskStatus.description)}</p>
-          <p><strong>Next required action:</strong> ${escapeHtml(taskStatus.nextActionText)} | ${escapeHtml(taskStatus.whoActsNext)}</p>
-        </div>
-        ${isDemoTask ? `
-          <div class="status-banner surface-alert info">
-            <strong>Arc Testnet demo mode</strong>
-            <p>Demo USDC settlement is shown for this walkthrough. Dispatch keeps owner approval and payout eligibility clear while external agents can integrate through ERC-8183-compatible adapter job flows.</p>
-            ${demoCanAdvance ? `<div class="secondary-actions" style="margin-top:12px;"><button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button></div>` : ""}
-          </div>
-        ` : ""}
-        <div class="steps-grid" style="margin-top:18px;">
-          ${lifecycle.steps.map((step) => `
-            <article class="step-card">
-              <div class="step-icon">${escapeHtml(step.status === "complete" ? "OK" : step.status === "current" ? "Now" : step.status === "warning" || step.status === "failed" ? "!" : ".")}</div>
-              <strong>${escapeHtml(step.label)}</strong>
-              <p>${escapeHtml(step.helper)}</p>
-              <div class="agent-tags" style="margin-top:10px;">
-                <span class="tag">${escapeHtml(labelize(step.status))}</span>
-                ${step.timestamp ? `<span class="tag">${escapeHtml(new Date(step.timestamp).toLocaleString())}</span>` : ""}
-              </div>
-            </article>
-          `).join("")}
-        </div>
+      <section class="task-lifecycle-strip reveal-on-scroll">
+        ${lifecycle.steps.map((step) => `
+          <article class="task-lifecycle-step task-lifecycle-step--${escapeHtml(step.status)}">
+            <span></span>
+            <strong>${escapeHtml(step.label)}</strong>
+          </article>
+        `).join("")}
       </section>
 
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">USDC payment</p>
-            <h2>Payment state</h2>
-          </div>
-          <span class="tag">${escapeHtml(payment.label)}</span>
-        </div>
-        <div class="task-summary">
-          <div class="metric-card"><strong>${escapeHtml(payment.amountDisplay)}</strong><span>Task reward</span></div>
-          <div class="metric-card"><strong>${escapeHtml(payment.label)}</strong><span>Payment status</span></div>
-          <div class="metric-card"><strong>${escapeHtml(payment.nextPaymentAction)}</strong><span>Next payment action</span></div>
-          <div class="metric-card"><strong>${escapeHtml(payment.networkDisplay)}</strong><span>Network</span></div>
-        </div>
-        <div class="status-banner surface-alert ${paymentBannerTone}">
-          <strong>${escapeHtml(payment.label)}</strong>
-          <p>${escapeHtml(payment.description)}</p>
-        </div>
-        <div class="agent-tags" style="margin-top:12px;">
-          ${payment.fundingTxLink ? `<a class="tag" href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tag">Funding tx: Not available yet</span>`}
-          ${payment.settlementTxLink ? `<a class="tag" href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tag">Release tx: Not available yet</span>`}
-        </div>
-      </section>
+      ${isDemoTask ? `
+        <section class="task-detail-alert task-detail-alert--info reveal-on-scroll">
+          <strong>Arc Testnet demo mode</strong>
+          <p>Demo USDC settlement is shown for this walkthrough. Owner approval and payout eligibility stay separate from wallet-funded production tasks.</p>
+          ${demoCanAdvance ? `<button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button>` : ""}
+        </section>
+      ` : ""}
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section surface-page">
-          <div class="section-head">
+      <section class="task-review-workspace reveal-on-scroll">
+        <article class="task-result-panel">
+          <div class="task-section-head">
             <div>
-              <p class="mini-label">Execution</p>
-              <h2>Live task status</h2>
+              <p class="task-detail-eyebrow">Submitted work</p>
+              <h2>${resultModel?.finalOutputText || resultModel?.sections?.length ? "Review the delivered output." : "No submitted work yet."}</h2>
             </div>
-            <span class="tag">${escapeHtml(taskStatus.label)}</span>
+            <span>${escapeHtml(resultModel?.workerLabel || "Marketplace Agent")}</span>
           </div>
-          <div class="status-banner surface-alert info">
-            <strong>Execution rail</strong>
-            <p>${executionHeadline}</p>
-          </div>
-          <div class="task-summary">
-            <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>Reward</span></div>
-            <div class="metric-card"><strong>${deadlineCountdown(task.deadline)}</strong><span>Deadline</span></div>
-            <div class="metric-card"><strong>${escapeHtml(lifecycle.reviewStateLabel)}</strong><span>Review</span></div>
-            <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
-          </div>
-          <div class="simple-panel surface-panel">
-            <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(taskStatus.label)} - ${escapeHtml(taskStatus.description)}</span></div>
-            <div class="agent-tags" style="margin-top:12px;">
-              ${agents.length
-                ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)} | ${escapeHtml(agent.originType === "external" ? "External" : "Platform")}</span>`).join("")
-                : "<span class='muted'>No agent assigned yet.</span>"}
+          ${resultModel?.finalOutputText || resultModel?.sections?.length ? `
+            <div class="task-result-meta">
+              <div><span>Quality score</span><strong>${resultModel?.qualityScore ?? "N/A"}</strong></div>
+              <div><span>Confidence</span><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong></div>
+              <div><span>Review confidence</span><strong>${resultModel?.reviewConfidence != null ? `${resultModel.reviewConfidence}%` : "N/A"}</strong></div>
             </div>
-            <p class="muted" style="margin-top:12px;">${escapeHtml(lifecycle.assignmentLabel)}</p>
-          </div>
-        </article>
-        <aside class="task-side">
-          <article class="shell-panel surface-panel">
-            <p class="mini-label">Task summary</p>
-            <h3>What happens next</h3>
-            <p class="muted">${nextStepSummary}</p>
-            <div class="status-banner surface-alert info" style="margin-top:12px;">
-              <strong>${escapeHtml(taskStatus.primaryCtaText)}</strong>
-              <p>${escapeHtml(lifecycle.nextActionHelper)}</p>
-            </div>
-            <div class="agent-tags" style="margin-top:12px;">
-              <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
-              <span class="tag">${escapeHtml(lifecycle.reviewStateLabel)}</span>
-              <span class="tag">${escapeHtml(lifecycle.paymentStateLabel)}</span>
-            </div>
-            ${(task.onchainTaskRef || onchainTask) ? `<p class="muted">${fundingConfirmed ? "Onchain task ref" : "Task pointer"}: ${escapeHtml(task.onchainTaskRef || `task:${task.taskId}`)}</p>` : ""}
-            ${browserTxHashes.length ? `
-              <div style="margin-top:14px;">
-                <p class="mini-label">Browser transaction trace</p>
-                <div class="agent-tags" style="margin-top:10px;">
-                  ${browserTxHashes.map((item) => {
-                    const href = arcTxLink(item.hash);
-                    const label = `${item.label} ${item.hash.slice(0, 12)}...`;
-                    return href
-                      ? `<a class="tag" href="${href}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`
-                      : `<span class="tag">${escapeHtml(label)}</span>`;
-                  }).join("")}
-                </div>
-                ${!fundingConfirmed ? `<p class="muted" style="margin-top:10px;">These hashes let the marketplace reconcile wallet-signed activity while final task state catches up.</p>` : ""}
-                ${!fundingConfirmed ? `<div class="secondary-actions" style="margin-top:12px;"><button data-check-funding="${task.taskId}">Refresh execution status</button></div>` : ""}
+            ${(resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote) ? `
+              <div class="task-detail-alert task-detail-alert--info">
+                <strong>AI review guidance</strong>
+                <p>${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}${resultModel?.reviewConfidence != null ? `Review confidence ${resultModel.reviewConfidence}%. ` : ""}${escapeHtml(resultModel?.evaluationNote || "AI review is guidance only. The owner makes the final approval decision.")}</p>
               </div>
             ` : ""}
-            ${onchainTask ? `<p class="muted" style="margin-top:10px;">Onchain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
-          </article>
-        </aside>
-      </section>
-
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section surface-page">
-          <div class="section-head">
-            <div>
-              <p class="mini-label">Result</p>
-              <h2>Delivered output</h2>
+            ${resultModel?.deliveryNote ? `
+              <div class="task-detail-alert task-detail-alert--info">
+                <strong>Marketplace benchmark run</strong>
+                <p>${escapeHtml(resultModel.deliveryNote)}</p>
+              </div>
+            ` : ""}
+            <div class="task-result-surface">${renderResultMarkup(resultModel)}</div>
+          ` : `
+            <div class="task-empty-panel">
+              <strong>No submitted work yet.</strong>
+              <p>The agent output will appear here once it is ready for owner review.</p>
             </div>
-          </div>
-          <div class="task-summary">
-            <div class="metric-card"><strong>${resultModel?.qualityScore ?? "N/A"}</strong><span>Quality Score</span></div>
-            <div class="metric-card"><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong><span>Confidence</span></div>
-            <div class="metric-card"><strong>${resultModel?.reviewConfidence != null ? `${resultModel.reviewConfidence}%` : "N/A"}</strong><span>Review Confidence</span></div>
-            <div class="metric-card"><strong>${escapeHtml(resultModel?.finalOutcome ? labelize(resultModel.finalOutcome) : (resultModel?.workerLabel || "Marketplace Agent"))}</strong><span>${resultModel?.finalOutcome ? "Result Status" : "Worker"}</span></div>
-          </div>
-          ${resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote ? `
-            <div class="status-banner surface-alert info">
-              <strong>AI review guidance</strong>
-              <p>
-                ${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}
-                ${resultModel?.reviewConfidence != null ? `Review confidence ${resultModel.reviewConfidence}%. ` : ""}
-                ${escapeHtml(resultModel?.evaluationNote || "AI review is only guidance. The task owner makes the final approval decision.")}
-              </p>
-            </div>
-          ` : ""}
-          ${resultModel?.deliveryNote ? `
-            <div class="status-banner surface-alert info">
-              <strong>Marketplace benchmark run</strong>
-              <p>${escapeHtml(resultModel.deliveryNote)}</p>
-            </div>
-          ` : ""}
-          <div class="result-surface">
-            ${renderResultMarkup(resultModel)}
-          </div>
+          `}
           ${(resultModel?.hasDraft || resultModel?.stageTimingsMs || onchainSnapshot?.onchainTask) ? `
-            <details class="shell-panel surface-panel disclosure-panel" style="margin-top:18px;">
-              <summary>More details</summary>
-              <div class="disclosure-panel__body">
+            <details class="task-detail-details">
+              <summary>More result details</summary>
+              <div>
                 ${resultModel?.hasDraft ? `
-                  <div>
+                  <section>
                     <strong>View Draft</strong>
-                    <div class="result-surface" style="margin-top:14px;">
-                      ${renderResultMarkup({ finalOutputText: resultModel.draftText })}
-                    </div>
-                  </div>
+                    <div class="task-result-surface">${renderResultMarkup({ finalOutputText: resultModel.draftText })}</div>
+                  </section>
                 ` : ""}
                 ${resultModel?.stageTimingsMs ? `
-                  <div>
+                  <section>
                     <strong>Stage timings</strong>
-                    <div class="agent-tags" style="margin-top:12px;">
-                      <span class="tag">structure ${Math.round(resultModel.stageTimingsMs.structuring)}ms</span>
-                      <span class="tag">generate ${Math.round(resultModel.stageTimingsMs.generation)}ms</span>
-                      ${resultModel.stageTimingsMs.improvement ? `<span class="tag">improve ${Math.round(resultModel.stageTimingsMs.improvement)}ms</span>` : ""}
+                    <div class="task-detail-badges">
+                      <span>structure ${Math.round(resultModel.stageTimingsMs.structuring)}ms</span>
+                      <span>generate ${Math.round(resultModel.stageTimingsMs.generation)}ms</span>
+                      ${resultModel.stageTimingsMs.improvement ? `<span>improve ${Math.round(resultModel.stageTimingsMs.improvement)}ms</span>` : ""}
                     </div>
-                  </div>
+                  </section>
                 ` : ""}
                 ${onchainSnapshot?.onchainTask ? `
-                  <div>
+                  <section>
                     <strong>Onchain trace</strong>
-                    <p class="muted">${escapeHtml(JSON.stringify(onchainSnapshot.onchainTask))}</p>
-                  </div>
+                    <p>${escapeHtml(JSON.stringify(onchainSnapshot.onchainTask))}</p>
+                  </section>
                 ` : ""}
               </div>
             </details>
           ` : ""}
         </article>
-        <aside class="task-side">
-          <article class="shell-panel surface-panel">
-            <p class="mini-label">Actions</p>
-            <h3>${escapeHtml(taskStatus.primaryCtaText)}</h3>
-            <p class="muted">${escapeHtml(reviewModel.headline)}</p>
-            <div class="review-actions">
+
+        <aside class="task-review-side">
+          <article class="task-decision-panel">
+            <p class="task-detail-eyebrow">Review decision</p>
+            <h2>${escapeHtml(reviewModel.headline || taskStatus.primaryCtaText)}</h2>
+            <p>Approve the work, request changes, or open a dispute if the result cannot be accepted.</p>
+            <div class="task-decision-actions">
               ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve work</button>' : ""}
               ${reviewModel.primaryActions.includes("request_revision") ? '<button data-request-revision-toggle>Request revision</button>' : ""}
-              ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>` : ""}
-              ${reviewModel.primaryActions.length === 0 ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
+              ${reviewModel.primaryActions.length === 0 && !reviewModel.primaryActions.includes("settle") ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
-            ${reviewModel.primaryActions.includes("request_revision") ? `
-              <div class="simple-panel surface-panel" data-revision-form style="margin-top:14px;">
-                <strong>Request changes</strong>
-                <p class="muted">This records revision guidance without releasing payment. USDC stays funded and locked until approval.</p>
-                <label class="field-stack" style="margin-top:12px;"><span class="muted">What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
-                <label class="field-stack"><span class="muted">What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
-                <label class="field-stack"><span class="muted">Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
-                <button data-request-revision="${task.taskId}">Save revision request</button>
-              </div>
-            ` : ""}
-            <div class="secondary-actions">
+            <div class="task-secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
-              ${resultModel?.improveAgainUnavailableReason ? `<p class="muted">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
+              ${resultModel?.improveAgainUnavailableReason ? `<p>${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
               ${reviewModel.advancedActions.includes("dispute") ? `<button data-open-dispute-toggle>Open dispute</button>` : ""}
               ${reviewModel.advancedActions.includes("appeal") ? `<button data-task-action="appeal" data-task-id="${task.taskId}">Appeal</button>` : ""}
-            </div>
-            ${reviewModel.advancedActions.includes("dispute") ? `
-              <div class="simple-panel surface-panel" data-dispute-form style="margin-top:14px;">
-                <strong>Open dispute</strong>
-                <p class="muted">Use this only when approval or revision cannot safely resolve the task. Payment stays locked; this does not process a refund or settlement.</p>
-                <label class="field-stack" style="margin-top:12px;">
-                  <span class="muted">Reason</span>
-                  <select id="disputeReason">
-                    <option value="">Select reason</option>
-                    <option value="Work does not match brief">Work does not match brief</option>
-                    <option value="Output is incomplete">Output is incomplete</option>
-                    <option value="Quality is too low">Quality is too low</option>
-                    <option value="Agent did not follow revision request">Agent did not follow revision request</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </label>
-                <label class="field-stack"><span class="muted">Evidence/details</span><textarea id="disputeDetails" rows="4" placeholder="Describe what happened and include useful evidence or context."></textarea></label>
-                <label class="field-stack">
-                  <span class="muted">Requested resolution</span>
-                  <select id="disputeResolution">
-                    <option value="Request platform review">Request platform review</option>
-                    <option value="Ask agent for final revision">Ask agent for final revision</option>
-                    <option value="Request refund review">Request refund review</option>
-                  </select>
-                </label>
-                <button data-open-dispute="${task.taskId}">Save dispute</button>
-              </div>
-            ` : ""}
-            <div class="secondary-actions">
               ${additionalReviewActions.map((action) => `<button data-task-action="${action}" data-task-id="${task.taskId}">${escapeHtml(labelize(action))}</button>`).join("")}
             </div>
           </article>
-        </aside>
-      </section>
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section surface-page">
-          <div class="section-head">
-            <div>
-              <p class="mini-label">Dispute status</p>
-              <h2>Trust review</h2>
+          <article class="task-payment-panel">
+            <p class="task-detail-eyebrow">USDC payment</p>
+            <h2>${escapeHtml(payment.label)}</h2>
+            <p>${escapeHtml(payment.description)}</p>
+            <div class="task-payment-rows">
+              <div><span>Reward</span><strong>${escapeHtml(payment.amountDisplay)}</strong></div>
+              <div><span>Payment state</span><strong>${escapeHtml(payment.label)}</strong></div>
+              <div><span>Network</span><strong>${escapeHtml(payment.networkDisplay || "Arc Testnet")}</strong></div>
+              <div><span>Settlement</span><strong>${escapeHtml(settlementLabel)}</strong></div>
             </div>
-            <span class="tag">${escapeHtml(disputeModel?.headline || "No dispute open")}</span>
-          </div>
-          <div class="status-banner surface-alert ${disputeModel?.hasOpenDispute ? "warning" : "info"}">
-            <strong>${escapeHtml(disputeModel?.headline || "No dispute open")}</strong>
-            <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
-          </div>
-          <div class="live-feed" style="margin-top:16px;">
-            ${(disputeModel?.items || []).map((item, index) => `
-              <article class="feed-card feed-card--warning" style="animation-delay:${index * 70}ms">
-                <span class="feed-card__pulse"></span>
-                <div>
-                  <strong>${escapeHtml(item.reason)}</strong>
-                  <p>${escapeHtml(item.details)}</p>
-                  <p>Requested resolution: ${escapeHtml(item.requestedResolution)}</p>
-                  <div class="agent-tags" style="margin-top:10px;">
-                    <span class="tag">${escapeHtml(item.statusLabel)}</span>
-                    <span class="tag">${escapeHtml(item.openedBy)}</span>
-                    ${item.openedAt ? `<span class="tag">${escapeHtml(new Date(item.openedAt).toLocaleString())}</span>` : ""}
-                  </div>
-                </div>
-              </article>
-            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.")}
-          </div>
-        </article>
-        <aside class="task-side">
-          <article class="shell-panel surface-panel">
-            <p class="mini-label">Dispute payment rule</p>
-            <h3>Payment stays locked</h3>
-            <p class="muted">Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash. It only pauses the task UX for review.</p>
+            <div class="task-payment-links">
+              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span>Funding tx: Not available yet</span>`}
+              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span>Release tx: Not available yet</span>`}
+            </div>
+            ${reviewModel.primaryActions.includes("settle")
+              ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>`
+              : `<small>${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
           </article>
         </aside>
       </section>
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section surface-page">
-          <div class="section-head">
+      <section class="task-support-grid reveal-on-scroll">
+        <article class="task-support-panel task-support-panel--revision">
+          <div class="task-section-head">
             <div>
-              <p class="mini-label">Revision history</p>
-              <h2>Requested changes</h2>
+              <p class="task-detail-eyebrow">Revision</p>
+              <h2>${escapeHtml(revisionModel?.headline || "No revision requested")}</h2>
             </div>
-            <span class="tag">${escapeHtml(revisionModel?.headline || "No revision requested")}</span>
+            <span>${escapeHtml(revisionModel?.hasRevisionRequested ? "Payment locked" : "Quiet")}</span>
           </div>
-          <div class="status-banner surface-alert ${revisionModel?.hasRevisionRequested ? "warning" : "info"}">
-            <strong>${escapeHtml(revisionModel?.headline || "No revision requested")}</strong>
-            <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
-          </div>
-          <div class="live-feed" style="margin-top:16px;">
-            ${(revisionModel?.items || []).map((item, index) => `
-              <article class="feed-card feed-card--warning" style="animation-delay:${index * 70}ms">
-                <span class="feed-card__pulse"></span>
-                <div>
-                  <strong>${escapeHtml(item.changeRequest)}</strong>
-                  <p>Missing: ${escapeHtml(item.missingDetails)}</p>
-                  ${item.extraInstruction ? `<p>Extra instruction: ${escapeHtml(item.extraInstruction)}</p>` : ""}
-                  <div class="agent-tags" style="margin-top:10px;">
-                    <span class="tag">${escapeHtml(item.requestedBy)}</span>
-                    ${item.requestedAt ? `<span class="tag">${escapeHtml(new Date(item.requestedAt).toLocaleString())}</span>` : ""}
-                    ${item.resubmissionNote ? `<span class="tag">${escapeHtml(item.resubmissionNote)}</span>` : ""}
-                  </div>
-                </div>
+          <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
+          ${reviewModel.primaryActions.includes("request_revision") ? `
+            <div class="task-form-panel" data-revision-form>
+              <label><span>What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
+              <label><span>What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
+              <label><span>Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
+              <button data-request-revision="${task.taskId}">Save revision request</button>
+            </div>
+          ` : ""}
+          <div class="task-activity-list">
+            ${(revisionModel?.items || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.changeRequest)}</strong>
+                <p>Missing: ${escapeHtml(item.missingDetails)}</p>
+                ${item.extraInstruction ? `<p>Extra instruction: ${escapeHtml(item.extraInstruction)}</p>` : ""}
+                <small>${escapeHtml(item.requestedBy)}${item.requestedAt ? ` | ${escapeHtml(new Date(item.requestedAt).toLocaleString())}` : ""}</small>
               </article>
             `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.")}
           </div>
         </article>
-        <aside class="task-side">
-          <article class="shell-panel surface-panel">
-            <p class="mini-label">Revision payment rule</p>
-            <h3>Approval still controls release</h3>
-            <p class="muted">Requesting a revision does not settle the task, create a payout transaction, or mark work complete. Payment remains funded and locked until the owner approves.</p>
-          </article>
-        </aside>
+
+        <article class="task-support-panel task-support-panel--dispute">
+          <div class="task-section-head">
+            <div>
+              <p class="task-detail-eyebrow">Dispute</p>
+              <h2>${escapeHtml(disputeModel?.headline || "No dispute open")}</h2>
+            </div>
+            <span>${escapeHtml(disputeModel?.hasOpenDispute ? "Under review" : "Closed")}</span>
+          </div>
+          <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
+          ${reviewModel.advancedActions.includes("dispute") ? `
+            <div class="task-form-panel" data-dispute-form>
+              <label>
+                <span>Reason</span>
+                <select id="disputeReason">
+                  <option value="">Select reason</option>
+                  <option value="Work does not match brief">Work does not match brief</option>
+                  <option value="Output is incomplete">Output is incomplete</option>
+                  <option value="Quality is too low">Quality is too low</option>
+                  <option value="Agent did not follow revision request">Agent did not follow revision request</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label><span>Evidence/details</span><textarea id="disputeDetails" rows="4" placeholder="Describe what happened and include useful evidence or context."></textarea></label>
+              <label>
+                <span>Requested resolution</span>
+                <select id="disputeResolution">
+                  <option value="Request platform review">Request platform review</option>
+                  <option value="Ask agent for final revision">Ask agent for final revision</option>
+                  <option value="Request refund review">Request refund review</option>
+                </select>
+              </label>
+              <button data-open-dispute="${task.taskId}">Save dispute</button>
+            </div>
+          ` : ""}
+          <div class="task-activity-list">
+            ${(disputeModel?.items || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.reason)}</strong>
+                <p>${escapeHtml(item.details)}</p>
+                <p>Requested resolution: ${escapeHtml(item.requestedResolution)}</p>
+                <small>${escapeHtml(item.statusLabel)} | ${escapeHtml(item.openedBy)}${item.openedAt ? ` | ${escapeHtml(new Date(item.openedAt).toLocaleString())}` : ""}</small>
+              </article>
+            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.")}
+          </div>
+          <div class="task-detail-alert task-detail-alert--warning">
+            <strong>Payment remains locked</strong>
+            <p>Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash.</p>
+          </div>
+        </article>
       </section>
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section surface-page">
-          <div class="section-head">
+      <section class="task-history-grid reveal-on-scroll">
+        <article class="task-history-panel">
+          <div class="task-section-head">
             <div>
-              <p class="mini-label">Timeline</p>
+              <p class="task-detail-eyebrow">Activity</p>
               <h2>Task history</h2>
             </div>
           </div>
-          <div class="live-feed">
-            ${(task.timeline || []).map((item, index) => `
-              <article class="feed-card feed-card--${taskStatusTone(item.status || task.status)}" style="animation-delay:${index * 70}ms">
-                <span class="feed-card__pulse"></span>
-                <div>
-                  <strong>${escapeHtml(item.title)}</strong>
-                  <p>${escapeHtml(item.description)}</p>
-                </div>
+          <div class="task-activity-list">
+            ${(task.timeline || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.title)}</strong>
+                <p>${escapeHtml(item.description)}</p>
               </article>
             `).join("") || emptyState("No timeline yet. Waiting for update.")}
           </div>
         </article>
-        <aside class="task-side">
-          <article class="shell-panel surface-panel">
-            <p class="mini-label">Settlement history</p>
-            <h3>Payout trail</h3>
-            ${latestSettlementTx ? `<p class="muted"><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
-            <div class="live-feed">
-              ${(history.items || []).slice().reverse().map((item, index) => `
-                <article class="feed-card feed-card--${taskStatusTone(item.settlementState)}" style="animation-delay:${index * 70}ms">
-                  <span class="feed-card__pulse"></span>
-                  <div>
-                    <strong>${escapeHtml(labelize(item.settlementState))}</strong>
-                    <p>${escapeHtml(item.outcome)}</p>
-                    ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
-                  </div>
-                </article>
-              `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.")}
+        <aside class="task-history-panel">
+          <p class="task-detail-eyebrow">Settlement history</p>
+          <h2>Payout trail</h2>
+          ${latestSettlementTx ? `<p><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
+          <div class="task-activity-list">
+            ${(history.items || []).slice().reverse().map((item) => `
+              <article>
+                <strong>${escapeHtml(labelize(item.settlementState))}</strong>
+                <p>${escapeHtml(item.outcome)}</p>
+                ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
+              </article>
+            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.")}
+          </div>
+          ${browserTxHashes.length ? `
+            <div class="task-browser-trace">
+              <strong>Browser transaction trace</strong>
+              <div class="task-payment-links">
+                ${browserTxHashes.map((item) => {
+                  const href = arcTxLink(item.hash);
+                  const label = `${item.label} ${item.hash.slice(0, 12)}...`;
+                  return href
+                    ? `<a href="${href}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`
+                    : `<span>${escapeHtml(label)}</span>`;
+                }).join("")}
+              </div>
+              ${!fundingConfirmed ? `<button data-check-funding="${task.taskId}">Refresh execution status</button>` : ""}
             </div>
-          </article>
+          ` : ""}
+          ${onchainTask ? `<p>Onchain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
         </aside>
       </section>
     </section>
