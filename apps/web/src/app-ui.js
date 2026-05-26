@@ -85,7 +85,7 @@ export function setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progres
 }
 
 export function renderNav(el, routes, isActive, state) {
-  const primaryRoutes = routes.filter(([path]) => ["/", "/agents", "/dashboard"].includes(path));
+  const primaryRoutes = routes.filter(([path]) => ["/", "/agents", "/post-task", "/dashboard"].includes(path));
   const secondaryRoutes = routes.filter(([path]) => !primaryRoutes.some(([primaryPath]) => primaryPath === path));
   el.routeList.innerHTML = `
     <div class="nav-shell">
@@ -388,12 +388,18 @@ export function taskStatusTone(status) {
 }
 
 export function emptyState(message) {
-  return `<div class="empty-inline">${escapeHtml(message)}</div>`;
+  return `
+    <div class="empty-inline">
+      <span class="empty-inline__mark">${icon("spark", 14)}</span>
+      <span>${escapeHtml(message)}</span>
+    </div>
+  `;
 }
 
 export function richEmptyState(title, body, actions = []) {
   return `
     <div class="empty-state">
+      <span class="empty-state__mark">${icon("spark", 16)}</span>
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(body)}</p>
       ${actions.length ? `<div class="empty-state-actions">${actions.join("")}</div>` : ""}

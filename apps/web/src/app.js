@@ -92,7 +92,7 @@ function renderFatalAppError(error, title = "App startup failed") {
   console.error(title, error);
   if (!el.appRoot) return;
   el.appRoot.innerHTML = `
-    <section class="error-state shell-section">
+    <section class="error-state shell-section surface-page">
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(message)}</p>
       <div class="empty-state-actions">
@@ -396,7 +396,7 @@ function renderArcDemo() {
         </div>
       </aside>
     </section>
-    <section class="shell-section" data-reveal>
+    <section class="shell-section surface-page" data-reveal>
       <div class="section-head">
         <div>
           <p class="mini-label">Assisted review</p>
@@ -417,7 +417,7 @@ function renderArcDemo() {
           .join("")}
       </div>
     </section>
-    <section class="shell-section" data-reveal>
+    <section class="shell-section surface-page" data-reveal>
       <div class="section-head">
         <div>
           <p class="mini-label">Owner approval</p>
@@ -430,7 +430,7 @@ function renderArcDemo() {
         <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Guidance confidence</span></article>
         <article class="metric-card"><strong>${current >= 4 ? "yes" : "no"}</strong><span>Settlement eligible</span></article>
       </div>
-      <div class="status-banner ${current >= 4 ? "is-success" : "is-neutral"}">
+      <div class="status-banner surface-alert ${current >= 4 ? "is-success" : "is-neutral"}">
         <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
         <p>${current >= 4
           ? "Payment can be released because the task owner approved the result after AI review guidance."
@@ -1216,7 +1216,7 @@ async function renderPostTaskPage() {
       </header>
       <section class="composer-grid">
         <div class="composer-main">
-          <article class="composer-intro reveal-on-scroll">
+          <article class="composer-intro surface-page reveal-on-scroll">
             <div class="composer-title-row">
               <div>
                 <p class="mini-label">Funded command</p>
@@ -1230,19 +1230,19 @@ async function renderPostTaskPage() {
             <p class="muted">Write the task once, route it cleanly, and keep funding, owner review, and settlement obvious. This surface is optimized for real AI work, not a generic prompt box.</p>
           </article>
           ${chainBanner ? `
-            <article class="status-banner ${chainBanner.tone} reveal-on-scroll">
+            <article class="status-banner surface-alert ${chainBanner.tone} reveal-on-scroll">
               <strong>${escapeHtml(chainBanner.title)}</strong>
               <p>${escapeHtml(chainBanner.body)}</p>
             </article>
           ` : ""}
-          <article class="status-banner info reveal-on-scroll">
+          <article class="status-banner surface-alert info reveal-on-scroll">
             <strong>3-minute Arc Testnet demo</strong>
             <p>Start a polished Thread Writer demo task with 10 USDC demo funding, structured output, owner approval, demo payment release, reputation update, and external-agent context.</p>
             <div class="secondary-actions" style="margin-top:12px;">
               <button type="button" data-start-demo-flow>Start Demo Flow</button>
             </div>
           </article>
-          <article class="shell-section reveal-on-scroll">
+          <article class="shell-section surface-page reveal-on-scroll">
               <div class="section-head">
               <div>
                 <p class="mini-label">Composer</p>
@@ -1254,7 +1254,7 @@ async function renderPostTaskPage() {
                 </div>
             </div>
             ${state.taskForm.selectedServicePackage ? `
-              <div class="status-banner info" style="margin-bottom:18px;">
+              <div class="status-banner surface-alert info" style="margin-bottom:18px;">
                 <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)} package: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
                 <p>This package only prefilled the editable task draft. You still fund the task with USDC, review the delivered work, and release payment only after approval.</p>
                 <div class="agent-tags" style="margin-top:10px;">
@@ -1264,7 +1264,7 @@ async function renderPostTaskPage() {
                 </div>
               </div>
             ` : ""}
-            <div class="simple-panel" style="margin-bottom:18px;">
+            <div class="simple-panel surface-panel" style="margin-bottom:18px;">
               <div class="section-head">
                 <div>
                   <p class="mini-label">Template</p>
@@ -1293,7 +1293,7 @@ async function renderPostTaskPage() {
                 <div class="secondary-actions" style="margin-top:14px;">
                   <button type="button" id="generateTaskBrief">Generate / Update Brief</button>
                 </div>
-                ${state.taskForm.templateMessage ? `<div class="status-banner ${templateResult.missingFields.length ? "warning" : "info"}" style="margin-top:12px;"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
+                ${state.taskForm.templateMessage ? `<div class="status-banner surface-alert ${templateResult.missingFields.length ? "warning" : "info"}" style="margin-top:12px;"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
               `}
             </div>
             <div class="form-grid field-stack">
@@ -1323,7 +1323,7 @@ async function renderPostTaskPage() {
                 `}
             </div>
           </article>
-          <details class="shell-section disclosure-panel reveal-on-scroll">
+          <details class="shell-section surface-page disclosure-panel reveal-on-scroll">
             <summary>Advanced options</summary>
             <div class="disclosure-panel__body">
               <div class="section-head">
@@ -1366,7 +1366,7 @@ async function renderPostTaskPage() {
           </details>
         </div>
         <aside class="composer-side">
-          <article class="shell-panel task-preview reveal-on-scroll">
+          <article class="shell-panel surface-panel task-preview reveal-on-scroll">
             <p class="mini-label">Preview</p>
             <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
               <p class="muted">${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
@@ -1376,13 +1376,13 @@ async function renderPostTaskPage() {
                 <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
               </div>
           </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
+          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
             <p class="mini-label">Readiness</p>
             <h3>Ready to route</h3>
             <p class="muted">${escapeHtml(taskChecklist.summary)}</p>
             <div class="tag-cloud">${taskChecklist.items.map((item) => `<span class="tag ${item.complete ? "tag-success" : "tag-muted"}">${escapeHtml(item.label)}</span>`).join("")}</div>
           </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
+          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
             <p class="mini-label">Assignment</p>
             <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Open execution path"}</h3>
             <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the funded task through the same owner-approved work loop."}</p>
@@ -1392,7 +1392,7 @@ async function renderPostTaskPage() {
               </div>
               <div class="attachment-list">
                 ${selectedAgentIdeas.map((idea, index) => `
-                  <button type="button" class="task-row suggested-task" data-suggested-task="${index}">
+                  <button type="button" class="task-row surface-flat suggested-task" data-suggested-task="${index}">
                     <strong>Starter idea ${index + 1}</strong>
                     <p>${escapeHtml(idea)}</p>
                   </button>
@@ -1400,7 +1400,7 @@ async function renderPostTaskPage() {
               </div>
             ` : ""}
           </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
+          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
             <p class="mini-label">Funding state</p>
             <h3>${escapeHtml(primaryActionLabel)}</h3>
             <p class="muted">${escapeHtml(fundingHint)} Wallet mode uses Arc Testnet ERC-20 USDC for task funding; payment is released only after owner approval. Demo settlement stays separate from wallet-funded tasks.</p>
@@ -1413,7 +1413,7 @@ async function renderPostTaskPage() {
               ${!walletOnArc ? `<div class="secondary-actions" style="margin-top:12px;"><button type="button" id="switchArcFromPost">Switch to Arc Testnet</button></div>` : ""}
             ` : ""}
             ${state.chainTransaction?.state && state.chainTransaction.state !== "idle" ? `
-              <div class="status-banner ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
+              <div class="status-banner surface-alert ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
                 <strong>${escapeHtml(labelize(state.chainTransaction.state))}</strong>
                 <p>${escapeHtml(state.chainTransaction.message)}</p>
               </div>
@@ -1863,7 +1863,7 @@ async function renderTaskDetail(taskId) {
     state.history = history;
   } catch (error) {
     el.appRoot.innerHTML = `
-      <div class="error-state shell-section">
+      <div class="error-state shell-section surface-page">
         <strong>Task unavailable</strong>
         <p>${escapeHtml(error.message)}</p>
         <div class="empty-state-actions">
@@ -2359,37 +2359,37 @@ async function renderAdmin() {
       </section>
       <section class="ops-grid">
       <div class="ops-stack">
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Queue</p><h2>Work queue</h2></div><span class="meta-pill">${allTasks.length} tasks</span></div>
         <div class="audit-list">${allTasks.slice(0, 10).map((task) => `<div class="audit-item"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.status)} | ${formatCurrency(task.rewardAmount)}</p><div class="ops-actions"><button data-admin-pause="${task.taskId}">Pause Task</button><button data-admin-refund="${task.taskId}">Refund Task</button></div></div>`).join("") || emptyState("No tasks loaded.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Review</p><h2>Manual resolution</h2></div><span class="meta-pill">${disputes.length} disputes</span></div>
         <div class="audit-list">${disputes.map((task) => `<div class="audit-item"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.status)} | ${formatCurrency(task.rewardAmount)} reward</p><div class="ops-actions"><button data-route="/tasks/${task.taskId}">Open Task</button><button data-admin-resolve="${task.taskId}" data-outcome="approve_payout">Approve Payout</button><button data-admin-resolve="${task.taskId}" data-outcome="refund_buyer">Refund Buyer</button></div></div>`).join("") || emptyState("No open disputes.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Risk</p><h2>Risk monitoring</h2></div><span class="meta-pill">${suspiciousAgents.length} flagged</span></div>
         <div class="audit-list">${suspiciousAgents.map((agent) => `<div class="audit-item"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${escapeHtml(agent.compatibilityStatus)} | ${escapeHtml(agent.healthStatus)}</p><div class="ops-actions"><button data-admin-disable="${agent.profile.agentId}">Disable Agent</button>${agent.profile.endpointUrl ? `<button data-admin-blacklist="${escapeHtml(agent.profile.endpointUrl)}">Blacklist Endpoint</button>` : ""}</div></div>`).join("") || emptyState("No suspicious endpoints.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Failures</p><h2>Debug queue</h2></div><span class="meta-pill">${failures.items.length} failed</span></div>
         <div class="audit-list">${failures.items.map((run) => `<div class="audit-item"><strong>${escapeHtml(run.taskId)}</strong><p>${escapeHtml(run.failureCategory || "unknown")} | ${escapeHtml(run.lastErrorMessage || "Execution failed")}</p><div class="ops-actions"><button data-route="/tasks/${run.taskId}">Inspect Task</button><button data-admin-debug="${run.taskId}">Debug Trace</button></div></div>`).join("") || emptyState("No failed executions.")}</div>
       </article>
       </div>
       <div class="ops-stack">
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Signals</p><h2>Pattern detection</h2></div><span class="meta-pill">${overview.suspiciousPatterns.length} signals</span></div>
         <div class="audit-list">${overview.suspiciousPatterns.map((flag) => `<div class="audit-item"><strong>${escapeHtml(labelize(flag.kind))}</strong><p>${escapeHtml(flag.summary)}</p><small>${escapeHtml(flag.subjectType)} | ${escapeHtml(flag.subjectId)}</small></div>`).join("") || emptyState("No suspicious patterns right now.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Blocks</p><h2>Hard blocks</h2></div><span class="meta-pill">${overview.blacklistedEndpoints.length} endpoints</span></div>
         <div class="audit-list">${overview.blacklistedEndpoints.map((row) => `<div class="audit-item"><strong>${escapeHtml(row.endpointUrl)}</strong><p>${escapeHtml(row.reason)}</p></div>`).join("") || emptyState("No blacklisted endpoints.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Audit</p><h2>Decision trail</h2></div><span class="meta-pill">${overview.auditLogs.length} events</span></div>
         <div class="audit-list">${overview.auditLogs.slice(0, 12).map((item) => `<div class="audit-item"><strong>${escapeHtml(labelize(item.action))}</strong><p>${escapeHtml(item.reason)}</p><small>${escapeHtml(item.subjectType)} | ${escapeHtml(item.subjectId)}</small></div>`).join("") || emptyState("No audit logs yet.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Inspect</p><h2>Deep inspection</h2></div>${debug ? `<span class="meta-pill">${escapeHtml(debug.task.taskId)}</span>` : ""}</div>
         ${debug
           ? `
@@ -2527,7 +2527,7 @@ async function render() {
       await loadMarketData();
     } catch (error) {
       el.appRoot.innerHTML = `
-        <div class="error-state shell-section">
+        <div class="error-state shell-section surface-page">
           <strong>Network error</strong>
           <p>${escapeHtml(statusMessage(error, "Marketplace data could not be loaded."))}</p>
           <div class="empty-state-actions">

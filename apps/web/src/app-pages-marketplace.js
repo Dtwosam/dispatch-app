@@ -52,7 +52,7 @@ function renderHomeHero({
   const latency = topAgent ? speedLabel(topAgent) : "Fast";
 
   return `
-    <header class="home-hero reveal-on-scroll is-visible">
+    <header class="home-hero surface-page reveal-on-scroll is-visible">
       <div class="home-hero__content">
         <p class="mini-label">AI work marketplace on Arc Testnet</p>
         <h1>AI agents that work, earn, and build reputation.</h1>
@@ -109,7 +109,7 @@ function renderHomeHero({
 
 function renderFlowStrip() {
   return `
-    <section class="flow-strip shell-section reveal-on-scroll">
+    <section class="flow-strip shell-section surface-page reveal-on-scroll">
       <div class="section-head">
         <div>
           <p class="mini-label">Execution flow</p>
@@ -140,7 +140,7 @@ function renderFlowStrip() {
 function renderActivityColumn(state) {
   const feed = liveActivityEntries(state).slice(0, 4);
   return `
-    <section class="shell-section activity-column">
+    <section class="shell-section surface-page activity-column">
       <div class="section-head">
         <div>
           <p class="mini-label">Live activity</p>
@@ -169,7 +169,7 @@ function renderActivityColumn(state) {
 function renderPerformanceColumn(state) {
   const bucket = topAgentBucket(state);
   return `
-    <section class="shell-section performance-column">
+    <section class="shell-section surface-page performance-column">
       <div class="section-head">
         <div>
           <p class="mini-label">Leaderboard</p>
@@ -201,7 +201,7 @@ function renderAgentCard(agent) {
   const statusTone = agentStatusTone(agent);
 
   return `
-    <article class="agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
+    <article class="agent-card surface-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
       <div class="agent-card__top">
         <div class="agent-card__identity">
           <div class="avatar">${initials(display.name)}</div>
@@ -245,7 +245,7 @@ function renderAgentCard(agent) {
 function renderLeaderboard(state) {
   const bucket = topAgentBucket(state);
   return `
-    <section class="shell-section">
+    <section class="shell-section surface-page">
       <div class="section-head">
         <div>
           <p class="mini-label">Leaderboard</p>
@@ -274,7 +274,7 @@ function renderLeaderboard(state) {
 function renderFeed(state) {
   const feed = liveActivityEntries(state);
   return `
-    <section class="shell-section">
+    <section class="shell-section surface-page">
       <div class="section-head">
         <div>
           <p class="mini-label">Live activity</p>
@@ -316,7 +316,7 @@ function renderTaskRow(task, agentRegistry = new Map(), localTaskState = {}) {
     ? `${selectedAgent.profile.publicName} (${selectedAgent.profile.originType === "external" ? "External" : "Platform"})`
     : lifecycle.assignmentLabel;
   return `
-    <article class="task-row task-row--${taskStatusTone(displayTask.status)}">
+    <article class="task-row surface-flat task-row--${taskStatusTone(displayTask.status)}">
       <strong>${escapeHtml(displayTask.title || "Untitled funded task")}</strong>
       <p>${escapeHtml(payment.amountDisplay)} reward</p>
       <div class="agent-tags" style="margin-top:10px;">
@@ -338,7 +338,7 @@ function renderTaskRow(task, agentRegistry = new Map(), localTaskState = {}) {
 
 function renderTaskRail({ eyebrow, title, tasks, emptyMessage, renderTask = renderTaskRow }) {
   return `
-    <article class="shell-section">
+    <article class="shell-section surface-page">
       <div class="section-head">
         <div>
           <p class="mini-label">${escapeHtml(eyebrow)}</p>
@@ -409,7 +409,7 @@ export function renderHomePage({ el, state, onNavigate }) {
         </section>
       ` : ""}
 
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Trending agents</p>
@@ -421,7 +421,7 @@ export function renderHomePage({ el, state, onNavigate }) {
         </div>
       </section>
 
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">How it works</p>
@@ -514,7 +514,7 @@ export function renderAgentsMarketplacePage({ el, state, onNavigate, rerender })
         <h1>Choose the right AI worker for USDC-funded tasks.</h1>
         <p class="muted">Compare trust, response time, paid earnings, and recent work before assigning a funded task.</p>
       </header>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="form-grid">
           <label class="field-stack field-wide">
             <span class="muted">Search</span>
@@ -545,7 +545,7 @@ export function renderAgentsMarketplacePage({ el, state, onNavigate, rerender })
           </label>
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="steps-grid">
           ${filtered.map(renderAgentCard).join("") || emptyState("No agents match yet. Platform agents provide day-one execution, and external agents can join through adapter-compatible workflows.")}
         </div>
@@ -583,7 +583,7 @@ export function renderAgentsMarketplacePage({ el, state, onNavigate, rerender })
 export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
   const agent = state.agents.find((item) => item.profile.slug === slug);
   if (!agent) {
-    el.appRoot.innerHTML = `<section class="shell-section"><strong>Agent not found</strong><p class="muted">No matching public profile was found.</p></section>`;
+    el.appRoot.innerHTML = `<section class="shell-section surface-page"><strong>Agent not found</strong><p class="muted">No matching public profile was found.</p></section>`;
     return;
   }
   const display = buildAgentDisplayModel(agent, {
@@ -612,7 +612,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
         <p class="muted">${escapeHtml(display.description)}</p>
       </header>
       <section class="profile-grid reveal-on-scroll">
-        <article class="shell-section task-main">
+        <article class="shell-section surface-page task-main">
           <div class="section-head">
             <div>
               <p class="mini-label">Performance</p>
@@ -646,7 +646,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Best for</p>
             <h3>Where this agent fits best</h3>
             <p class="muted">Use this worker when you want structured output, clear review, and payout accountability after approval.</p>
@@ -662,7 +662,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
               ${display.suggestedTemplates.map((template) => `<span class="tag">${escapeHtml(template.name)}</span>`).join("")}
             </div>
           </article>
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Hire flow</p>
             <h3>Create task with this agent</h3>
             <textarea id="quickTaskIdea" rows="5" placeholder="Describe the outcome you want from this agent."></textarea>
@@ -675,7 +675,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
           </article>
         </aside>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Verification readiness</p>
@@ -691,7 +691,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
         </div>
         <div class="task-rail">
           ${display.verificationChecklist.map((item) => `
-            <article class="task-row">
+            <article class="task-row surface-card">
               <div class="agent-tags">
                 <span class="tag">${escapeHtml(item.stateLabel)}</span>
               </div>
@@ -701,7 +701,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
           `).join("")}
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Service packages</p>
@@ -712,7 +712,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
         </div>
         <div class="task-rail">
           ${servicePackages.map((servicePackage) => `
-            <article class="task-row">
+            <article class="task-row surface-card">
               <div class="agent-tags">
                 <span class="tag">${escapeHtml(servicePackage.tier)}</span>
                 <span class="tag">${escapeHtml(servicePackage.priceDisplay)}</span>
@@ -729,7 +729,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
           `).join("") || emptyState("No ready-made packages for this agent yet. Create a custom funded task instead.")}
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Recent work</p>
@@ -738,7 +738,7 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
         </div>
         <div class="work-history">
           ${recentWork.map((item) => `
-            <article class="work-history__item">
+            <article class="work-history__item surface-flat">
               <div class="work-history__main">
                 <strong>${escapeHtml(item.title)}</strong>
                 <p>${escapeHtml(item.category)} | ${formatCurrency(item.rewardAmount)} reward | ${item.evaluationScore === null ? "No score yet" : `${item.evaluationScore} score`}</p>
@@ -822,11 +822,11 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
         <h1>Builder dashboard preview.</h1>
         <p class="muted">Track agents available in this Dispatch environment, their package readiness, real paid-work metrics, and tasks that may need attention.</p>
       </header>
-      <article class="status-banner info reveal-on-scroll">
+      <article class="status-banner surface-alert info reveal-on-scroll">
         <strong>Preview mode</strong>
         <p>${escapeHtml(summary.ownershipNote)}</p>
       </article>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="task-summary">
           <div class="metric-card"><strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong><span>Agents listed</span></div>
           <div class="metric-card"><strong data-count="${summary.activeAgents}">${summary.activeAgents}</strong><span>Active or available</span></div>
@@ -835,18 +835,18 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
           <div class="metric-card"><strong data-count="${summary.attentionCount}">${summary.attentionCount}</strong><span>Tasks needing attention</span></div>
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="segmented">
           <button class="${state.dashboardTab === "agents" ? "active" : ""}" data-dashboard-tab="agents">Agents</button>
           <button class="${state.dashboardTab === "attention" ? "active" : ""}" data-dashboard-tab="attention">Tasks needing attention</button>
           <button class="${state.dashboardTab === "earnings" ? "active" : ""}" data-dashboard-tab="earnings">Earnings</button>
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="steps-grid">
           ${state.dashboardTab === "attention"
             ? attentionItems.map((item) => `
-                <article class="task-row">
+                <article class="task-row surface-flat">
                   <strong>${escapeHtml(item.title)}</strong>
                   <p>${escapeHtml(item.agentName)} | ${escapeHtml(item.statusLabel)} | ${escapeHtml(item.paymentLabel)}</p>
                   <p class="muted">Next: ${escapeHtml(item.nextAction)} | ${escapeHtml(item.whoActsNext)}</p>
@@ -855,7 +855,7 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
               `).join("") || emptyState("No agent tasks need attention yet.")
             : state.dashboardTab === "earnings"
               ? `
-                <article class="shell-panel">
+                <article class="shell-panel surface-panel">
                   <p class="mini-label">Earnings visibility</p>
                   <h3>Agent earnings from available task data</h3>
                   <p class="muted">${escapeHtml(earningsDashboard.note)}</p>
@@ -868,14 +868,14 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
                   </div>
                 </article>
                 ${earningsDashboard.breakdowns.map((item) => `
-                  <article class="task-row">
+                  <article class="task-row surface-flat">
                     <strong>${escapeHtml(item.name)}</strong>
                     <p>${escapeHtml(item.settledEarningsDisplay)} settled | ${escapeHtml(item.paidTasksDisplay)} paid tasks</p>
                     <p class="muted">Pending/locked: ${escapeHtml(item.pendingLockedDisplay)} | Disputed/locked: ${escapeHtml(item.disputedLockedDisplay)}</p>
                     <p class="muted">Approval: ${escapeHtml(item.approvalRateDisplay)} | Avg paid task: ${escapeHtml(item.averagePaidTaskValueDisplay)} | Package from: ${escapeHtml(item.packageStartingPriceDisplay)}</p>
                   </article>
                 `).join("")}
-                <article class="shell-panel">
+                <article class="shell-panel surface-panel">
                   <p class="mini-label">Payment activity</p>
                   <h3>Task-linked earning activity</h3>
                   <div class="live-feed" style="margin-top:14px;">
@@ -894,7 +894,7 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
                 </article>
               `
               : agentRows.map((row) => `
-                  <article class="task-row">
+                  <article class="task-row surface-flat">
                     <div class="agent-tags">
                       <span class="tag">${escapeHtml(row.typeLabel)}</span>
                       <span class="tag">${escapeHtml(row.statusLabel)}</span>

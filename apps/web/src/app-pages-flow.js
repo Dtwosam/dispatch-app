@@ -143,7 +143,7 @@ export function renderTaskDetailPageView({
         <p class="muted">${escapeHtml(task.description)}</p>
       </header>
 
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Lifecycle</p>
@@ -159,13 +159,13 @@ export function renderTaskDetailPageView({
           <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
           <div class="metric-card"><strong>${escapeHtml(lifecycle.nextActor)}</strong><span>Who acts next</span></div>
         </div>
-        <div class="status-banner ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
+        <div class="status-banner surface-alert ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
           <strong>${escapeHtml(taskStatus.label)}</strong>
           <p>${escapeHtml(taskStatus.description)}</p>
           <p><strong>Next required action:</strong> ${escapeHtml(taskStatus.nextActionText)} | ${escapeHtml(taskStatus.whoActsNext)}</p>
         </div>
         ${isDemoTask ? `
-          <div class="status-banner info">
+          <div class="status-banner surface-alert info">
             <strong>Arc Testnet demo mode</strong>
             <p>Demo USDC settlement is shown for this walkthrough. Dispatch keeps owner approval and payout eligibility clear while external agents can integrate through ERC-8183-compatible adapter job flows.</p>
             ${demoCanAdvance ? `<div class="secondary-actions" style="margin-top:12px;"><button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button></div>` : ""}
@@ -186,7 +186,7 @@ export function renderTaskDetailPageView({
         </div>
       </section>
 
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">USDC payment</p>
@@ -200,7 +200,7 @@ export function renderTaskDetailPageView({
           <div class="metric-card"><strong>${escapeHtml(payment.nextPaymentAction)}</strong><span>Next payment action</span></div>
           <div class="metric-card"><strong>${escapeHtml(payment.networkDisplay)}</strong><span>Network</span></div>
         </div>
-        <div class="status-banner ${paymentBannerTone}">
+        <div class="status-banner surface-alert ${paymentBannerTone}">
           <strong>${escapeHtml(payment.label)}</strong>
           <p>${escapeHtml(payment.description)}</p>
         </div>
@@ -211,7 +211,7 @@ export function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Execution</p>
@@ -219,7 +219,7 @@ export function renderTaskDetailPageView({
             </div>
             <span class="tag">${escapeHtml(taskStatus.label)}</span>
           </div>
-          <div class="status-banner info">
+          <div class="status-banner surface-alert info">
             <strong>Execution rail</strong>
             <p>${executionHeadline}</p>
           </div>
@@ -229,7 +229,7 @@ export function renderTaskDetailPageView({
             <div class="metric-card"><strong>${escapeHtml(lifecycle.reviewStateLabel)}</strong><span>Review</span></div>
             <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
           </div>
-          <div class="simple-panel">
+          <div class="simple-panel surface-panel">
             <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(taskStatus.label)} - ${escapeHtml(taskStatus.description)}</span></div>
             <div class="agent-tags" style="margin-top:12px;">
               ${agents.length
@@ -240,11 +240,11 @@ export function renderTaskDetailPageView({
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Task summary</p>
             <h3>What happens next</h3>
             <p class="muted">${nextStepSummary}</p>
-            <div class="status-banner info" style="margin-top:12px;">
+            <div class="status-banner surface-alert info" style="margin-top:12px;">
               <strong>${escapeHtml(taskStatus.primaryCtaText)}</strong>
               <p>${escapeHtml(lifecycle.nextActionHelper)}</p>
             </div>
@@ -276,7 +276,7 @@ export function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Result</p>
@@ -290,7 +290,7 @@ export function renderTaskDetailPageView({
             <div class="metric-card"><strong>${escapeHtml(resultModel?.finalOutcome ? labelize(resultModel.finalOutcome) : (resultModel?.workerLabel || "Marketplace Agent"))}</strong><span>${resultModel?.finalOutcome ? "Result Status" : "Worker"}</span></div>
           </div>
           ${resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote ? `
-            <div class="status-banner info">
+            <div class="status-banner surface-alert info">
               <strong>AI review guidance</strong>
               <p>
                 ${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}
@@ -300,7 +300,7 @@ export function renderTaskDetailPageView({
             </div>
           ` : ""}
           ${resultModel?.deliveryNote ? `
-            <div class="status-banner info">
+            <div class="status-banner surface-alert info">
               <strong>Marketplace benchmark run</strong>
               <p>${escapeHtml(resultModel.deliveryNote)}</p>
             </div>
@@ -309,7 +309,7 @@ export function renderTaskDetailPageView({
             ${renderResultMarkup(resultModel)}
           </div>
           ${(resultModel?.hasDraft || resultModel?.stageTimingsMs || onchainSnapshot?.onchainTask) ? `
-            <details class="shell-panel disclosure-panel" style="margin-top:18px;">
+            <details class="shell-panel surface-panel disclosure-panel" style="margin-top:18px;">
               <summary>More details</summary>
               <div class="disclosure-panel__body">
                 ${resultModel?.hasDraft ? `
@@ -341,7 +341,7 @@ export function renderTaskDetailPageView({
           ` : ""}
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Actions</p>
             <h3>${escapeHtml(taskStatus.primaryCtaText)}</h3>
             <p class="muted">${escapeHtml(reviewModel.headline)}</p>
@@ -352,7 +352,7 @@ export function renderTaskDetailPageView({
               ${reviewModel.primaryActions.length === 0 ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
             ${reviewModel.primaryActions.includes("request_revision") ? `
-              <div class="simple-panel" data-revision-form style="margin-top:14px;">
+              <div class="simple-panel surface-panel" data-revision-form style="margin-top:14px;">
                 <strong>Request changes</strong>
                 <p class="muted">This records revision guidance without releasing payment. USDC stays funded and locked until approval.</p>
                 <label class="field-stack" style="margin-top:12px;"><span class="muted">What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
@@ -370,7 +370,7 @@ export function renderTaskDetailPageView({
               ${reviewModel.advancedActions.includes("appeal") ? `<button data-task-action="appeal" data-task-id="${task.taskId}">Appeal</button>` : ""}
             </div>
             ${reviewModel.advancedActions.includes("dispute") ? `
-              <div class="simple-panel" data-dispute-form style="margin-top:14px;">
+              <div class="simple-panel surface-panel" data-dispute-form style="margin-top:14px;">
                 <strong>Open dispute</strong>
                 <p class="muted">Use this only when approval or revision cannot safely resolve the task. Payment stays locked; this does not process a refund or settlement.</p>
                 <label class="field-stack" style="margin-top:12px;">
@@ -404,7 +404,7 @@ export function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Dispute status</p>
@@ -412,7 +412,7 @@ export function renderTaskDetailPageView({
             </div>
             <span class="tag">${escapeHtml(disputeModel?.headline || "No dispute open")}</span>
           </div>
-          <div class="status-banner ${disputeModel?.hasOpenDispute ? "warning" : "info"}">
+          <div class="status-banner surface-alert ${disputeModel?.hasOpenDispute ? "warning" : "info"}">
             <strong>${escapeHtml(disputeModel?.headline || "No dispute open")}</strong>
             <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
           </div>
@@ -435,7 +435,7 @@ export function renderTaskDetailPageView({
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Dispute payment rule</p>
             <h3>Payment stays locked</h3>
             <p class="muted">Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash. It only pauses the task UX for review.</p>
@@ -444,7 +444,7 @@ export function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Revision history</p>
@@ -452,7 +452,7 @@ export function renderTaskDetailPageView({
             </div>
             <span class="tag">${escapeHtml(revisionModel?.headline || "No revision requested")}</span>
           </div>
-          <div class="status-banner ${revisionModel?.hasRevisionRequested ? "warning" : "info"}">
+          <div class="status-banner surface-alert ${revisionModel?.hasRevisionRequested ? "warning" : "info"}">
             <strong>${escapeHtml(revisionModel?.headline || "No revision requested")}</strong>
             <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
           </div>
@@ -475,7 +475,7 @@ export function renderTaskDetailPageView({
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Revision payment rule</p>
             <h3>Approval still controls release</h3>
             <p class="muted">Requesting a revision does not settle the task, create a payout transaction, or mark work complete. Payment remains funded and locked until the owner approves.</p>
@@ -484,7 +484,7 @@ export function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Timeline</p>
@@ -504,7 +504,7 @@ export function renderTaskDetailPageView({
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Settlement history</p>
             <h3>Payout trail</h3>
             ${latestSettlementTx ? `<p class="muted"><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
@@ -568,7 +568,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
         <label class="field-stack field-wide"><span class="muted">Public tagline</span><input id="agentIdentityTagline" value="${escapeHtml(state.agentDraft.identity.tagline)}" placeholder="One-line promise for buyers" /></label>
         <label class="field-stack field-wide"><span class="muted">Skills</span><input id="agentIdentityTags" value="${escapeHtml((state.agentDraft.identity.tags || []).join(", "))}" placeholder="contract qa, source grounding, structured output" /></label>
       </div>
-      <div class="simple-panel" style="margin-top:16px;">
+      <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Suggested skills</strong>
         <p class="muted">Keep them plain-English. These become capability labels and quality hints for the agent later.</p>
         <div class="agent-tags" style="margin-top:12px;">
@@ -605,7 +605,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
     `
       <label class="field-stack"><span class="muted">Sample task</span><textarea id="testRunTask" rows="5">${escapeHtml(state.agentDraft.testRun.sampleTask)}</textarea></label>
       <button id="runTest">Run Test</button>
-      <div class="simple-panel" style="margin-top:16px;">
+      <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
         <p class="muted">${escapeHtml(state.agentDraft.testRun.result || "No test run yet.")}</p>
         <div class="agent-tags" style="margin-top:12px;">
@@ -617,14 +617,14 @@ export function renderCreateAgentWizardPage({ el, state }) {
       </div>
     `,
     `
-      <div class="simple-panel">
+      <div class="simple-panel surface-panel">
         <strong>${escapeHtml(state.agentDraft.identity.name)}</strong>
         <p class="muted">${escapeHtml(state.agentDraft.identity.category)}</p>
         <div class="agent-tags" style="margin-top:12px;">
           ${(state.agentDraft.identity.tags || []).slice(0, 4).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || `<span class="muted">No skills added yet.</span>`}
         </div>
       </div>
-      <div class="status-banner ${draftStatusTone}" style="margin-top:16px;">
+      <div class="status-banner surface-alert ${draftStatusTone}" style="margin-top:16px;">
         <strong>Backend draft status</strong>
         <p>${escapeHtml(state.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
         ${state.agentDraftMeta?.draftId ? `<small>Draft ID: ${escapeHtml(state.agentDraftMeta.draftId)}</small>` : ""}
@@ -641,7 +641,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
       </header>
 
       <section class="wizard-shell reveal-on-scroll">
-        <div class="wizard-progress shell-section">
+        <div class="wizard-progress shell-section surface-page">
           <div class="wizard-progress__bar"><span style="width:${(state.wizardStep / 7) * 100}%"></span></div>
           <div class="wizard-steps">
             ${wizardSteps.map((step, index) => `<button data-step="${index + 1}" class="${state.wizardStep === index + 1 ? "active" : index + 1 < state.wizardStep ? "done" : ""}">${index + 1}. ${step}</button>`).join("")}
@@ -649,7 +649,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
         </div>
         <div class="wizard-layout">
           <div class="wizard-main">
-            <article class="shell-section wizard-stage-card">
+            <article class="shell-section surface-page wizard-stage-card">
               <div class="section-head">
                 <div>
                   <p class="mini-label">${escapeHtml(currentStep.eyebrow)}</p>
@@ -662,7 +662,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
                 ${stepBodies[state.wizardStep - 1]}
               </div>
             </article>
-            <article class="shell-section">
+            <article class="shell-section surface-page">
               <div class="review-actions">
                 <button id="wizardPrev" ${state.wizardStep === 1 ? "disabled" : ""}>Back</button>
                 <button class="hero-primary" id="wizardNext">${state.wizardStep === 7 ? "Save Draft" : "Next"}</button>
@@ -670,7 +670,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
             </article>
           </div>
           <aside class="wizard-side">
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Launch readiness</p>
               <h3>${readinessScore}% ready</h3>
               <div class="wizard-progress__bar"><span style="width:${readinessScore}%"></span></div>
@@ -678,15 +678,15 @@ export function renderCreateAgentWizardPage({ el, state }) {
                 ${readinessChecks.map((item) => `<div class="checklist-row ${item.ready ? "is-ready" : ""}"><span>${item.ready ? "Done" : "Open"}</span><strong>${escapeHtml(item.label)}</strong></div>`).join("")}
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Backend draft</p>
               <h3>${escapeHtml(labelize(state.agentDraftMeta?.syncState || "idle"))}</h3>
               <p class="muted">${escapeHtml(state.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
               ${state.agentDraftMeta?.lastSyncedAt ? `<small>Last synced ${escapeHtml(new Date(state.agentDraftMeta.lastSyncedAt).toLocaleTimeString())}</small>` : ""}
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Market preview</p>
-              <div class="agent-card wizard-preview-card">
+              <div class="agent-card surface-card wizard-preview-card">
                 <div class="agent-card__top">
                   <div class="agent-card__identity">
                     <div class="avatar">${escapeHtml(state.agentDraft.identity.avatar || state.agentDraft.identity.name.slice(0, 2).toUpperCase())}</div>
@@ -706,7 +706,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
                 </div>
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Draft notes</p>
               <p class="muted">${state.wizardStep < 6 ? "Keep the setup tight. The market rewards fast, legible agents with clear skills and a strong output shape." : state.agentDraft.testRun.result ? "This draft now has a real backend preview. Final publish still needs the owner proof and registry flow." : "Run one believable backend test before treating this draft as publish-ready."}</p>
             </article>
@@ -735,7 +735,7 @@ export function renderConnectExternalAgentPage({ el, state }) {
       <section class="wizard-shell reveal-on-scroll">
         <div class="wizard-layout">
           <div class="wizard-main">
-            <article class="shell-section wizard-stage-card">
+            <article class="shell-section surface-page wizard-stage-card">
               <div class="section-head">
                 <div>
                   <p class="mini-label">Agent identity</p>
@@ -753,7 +753,7 @@ export function renderConnectExternalAgentPage({ el, state }) {
                 <label class="field-stack field-wide"><span class="muted">Description</span><textarea id="externalAgentDescription" rows="4">${escapeHtml(state.externalAgentForm.description)}</textarea></label>
                 <label class="field-stack field-wide"><span class="muted">Skills</span><input id="externalAgentSkills" value="${escapeHtml(state.externalAgentForm.skills.join(", "))}" placeholder="research synthesis, source grounding, structured output" /></label>
               </div>
-              <div class="simple-panel">
+              <div class="simple-panel surface-panel">
                 <strong>Suggested skills</strong>
                 <div class="agent-tags" style="margin-top:12px;">
                   ${suggestedSkills.map((skill) => `<button type="button" class="tag-button" data-external-skill="${escapeHtml(skill)}">${escapeHtml(skill)}</button>`).join("") || `<span class="muted">No suggestions for this category yet.</span>`}
@@ -761,7 +761,7 @@ export function renderConnectExternalAgentPage({ el, state }) {
               </div>
             </article>
 
-            <article class="shell-section wizard-stage-card">
+            <article class="shell-section surface-page wizard-stage-card">
               <div class="section-head">
                 <div>
                   <p class="mini-label">Marketplace checks</p>
@@ -781,11 +781,11 @@ export function renderConnectExternalAgentPage({ el, state }) {
                 <label class="field-stack field-wide"><span class="muted">Payout wallet</span><input id="externalAgentPayoutWallet" value="${escapeHtml(state.externalAgentForm.payoutWallet || "")}" placeholder="Defaults to connected owner wallet" /></label>
                 <label class="field-stack field-wide"><span class="muted">Output schema</span><textarea id="externalAgentOutputSchema" rows="3">${escapeHtml(state.externalAgentForm.outputSchema || "")}</textarea></label>
               </div>
-              <div class="status-banner info">
+              <div class="status-banner surface-alert info">
                 <strong>Expected endpoint shape</strong>
                 <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code>. Dispatch sends a funded job envelope with task scope, USDC reward, Arc Testnet lifecycle status, and adapter metadata.</p>
               </div>
-              <details class="shell-panel disclosure-panel">
+              <details class="shell-panel surface-panel disclosure-panel">
                 <summary>Builder checklist</summary>
                 <div class="disclosure-panel__body">
                   <div class="live-feed">
@@ -822,7 +822,7 @@ export function renderConnectExternalAgentPage({ el, state }) {
               </details>
             </article>
 
-            <article class="shell-section">
+            <article class="shell-section surface-page">
               <div class="review-actions">
                 <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify Wallet Ownership"}</button>
                 <button class="hero-primary" id="connectExternalAgent">${verified ? "Connect Agent" : "Verify First"}</button>
@@ -831,20 +831,20 @@ export function renderConnectExternalAgentPage({ el, state }) {
           </div>
 
           <aside class="wizard-side">
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Owner proof</p>
               <h3>${escapeHtml(verified ? "Verified" : "Pending")}</h3>
               <p class="muted">${escapeHtml(state.externalAgentMeta.verificationMessage)}</p>
               ${state.externalAgentMeta.verificationMode ? `<small>Mode: ${escapeHtml(labelize(state.externalAgentMeta.verificationMode))}</small>` : ""}
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Compatibility</p>
               <h3>${escapeHtml(state.externalAgentMeta.compatibilityHeadline)}</h3>
               <div class="live-feed">
                 ${compatibilityNotes.map((note) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><p>${escapeHtml(note)}</p></div></article>`).join("") || emptyState("No compatibility notes yet.")}
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">What this does</p>
               <p class="muted">This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. External agents can compete for funded work, submit structured outputs, earn testnet USDC after owner-approved settlement, and build reputation.</p>
               <div class="agent-tags" style="margin-top:12px;">

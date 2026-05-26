@@ -46934,7 +46934,7 @@ function setChrome(el2, eyebrow, title, sidebarTitle, sidebarLead, progress) {
   `;
 }
 function renderNav(el2, routes2, isActive2, state2) {
-  const primaryRoutes = routes2.filter(([path]) => ["/", "/agents", "/dashboard"].includes(path));
+  const primaryRoutes = routes2.filter(([path]) => ["/", "/agents", "/post-task", "/dashboard"].includes(path));
   const secondaryRoutes = routes2.filter(([path]) => !primaryRoutes.some(([primaryPath]) => primaryPath === path));
   el2.routeList.innerHTML = `
     <div class="nav-shell">
@@ -47160,7 +47160,12 @@ function taskStatusTone(status) {
   return "neutral";
 }
 function emptyState(message) {
-  return `<div class="empty-inline">${escapeHtml(message)}</div>`;
+  return `
+    <div class="empty-inline">
+      <span class="empty-inline__mark">${icon("spark", 14)}</span>
+      <span>${escapeHtml(message)}</span>
+    </div>
+  `;
 }
 function countMarkup(value, label, className = "") {
   const numeric = Number(value) || 0;
@@ -48328,7 +48333,7 @@ function renderHomeHero({
   const approval = topAgent ? formatPercent(Math.round((topAgent.performanceSummary?.approvalRate || 0) * 100)) : "92%";
   const latency = topAgent ? speedLabel(topAgent) : "Fast";
   return `
-    <header class="home-hero reveal-on-scroll is-visible">
+    <header class="home-hero surface-page reveal-on-scroll is-visible">
       <div class="home-hero__content">
         <p class="mini-label">AI work marketplace on Arc Testnet</p>
         <h1>AI agents that work, earn, and build reputation.</h1>
@@ -48384,7 +48389,7 @@ function renderHomeHero({
 }
 function renderFlowStrip() {
   return `
-    <section class="flow-strip shell-section reveal-on-scroll">
+    <section class="flow-strip shell-section surface-page reveal-on-scroll">
       <div class="section-head">
         <div>
           <p class="mini-label">Execution flow</p>
@@ -48414,7 +48419,7 @@ function renderFlowStrip() {
 function renderActivityColumn(state2) {
   const feed = liveActivityEntries(state2).slice(0, 4);
   return `
-    <section class="shell-section activity-column">
+    <section class="shell-section surface-page activity-column">
       <div class="section-head">
         <div>
           <p class="mini-label">Live activity</p>
@@ -48442,7 +48447,7 @@ function renderActivityColumn(state2) {
 function renderPerformanceColumn(state2) {
   const bucket = topAgentBucket(state2);
   return `
-    <section class="shell-section performance-column">
+    <section class="shell-section surface-page performance-column">
       <div class="section-head">
         <div>
           <p class="mini-label">Leaderboard</p>
@@ -48472,7 +48477,7 @@ function renderAgentCard(agent) {
   const tags = [.../* @__PURE__ */ new Set([...agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags, speedLabel(agent)])].slice(0, 4);
   const statusTone = agentStatusTone(agent);
   return `
-    <article class="agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
+    <article class="agent-card surface-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
       <div class="agent-card__top">
         <div class="agent-card__identity">
           <div class="avatar">${initials(display.name)}</div>
@@ -48525,7 +48530,7 @@ function renderTaskRow(task, agentRegistry = /* @__PURE__ */ new Map(), localTas
   const selectedAgent = selectedAgentId ? agentRegistry.get(selectedAgentId) : null;
   const assignmentLabel = selectedAgent ? `${selectedAgent.profile.publicName} (${selectedAgent.profile.originType === "external" ? "External" : "Platform"})` : lifecycle.assignmentLabel;
   return `
-    <article class="task-row task-row--${taskStatusTone(displayTask.status)}">
+    <article class="task-row surface-flat task-row--${taskStatusTone(displayTask.status)}">
       <strong>${escapeHtml(displayTask.title || "Untitled funded task")}</strong>
       <p>${escapeHtml(payment.amountDisplay)} reward</p>
       <div class="agent-tags" style="margin-top:10px;">
@@ -48546,7 +48551,7 @@ function renderTaskRow(task, agentRegistry = /* @__PURE__ */ new Map(), localTas
 }
 function renderTaskRail({ eyebrow, title, tasks, emptyMessage, renderTask = renderTaskRow }) {
   return `
-    <article class="shell-section">
+    <article class="shell-section surface-page">
       <div class="section-head">
         <div>
           <p class="mini-label">${escapeHtml(eyebrow)}</p>
@@ -48609,7 +48614,7 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
         </section>
       ` : ""}
 
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Trending agents</p>
@@ -48621,7 +48626,7 @@ function renderHomePage({ el: el2, state: state2, onNavigate }) {
         </div>
       </section>
 
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">How it works</p>
@@ -48710,7 +48715,7 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
         <h1>Choose the right AI worker for USDC-funded tasks.</h1>
         <p class="muted">Compare trust, response time, paid earnings, and recent work before assigning a funded task.</p>
       </header>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="form-grid">
           <label class="field-stack field-wide">
             <span class="muted">Search</span>
@@ -48741,7 +48746,7 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
           </label>
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="steps-grid">
           ${filtered.map(renderAgentCard).join("") || emptyState("No agents match yet. Platform agents provide day-one execution, and external agents can join through adapter-compatible workflows.")}
         </div>
@@ -48776,7 +48781,7 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
 function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
   const agent = state2.agents.find((item) => item.profile.slug === slug);
   if (!agent) {
-    el2.appRoot.innerHTML = `<section class="shell-section"><strong>Agent not found</strong><p class="muted">No matching public profile was found.</p></section>`;
+    el2.appRoot.innerHTML = `<section class="shell-section surface-page"><strong>Agent not found</strong><p class="muted">No matching public profile was found.</p></section>`;
     return;
   }
   const display = buildAgentDisplayModel(agent, {
@@ -48804,7 +48809,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
         <p class="muted">${escapeHtml(display.description)}</p>
       </header>
       <section class="profile-grid reveal-on-scroll">
-        <article class="shell-section task-main">
+        <article class="shell-section surface-page task-main">
           <div class="section-head">
             <div>
               <p class="mini-label">Performance</p>
@@ -48838,7 +48843,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Best for</p>
             <h3>Where this agent fits best</h3>
             <p class="muted">Use this worker when you want structured output, clear review, and payout accountability after approval.</p>
@@ -48854,7 +48859,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
               ${display.suggestedTemplates.map((template) => `<span class="tag">${escapeHtml(template.name)}</span>`).join("")}
             </div>
           </article>
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Hire flow</p>
             <h3>Create task with this agent</h3>
             <textarea id="quickTaskIdea" rows="5" placeholder="Describe the outcome you want from this agent."></textarea>
@@ -48865,7 +48870,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
           </article>
         </aside>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Verification readiness</p>
@@ -48881,7 +48886,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
         </div>
         <div class="task-rail">
           ${display.verificationChecklist.map((item) => `
-            <article class="task-row">
+            <article class="task-row surface-card">
               <div class="agent-tags">
                 <span class="tag">${escapeHtml(item.stateLabel)}</span>
               </div>
@@ -48891,7 +48896,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
           `).join("")}
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Service packages</p>
@@ -48902,7 +48907,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
         </div>
         <div class="task-rail">
           ${servicePackages.map((servicePackage) => `
-            <article class="task-row">
+            <article class="task-row surface-card">
               <div class="agent-tags">
                 <span class="tag">${escapeHtml(servicePackage.tier)}</span>
                 <span class="tag">${escapeHtml(servicePackage.priceDisplay)}</span>
@@ -48919,7 +48924,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
           `).join("") || emptyState("No ready-made packages for this agent yet. Create a custom funded task instead.")}
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Recent work</p>
@@ -48928,7 +48933,7 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
         </div>
         <div class="work-history">
           ${recentWork.map((item) => `
-            <article class="work-history__item">
+            <article class="work-history__item surface-flat">
               <div class="work-history__main">
                 <strong>${escapeHtml(item.title)}</strong>
                 <p>${escapeHtml(item.category)} | ${formatCurrency(item.rewardAmount)} reward | ${item.evaluationScore === null ? "No score yet" : `${item.evaluationScore} score`}</p>
@@ -49007,11 +49012,11 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
         <h1>Builder dashboard preview.</h1>
         <p class="muted">Track agents available in this Dispatch environment, their package readiness, real paid-work metrics, and tasks that may need attention.</p>
       </header>
-      <article class="status-banner info reveal-on-scroll">
+      <article class="status-banner surface-alert info reveal-on-scroll">
         <strong>Preview mode</strong>
         <p>${escapeHtml(summary.ownershipNote)}</p>
       </article>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="task-summary">
           <div class="metric-card"><strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong><span>Agents listed</span></div>
           <div class="metric-card"><strong data-count="${summary.activeAgents}">${summary.activeAgents}</strong><span>Active or available</span></div>
@@ -49020,24 +49025,24 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
           <div class="metric-card"><strong data-count="${summary.attentionCount}">${summary.attentionCount}</strong><span>Tasks needing attention</span></div>
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="segmented">
           <button class="${state2.dashboardTab === "agents" ? "active" : ""}" data-dashboard-tab="agents">Agents</button>
           <button class="${state2.dashboardTab === "attention" ? "active" : ""}" data-dashboard-tab="attention">Tasks needing attention</button>
           <button class="${state2.dashboardTab === "earnings" ? "active" : ""}" data-dashboard-tab="earnings">Earnings</button>
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="steps-grid">
           ${state2.dashboardTab === "attention" ? attentionItems.map((item) => `
-                <article class="task-row">
+                <article class="task-row surface-flat">
                   <strong>${escapeHtml(item.title)}</strong>
                   <p>${escapeHtml(item.agentName)} | ${escapeHtml(item.statusLabel)} | ${escapeHtml(item.paymentLabel)}</p>
                   <p class="muted">Next: ${escapeHtml(item.nextAction)} | ${escapeHtml(item.whoActsNext)}</p>
                   <footer><button data-route="/tasks/${item.taskId}">View Task</button></footer>
                 </article>
               `).join("") || emptyState("No agent tasks need attention yet.") : state2.dashboardTab === "earnings" ? `
-                <article class="shell-panel">
+                <article class="shell-panel surface-panel">
                   <p class="mini-label">Earnings visibility</p>
                   <h3>Agent earnings from available task data</h3>
                   <p class="muted">${escapeHtml(earningsDashboard.note)}</p>
@@ -49050,14 +49055,14 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                   </div>
                 </article>
                 ${earningsDashboard.breakdowns.map((item) => `
-                  <article class="task-row">
+                  <article class="task-row surface-flat">
                     <strong>${escapeHtml(item.name)}</strong>
                     <p>${escapeHtml(item.settledEarningsDisplay)} settled | ${escapeHtml(item.paidTasksDisplay)} paid tasks</p>
                     <p class="muted">Pending/locked: ${escapeHtml(item.pendingLockedDisplay)} | Disputed/locked: ${escapeHtml(item.disputedLockedDisplay)}</p>
                     <p class="muted">Approval: ${escapeHtml(item.approvalRateDisplay)} | Avg paid task: ${escapeHtml(item.averagePaidTaskValueDisplay)} | Package from: ${escapeHtml(item.packageStartingPriceDisplay)}</p>
                   </article>
                 `).join("")}
-                <article class="shell-panel">
+                <article class="shell-panel surface-panel">
                   <p class="mini-label">Payment activity</p>
                   <h3>Task-linked earning activity</h3>
                   <div class="live-feed" style="margin-top:14px;">
@@ -49075,7 +49080,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                   </div>
                 </article>
               ` : agentRows.map((row) => `
-                  <article class="task-row">
+                  <article class="task-row surface-flat">
                     <div class="agent-tags">
                       <span class="tag">${escapeHtml(row.typeLabel)}</span>
                       <span class="tag">${escapeHtml(row.statusLabel)}</span>
@@ -49221,7 +49226,7 @@ function renderTaskDetailPageView({
         <p class="muted">${escapeHtml(task.description)}</p>
       </header>
 
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">Lifecycle</p>
@@ -49237,13 +49242,13 @@ function renderTaskDetailPageView({
           <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
           <div class="metric-card"><strong>${escapeHtml(lifecycle.nextActor)}</strong><span>Who acts next</span></div>
         </div>
-        <div class="status-banner ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
+        <div class="status-banner surface-alert ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
           <strong>${escapeHtml(taskStatus.label)}</strong>
           <p>${escapeHtml(taskStatus.description)}</p>
           <p><strong>Next required action:</strong> ${escapeHtml(taskStatus.nextActionText)} | ${escapeHtml(taskStatus.whoActsNext)}</p>
         </div>
         ${isDemoTask ? `
-          <div class="status-banner info">
+          <div class="status-banner surface-alert info">
             <strong>Arc Testnet demo mode</strong>
             <p>Demo USDC settlement is shown for this walkthrough. Dispatch keeps owner approval and payout eligibility clear while external agents can integrate through ERC-8183-compatible adapter job flows.</p>
             ${demoCanAdvance ? `<div class="secondary-actions" style="margin-top:12px;"><button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button></div>` : ""}
@@ -49264,7 +49269,7 @@ function renderTaskDetailPageView({
         </div>
       </section>
 
-      <section class="shell-section reveal-on-scroll">
+      <section class="shell-section surface-page reveal-on-scroll">
         <div class="section-head">
           <div>
             <p class="mini-label">USDC payment</p>
@@ -49278,7 +49283,7 @@ function renderTaskDetailPageView({
           <div class="metric-card"><strong>${escapeHtml(payment.nextPaymentAction)}</strong><span>Next payment action</span></div>
           <div class="metric-card"><strong>${escapeHtml(payment.networkDisplay)}</strong><span>Network</span></div>
         </div>
-        <div class="status-banner ${paymentBannerTone}">
+        <div class="status-banner surface-alert ${paymentBannerTone}">
           <strong>${escapeHtml(payment.label)}</strong>
           <p>${escapeHtml(payment.description)}</p>
         </div>
@@ -49289,7 +49294,7 @@ function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Execution</p>
@@ -49297,7 +49302,7 @@ function renderTaskDetailPageView({
             </div>
             <span class="tag">${escapeHtml(taskStatus.label)}</span>
           </div>
-          <div class="status-banner info">
+          <div class="status-banner surface-alert info">
             <strong>Execution rail</strong>
             <p>${executionHeadline}</p>
           </div>
@@ -49307,7 +49312,7 @@ function renderTaskDetailPageView({
             <div class="metric-card"><strong>${escapeHtml(lifecycle.reviewStateLabel)}</strong><span>Review</span></div>
             <div class="metric-card"><strong>${escapeHtml(lifecycle.paymentStateLabel)}</strong><span>Payment</span></div>
           </div>
-          <div class="simple-panel">
+          <div class="simple-panel surface-panel">
             <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(taskStatus.label)} - ${escapeHtml(taskStatus.description)}</span></div>
             <div class="agent-tags" style="margin-top:12px;">
               ${agents.length ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)} | ${escapeHtml(agent.originType === "external" ? "External" : "Platform")}</span>`).join("") : "<span class='muted'>No agent assigned yet.</span>"}
@@ -49316,11 +49321,11 @@ function renderTaskDetailPageView({
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Task summary</p>
             <h3>What happens next</h3>
             <p class="muted">${nextStepSummary}</p>
-            <div class="status-banner info" style="margin-top:12px;">
+            <div class="status-banner surface-alert info" style="margin-top:12px;">
               <strong>${escapeHtml(taskStatus.primaryCtaText)}</strong>
               <p>${escapeHtml(lifecycle.nextActionHelper)}</p>
             </div>
@@ -49350,7 +49355,7 @@ function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Result</p>
@@ -49364,7 +49369,7 @@ function renderTaskDetailPageView({
             <div class="metric-card"><strong>${escapeHtml(resultModel?.finalOutcome ? labelize(resultModel.finalOutcome) : resultModel?.workerLabel || "Marketplace Agent")}</strong><span>${resultModel?.finalOutcome ? "Result Status" : "Worker"}</span></div>
           </div>
           ${resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote ? `
-            <div class="status-banner info">
+            <div class="status-banner surface-alert info">
               <strong>AI review guidance</strong>
               <p>
                 ${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}
@@ -49374,7 +49379,7 @@ function renderTaskDetailPageView({
             </div>
           ` : ""}
           ${resultModel?.deliveryNote ? `
-            <div class="status-banner info">
+            <div class="status-banner surface-alert info">
               <strong>Marketplace benchmark run</strong>
               <p>${escapeHtml(resultModel.deliveryNote)}</p>
             </div>
@@ -49383,7 +49388,7 @@ function renderTaskDetailPageView({
             ${renderResultMarkup(resultModel)}
           </div>
           ${resultModel?.hasDraft || resultModel?.stageTimingsMs || onchainSnapshot?.onchainTask ? `
-            <details class="shell-panel disclosure-panel" style="margin-top:18px;">
+            <details class="shell-panel surface-panel disclosure-panel" style="margin-top:18px;">
               <summary>More details</summary>
               <div class="disclosure-panel__body">
                 ${resultModel?.hasDraft ? `
@@ -49415,7 +49420,7 @@ function renderTaskDetailPageView({
           ` : ""}
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Actions</p>
             <h3>${escapeHtml(taskStatus.primaryCtaText)}</h3>
             <p class="muted">${escapeHtml(reviewModel.headline)}</p>
@@ -49426,7 +49431,7 @@ function renderTaskDetailPageView({
               ${reviewModel.primaryActions.length === 0 ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
             ${reviewModel.primaryActions.includes("request_revision") ? `
-              <div class="simple-panel" data-revision-form style="margin-top:14px;">
+              <div class="simple-panel surface-panel" data-revision-form style="margin-top:14px;">
                 <strong>Request changes</strong>
                 <p class="muted">This records revision guidance without releasing payment. USDC stays funded and locked until approval.</p>
                 <label class="field-stack" style="margin-top:12px;"><span class="muted">What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
@@ -49444,7 +49449,7 @@ function renderTaskDetailPageView({
               ${reviewModel.advancedActions.includes("appeal") ? `<button data-task-action="appeal" data-task-id="${task.taskId}">Appeal</button>` : ""}
             </div>
             ${reviewModel.advancedActions.includes("dispute") ? `
-              <div class="simple-panel" data-dispute-form style="margin-top:14px;">
+              <div class="simple-panel surface-panel" data-dispute-form style="margin-top:14px;">
                 <strong>Open dispute</strong>
                 <p class="muted">Use this only when approval or revision cannot safely resolve the task. Payment stays locked; this does not process a refund or settlement.</p>
                 <label class="field-stack" style="margin-top:12px;">
@@ -49478,7 +49483,7 @@ function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Dispute status</p>
@@ -49486,7 +49491,7 @@ function renderTaskDetailPageView({
             </div>
             <span class="tag">${escapeHtml(disputeModel?.headline || "No dispute open")}</span>
           </div>
-          <div class="status-banner ${disputeModel?.hasOpenDispute ? "warning" : "info"}">
+          <div class="status-banner surface-alert ${disputeModel?.hasOpenDispute ? "warning" : "info"}">
             <strong>${escapeHtml(disputeModel?.headline || "No dispute open")}</strong>
             <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
           </div>
@@ -49509,7 +49514,7 @@ function renderTaskDetailPageView({
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Dispute payment rule</p>
             <h3>Payment stays locked</h3>
             <p class="muted">Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash. It only pauses the task UX for review.</p>
@@ -49518,7 +49523,7 @@ function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Revision history</p>
@@ -49526,7 +49531,7 @@ function renderTaskDetailPageView({
             </div>
             <span class="tag">${escapeHtml(revisionModel?.headline || "No revision requested")}</span>
           </div>
-          <div class="status-banner ${revisionModel?.hasRevisionRequested ? "warning" : "info"}">
+          <div class="status-banner surface-alert ${revisionModel?.hasRevisionRequested ? "warning" : "info"}">
             <strong>${escapeHtml(revisionModel?.headline || "No revision requested")}</strong>
             <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
           </div>
@@ -49549,7 +49554,7 @@ function renderTaskDetailPageView({
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Revision payment rule</p>
             <h3>Approval still controls release</h3>
             <p class="muted">Requesting a revision does not settle the task, create a payout transaction, or mark work complete. Payment remains funded and locked until the owner approves.</p>
@@ -49558,7 +49563,7 @@ function renderTaskDetailPageView({
       </section>
 
       <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
+        <article class="task-main shell-section surface-page">
           <div class="section-head">
             <div>
               <p class="mini-label">Timeline</p>
@@ -49578,7 +49583,7 @@ function renderTaskDetailPageView({
           </div>
         </article>
         <aside class="task-side">
-          <article class="shell-panel">
+          <article class="shell-panel surface-panel">
             <p class="mini-label">Settlement history</p>
             <h3>Payout trail</h3>
             ${latestSettlementTx ? `<p class="muted"><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
@@ -49633,7 +49638,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
         <label class="field-stack field-wide"><span class="muted">Public tagline</span><input id="agentIdentityTagline" value="${escapeHtml(state2.agentDraft.identity.tagline)}" placeholder="One-line promise for buyers" /></label>
         <label class="field-stack field-wide"><span class="muted">Skills</span><input id="agentIdentityTags" value="${escapeHtml((state2.agentDraft.identity.tags || []).join(", "))}" placeholder="contract qa, source grounding, structured output" /></label>
       </div>
-      <div class="simple-panel" style="margin-top:16px;">
+      <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Suggested skills</strong>
         <p class="muted">Keep them plain-English. These become capability labels and quality hints for the agent later.</p>
         <div class="agent-tags" style="margin-top:12px;">
@@ -49670,7 +49675,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
     `
       <label class="field-stack"><span class="muted">Sample task</span><textarea id="testRunTask" rows="5">${escapeHtml(state2.agentDraft.testRun.sampleTask)}</textarea></label>
       <button id="runTest">Run Test</button>
-      <div class="simple-panel" style="margin-top:16px;">
+      <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
         <p class="muted">${escapeHtml(state2.agentDraft.testRun.result || "No test run yet.")}</p>
         <div class="agent-tags" style="margin-top:12px;">
@@ -49682,14 +49687,14 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       </div>
     `,
     `
-      <div class="simple-panel">
+      <div class="simple-panel surface-panel">
         <strong>${escapeHtml(state2.agentDraft.identity.name)}</strong>
         <p class="muted">${escapeHtml(state2.agentDraft.identity.category)}</p>
         <div class="agent-tags" style="margin-top:12px;">
           ${(state2.agentDraft.identity.tags || []).slice(0, 4).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || `<span class="muted">No skills added yet.</span>`}
         </div>
       </div>
-      <div class="status-banner ${draftStatusTone}" style="margin-top:16px;">
+      <div class="status-banner surface-alert ${draftStatusTone}" style="margin-top:16px;">
         <strong>Backend draft status</strong>
         <p>${escapeHtml(state2.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
         ${state2.agentDraftMeta?.draftId ? `<small>Draft ID: ${escapeHtml(state2.agentDraftMeta.draftId)}</small>` : ""}
@@ -49705,7 +49710,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       </header>
 
       <section class="wizard-shell reveal-on-scroll">
-        <div class="wizard-progress shell-section">
+        <div class="wizard-progress shell-section surface-page">
           <div class="wizard-progress__bar"><span style="width:${state2.wizardStep / 7 * 100}%"></span></div>
           <div class="wizard-steps">
             ${wizardSteps.map((step, index2) => `<button data-step="${index2 + 1}" class="${state2.wizardStep === index2 + 1 ? "active" : index2 + 1 < state2.wizardStep ? "done" : ""}">${index2 + 1}. ${step}</button>`).join("")}
@@ -49713,7 +49718,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
         </div>
         <div class="wizard-layout">
           <div class="wizard-main">
-            <article class="shell-section wizard-stage-card">
+            <article class="shell-section surface-page wizard-stage-card">
               <div class="section-head">
                 <div>
                   <p class="mini-label">${escapeHtml(currentStep.eyebrow)}</p>
@@ -49726,7 +49731,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
                 ${stepBodies[state2.wizardStep - 1]}
               </div>
             </article>
-            <article class="shell-section">
+            <article class="shell-section surface-page">
               <div class="review-actions">
                 <button id="wizardPrev" ${state2.wizardStep === 1 ? "disabled" : ""}>Back</button>
                 <button class="hero-primary" id="wizardNext">${state2.wizardStep === 7 ? "Save Draft" : "Next"}</button>
@@ -49734,7 +49739,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
             </article>
           </div>
           <aside class="wizard-side">
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Launch readiness</p>
               <h3>${readinessScore}% ready</h3>
               <div class="wizard-progress__bar"><span style="width:${readinessScore}%"></span></div>
@@ -49742,15 +49747,15 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
                 ${readinessChecks.map((item) => `<div class="checklist-row ${item.ready ? "is-ready" : ""}"><span>${item.ready ? "Done" : "Open"}</span><strong>${escapeHtml(item.label)}</strong></div>`).join("")}
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Backend draft</p>
               <h3>${escapeHtml(labelize(state2.agentDraftMeta?.syncState || "idle"))}</h3>
               <p class="muted">${escapeHtml(state2.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
               ${state2.agentDraftMeta?.lastSyncedAt ? `<small>Last synced ${escapeHtml(new Date(state2.agentDraftMeta.lastSyncedAt).toLocaleTimeString())}</small>` : ""}
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Market preview</p>
-              <div class="agent-card wizard-preview-card">
+              <div class="agent-card surface-card wizard-preview-card">
                 <div class="agent-card__top">
                   <div class="agent-card__identity">
                     <div class="avatar">${escapeHtml(state2.agentDraft.identity.avatar || state2.agentDraft.identity.name.slice(0, 2).toUpperCase())}</div>
@@ -49770,7 +49775,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
                 </div>
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Draft notes</p>
               <p class="muted">${state2.wizardStep < 6 ? "Keep the setup tight. The market rewards fast, legible agents with clear skills and a strong output shape." : state2.agentDraft.testRun.result ? "This draft now has a real backend preview. Final publish still needs the owner proof and registry flow." : "Run one believable backend test before treating this draft as publish-ready."}</p>
             </article>
@@ -49796,7 +49801,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
       <section class="wizard-shell reveal-on-scroll">
         <div class="wizard-layout">
           <div class="wizard-main">
-            <article class="shell-section wizard-stage-card">
+            <article class="shell-section surface-page wizard-stage-card">
               <div class="section-head">
                 <div>
                   <p class="mini-label">Agent identity</p>
@@ -49814,7 +49819,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
                 <label class="field-stack field-wide"><span class="muted">Description</span><textarea id="externalAgentDescription" rows="4">${escapeHtml(state2.externalAgentForm.description)}</textarea></label>
                 <label class="field-stack field-wide"><span class="muted">Skills</span><input id="externalAgentSkills" value="${escapeHtml(state2.externalAgentForm.skills.join(", "))}" placeholder="research synthesis, source grounding, structured output" /></label>
               </div>
-              <div class="simple-panel">
+              <div class="simple-panel surface-panel">
                 <strong>Suggested skills</strong>
                 <div class="agent-tags" style="margin-top:12px;">
                   ${suggestedSkills.map((skill) => `<button type="button" class="tag-button" data-external-skill="${escapeHtml(skill)}">${escapeHtml(skill)}</button>`).join("") || `<span class="muted">No suggestions for this category yet.</span>`}
@@ -49822,7 +49827,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
               </div>
             </article>
 
-            <article class="shell-section wizard-stage-card">
+            <article class="shell-section surface-page wizard-stage-card">
               <div class="section-head">
                 <div>
                   <p class="mini-label">Marketplace checks</p>
@@ -49842,11 +49847,11 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
                 <label class="field-stack field-wide"><span class="muted">Payout wallet</span><input id="externalAgentPayoutWallet" value="${escapeHtml(state2.externalAgentForm.payoutWallet || "")}" placeholder="Defaults to connected owner wallet" /></label>
                 <label class="field-stack field-wide"><span class="muted">Output schema</span><textarea id="externalAgentOutputSchema" rows="3">${escapeHtml(state2.externalAgentForm.outputSchema || "")}</textarea></label>
               </div>
-              <div class="status-banner info">
+              <div class="status-banner surface-alert info">
                 <strong>Expected endpoint shape</strong>
                 <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code>. Dispatch sends a funded job envelope with task scope, USDC reward, Arc Testnet lifecycle status, and adapter metadata.</p>
               </div>
-              <details class="shell-panel disclosure-panel">
+              <details class="shell-panel surface-panel disclosure-panel">
                 <summary>Builder checklist</summary>
                 <div class="disclosure-panel__body">
                   <div class="live-feed">
@@ -49883,7 +49888,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
               </details>
             </article>
 
-            <article class="shell-section">
+            <article class="shell-section surface-page">
               <div class="review-actions">
                 <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify Wallet Ownership"}</button>
                 <button class="hero-primary" id="connectExternalAgent">${verified ? "Connect Agent" : "Verify First"}</button>
@@ -49892,20 +49897,20 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
           </div>
 
           <aside class="wizard-side">
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Owner proof</p>
               <h3>${escapeHtml(verified ? "Verified" : "Pending")}</h3>
               <p class="muted">${escapeHtml(state2.externalAgentMeta.verificationMessage)}</p>
               ${state2.externalAgentMeta.verificationMode ? `<small>Mode: ${escapeHtml(labelize(state2.externalAgentMeta.verificationMode))}</small>` : ""}
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">Compatibility</p>
               <h3>${escapeHtml(state2.externalAgentMeta.compatibilityHeadline)}</h3>
               <div class="live-feed">
                 ${compatibilityNotes.map((note) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><p>${escapeHtml(note)}</p></div></article>`).join("") || emptyState("No compatibility notes yet.")}
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
+            <article class="shell-panel surface-panel wizard-snapshot">
               <p class="mini-label">What this does</p>
               <p class="muted">This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. External agents can compete for funded work, submit structured outputs, earn testnet USDC after owner-approved settlement, and build reputation.</p>
               <div class="agent-tags" style="margin-top:12px;">
@@ -49947,7 +49952,7 @@ function renderFatalAppError(error, title = "App startup failed") {
   console.error(title, error);
   if (!el.appRoot) return;
   el.appRoot.innerHTML = `
-    <section class="error-state shell-section">
+    <section class="error-state shell-section surface-page">
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(message)}</p>
       <div class="empty-state-actions">
@@ -50225,7 +50230,7 @@ function renderArcDemo() {
         </div>
       </aside>
     </section>
-    <section class="shell-section" data-reveal>
+    <section class="shell-section surface-page" data-reveal>
       <div class="section-head">
         <div>
           <p class="mini-label">Assisted review</p>
@@ -50244,7 +50249,7 @@ function renderArcDemo() {
           `).join("")}
       </div>
     </section>
-    <section class="shell-section" data-reveal>
+    <section class="shell-section surface-page" data-reveal>
       <div class="section-head">
         <div>
           <p class="mini-label">Owner approval</p>
@@ -50257,7 +50262,7 @@ function renderArcDemo() {
         <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Guidance confidence</span></article>
         <article class="metric-card"><strong>${current >= 4 ? "yes" : "no"}</strong><span>Settlement eligible</span></article>
       </div>
-      <div class="status-banner ${current >= 4 ? "is-success" : "is-neutral"}">
+      <div class="status-banner surface-alert ${current >= 4 ? "is-success" : "is-neutral"}">
         <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
         <p>${current >= 4 ? "Payment can be released because the task owner approved the result after AI review guidance." : "Advance the demo to see the task move from funded work to result review and settlement eligibility."}</p>
       </div>
@@ -50934,7 +50939,7 @@ async function renderPostTaskPage() {
       </header>
       <section class="composer-grid">
         <div class="composer-main">
-          <article class="composer-intro reveal-on-scroll">
+          <article class="composer-intro surface-page reveal-on-scroll">
             <div class="composer-title-row">
               <div>
                 <p class="mini-label">Funded command</p>
@@ -50948,19 +50953,19 @@ async function renderPostTaskPage() {
             <p class="muted">Write the task once, route it cleanly, and keep funding, owner review, and settlement obvious. This surface is optimized for real AI work, not a generic prompt box.</p>
           </article>
           ${chainBanner ? `
-            <article class="status-banner ${chainBanner.tone} reveal-on-scroll">
+            <article class="status-banner surface-alert ${chainBanner.tone} reveal-on-scroll">
               <strong>${escapeHtml(chainBanner.title)}</strong>
               <p>${escapeHtml(chainBanner.body)}</p>
             </article>
           ` : ""}
-          <article class="status-banner info reveal-on-scroll">
+          <article class="status-banner surface-alert info reveal-on-scroll">
             <strong>3-minute Arc Testnet demo</strong>
             <p>Start a polished Thread Writer demo task with 10 USDC demo funding, structured output, owner approval, demo payment release, reputation update, and external-agent context.</p>
             <div class="secondary-actions" style="margin-top:12px;">
               <button type="button" data-start-demo-flow>Start Demo Flow</button>
             </div>
           </article>
-          <article class="shell-section reveal-on-scroll">
+          <article class="shell-section surface-page reveal-on-scroll">
               <div class="section-head">
               <div>
                 <p class="mini-label">Composer</p>
@@ -50972,7 +50977,7 @@ async function renderPostTaskPage() {
                 </div>
             </div>
             ${state.taskForm.selectedServicePackage ? `
-              <div class="status-banner info" style="margin-bottom:18px;">
+              <div class="status-banner surface-alert info" style="margin-bottom:18px;">
                 <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)} package: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
                 <p>This package only prefilled the editable task draft. You still fund the task with USDC, review the delivered work, and release payment only after approval.</p>
                 <div class="agent-tags" style="margin-top:10px;">
@@ -50982,7 +50987,7 @@ async function renderPostTaskPage() {
                 </div>
               </div>
             ` : ""}
-            <div class="simple-panel" style="margin-bottom:18px;">
+            <div class="simple-panel surface-panel" style="margin-bottom:18px;">
               <div class="section-head">
                 <div>
                   <p class="mini-label">Template</p>
@@ -51009,7 +51014,7 @@ async function renderPostTaskPage() {
                 <div class="secondary-actions" style="margin-top:14px;">
                   <button type="button" id="generateTaskBrief">Generate / Update Brief</button>
                 </div>
-                ${state.taskForm.templateMessage ? `<div class="status-banner ${templateResult.missingFields.length ? "warning" : "info"}" style="margin-top:12px;"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
+                ${state.taskForm.templateMessage ? `<div class="status-banner surface-alert ${templateResult.missingFields.length ? "warning" : "info"}" style="margin-top:12px;"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
               `}
             </div>
             <div class="form-grid field-stack">
@@ -51037,7 +51042,7 @@ async function renderPostTaskPage() {
                 `}
             </div>
           </article>
-          <details class="shell-section disclosure-panel reveal-on-scroll">
+          <details class="shell-section surface-page disclosure-panel reveal-on-scroll">
             <summary>Advanced options</summary>
             <div class="disclosure-panel__body">
               <div class="section-head">
@@ -51078,7 +51083,7 @@ async function renderPostTaskPage() {
           </details>
         </div>
         <aside class="composer-side">
-          <article class="shell-panel task-preview reveal-on-scroll">
+          <article class="shell-panel surface-panel task-preview reveal-on-scroll">
             <p class="mini-label">Preview</p>
             <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
               <p class="muted">${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
@@ -51088,13 +51093,13 @@ async function renderPostTaskPage() {
                 <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
               </div>
           </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
+          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
             <p class="mini-label">Readiness</p>
             <h3>Ready to route</h3>
             <p class="muted">${escapeHtml(taskChecklist.summary)}</p>
             <div class="tag-cloud">${taskChecklist.items.map((item) => `<span class="tag ${item.complete ? "tag-success" : "tag-muted"}">${escapeHtml(item.label)}</span>`).join("")}</div>
           </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
+          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
             <p class="mini-label">Assignment</p>
             <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Open execution path"}</h3>
             <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the funded task through the same owner-approved work loop."}</p>
@@ -51104,7 +51109,7 @@ async function renderPostTaskPage() {
               </div>
               <div class="attachment-list">
                 ${selectedAgentIdeas.map((idea, index2) => `
-                  <button type="button" class="task-row suggested-task" data-suggested-task="${index2}">
+                  <button type="button" class="task-row surface-flat suggested-task" data-suggested-task="${index2}">
                     <strong>Starter idea ${index2 + 1}</strong>
                     <p>${escapeHtml(idea)}</p>
                   </button>
@@ -51112,7 +51117,7 @@ async function renderPostTaskPage() {
               </div>
             ` : ""}
           </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
+          <article class="shell-panel surface-panel info-panel reveal-on-scroll">
             <p class="mini-label">Funding state</p>
             <h3>${escapeHtml(primaryActionLabel)}</h3>
             <p class="muted">${escapeHtml(fundingHint)} Wallet mode uses Arc Testnet ERC-20 USDC for task funding; payment is released only after owner approval. Demo settlement stays separate from wallet-funded tasks.</p>
@@ -51125,7 +51130,7 @@ async function renderPostTaskPage() {
               ${!walletOnArc ? `<div class="secondary-actions" style="margin-top:12px;"><button type="button" id="switchArcFromPost">Switch to Arc Testnet</button></div>` : ""}
             ` : ""}
             ${state.chainTransaction?.state && state.chainTransaction.state !== "idle" ? `
-              <div class="status-banner ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
+              <div class="status-banner surface-alert ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
                 <strong>${escapeHtml(labelize(state.chainTransaction.state))}</strong>
                 <p>${escapeHtml(state.chainTransaction.message)}</p>
               </div>
@@ -51541,7 +51546,7 @@ async function renderTaskDetail(taskId) {
     state.history = history2;
   } catch (error) {
     el.appRoot.innerHTML = `
-      <div class="error-state shell-section">
+      <div class="error-state shell-section surface-page">
         <strong>Task unavailable</strong>
         <p>${escapeHtml(error.message)}</p>
         <div class="empty-state-actions">
@@ -51989,37 +51994,37 @@ async function renderAdmin() {
       </section>
       <section class="ops-grid">
       <div class="ops-stack">
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Queue</p><h2>Work queue</h2></div><span class="meta-pill">${allTasks.length} tasks</span></div>
         <div class="audit-list">${allTasks.slice(0, 10).map((task) => `<div class="audit-item"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.status)} | ${formatCurrency(task.rewardAmount)}</p><div class="ops-actions"><button data-admin-pause="${task.taskId}">Pause Task</button><button data-admin-refund="${task.taskId}">Refund Task</button></div></div>`).join("") || emptyState("No tasks loaded.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Review</p><h2>Manual resolution</h2></div><span class="meta-pill">${disputes.length} disputes</span></div>
         <div class="audit-list">${disputes.map((task) => `<div class="audit-item"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.status)} | ${formatCurrency(task.rewardAmount)} reward</p><div class="ops-actions"><button data-route="/tasks/${task.taskId}">Open Task</button><button data-admin-resolve="${task.taskId}" data-outcome="approve_payout">Approve Payout</button><button data-admin-resolve="${task.taskId}" data-outcome="refund_buyer">Refund Buyer</button></div></div>`).join("") || emptyState("No open disputes.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Risk</p><h2>Risk monitoring</h2></div><span class="meta-pill">${suspiciousAgents.length} flagged</span></div>
         <div class="audit-list">${suspiciousAgents.map((agent) => `<div class="audit-item"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${escapeHtml(agent.compatibilityStatus)} | ${escapeHtml(agent.healthStatus)}</p><div class="ops-actions"><button data-admin-disable="${agent.profile.agentId}">Disable Agent</button>${agent.profile.endpointUrl ? `<button data-admin-blacklist="${escapeHtml(agent.profile.endpointUrl)}">Blacklist Endpoint</button>` : ""}</div></div>`).join("") || emptyState("No suspicious endpoints.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Failures</p><h2>Debug queue</h2></div><span class="meta-pill">${failures.items.length} failed</span></div>
         <div class="audit-list">${failures.items.map((run) => `<div class="audit-item"><strong>${escapeHtml(run.taskId)}</strong><p>${escapeHtml(run.failureCategory || "unknown")} | ${escapeHtml(run.lastErrorMessage || "Execution failed")}</p><div class="ops-actions"><button data-route="/tasks/${run.taskId}">Inspect Task</button><button data-admin-debug="${run.taskId}">Debug Trace</button></div></div>`).join("") || emptyState("No failed executions.")}</div>
       </article>
       </div>
       <div class="ops-stack">
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Signals</p><h2>Pattern detection</h2></div><span class="meta-pill">${overview.suspiciousPatterns.length} signals</span></div>
         <div class="audit-list">${overview.suspiciousPatterns.map((flag) => `<div class="audit-item"><strong>${escapeHtml(labelize(flag.kind))}</strong><p>${escapeHtml(flag.summary)}</p><small>${escapeHtml(flag.subjectType)} | ${escapeHtml(flag.subjectId)}</small></div>`).join("") || emptyState("No suspicious patterns right now.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Blocks</p><h2>Hard blocks</h2></div><span class="meta-pill">${overview.blacklistedEndpoints.length} endpoints</span></div>
         <div class="audit-list">${overview.blacklistedEndpoints.map((row) => `<div class="audit-item"><strong>${escapeHtml(row.endpointUrl)}</strong><p>${escapeHtml(row.reason)}</p></div>`).join("") || emptyState("No blacklisted endpoints.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Audit</p><h2>Decision trail</h2></div><span class="meta-pill">${overview.auditLogs.length} events</span></div>
         <div class="audit-list">${overview.auditLogs.slice(0, 12).map((item) => `<div class="audit-item"><strong>${escapeHtml(labelize(item.action))}</strong><p>${escapeHtml(item.reason)}</p><small>${escapeHtml(item.subjectType)} | ${escapeHtml(item.subjectId)}</small></div>`).join("") || emptyState("No audit logs yet.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Inspect</p><h2>Deep inspection</h2></div>${debug ? `<span class="meta-pill">${escapeHtml(debug.task.taskId)}</span>` : ""}</div>
         ${debug ? `
             <div class="audit-list">
@@ -52147,7 +52152,7 @@ async function render() {
       await loadMarketData2();
     } catch (error) {
       el.appRoot.innerHTML = `
-        <div class="error-state shell-section">
+        <div class="error-state shell-section surface-page">
           <strong>Network error</strong>
           <p>${escapeHtml(statusMessage(error, "Marketplace data could not be loaded."))}</p>
           <div class="empty-state-actions">
