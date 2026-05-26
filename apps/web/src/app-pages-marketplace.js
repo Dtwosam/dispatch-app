@@ -6,12 +6,9 @@ import {
   formatCurrency,
   initials,
   labelize,
-  agentStatusLabel,
-  agentStatusTone,
   revealSections,
   sortAgents,
   taskStatusTone,
-  trustScore,
 } from "./app-ui.js";
 import {
   buildAgentBuilderDashboardModel,
@@ -21,7 +18,6 @@ import {
   buildServicePackageDisplayModel,
   buildTaskDraftFromServicePackage,
   buildTaskLifecycleModel,
-  shortWallet,
 } from "./ui-models.js";
 
 function renderHomeHero() {
@@ -233,7 +229,7 @@ function renderAgentCard(agent) {
   const packages = display.servicePackages || [];
   const packagePrice = packages.length ? Math.min(...packages.map((item) => Number(item.priceUsdc || 0)).filter((price) => price > 0)) : null;
   const readinessClass = display.readinessTone ? `market-agent-badge--${display.readinessTone}` : "market-agent-badge--neutral";
-  const typeLine = `${display.typeLabel} · ${display.readinessLabel}`;
+  const typeLine = `${display.typeLabel} | ${display.readinessLabel}`;
 
   return `
     <article class="market-agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
@@ -475,7 +471,16 @@ export function renderAgentsMarketplacePage({ el, state, onNavigate, rerender })
 export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
   const agent = state.agents.find((item) => item.profile.slug === slug);
   if (!agent) {
-    el.appRoot.innerHTML = `<section class="shell-section surface-page"><strong>Agent not found</strong><p class="muted">No matching public profile was found.</p></section>`;
+    el.appRoot.innerHTML = `
+      <section data-structure="agent-profile" class="agent-profile-page">
+        <article class="agent-profile-missing">
+          <p class="profile-eyebrow">Agent profile</p>
+          <h1>Agent not found.</h1>
+          <p>This agent is not available in the current marketplace.</p>
+          <button class="hero-primary" data-route="/agents">Back to agents</button>
+        </article>
+      </section>
+    `;
     return;
   }
   const display = buildAgentDisplayModel(agent, {
@@ -483,190 +488,202 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
     rejectedTasks: state.tasks?.rejectedTasks || [],
     disputedTasks: state.tasks?.disputedTasks || [],
   });
-  const earningsBreakdown = buildAgentEarningsDashboardModel([agent], {
-    myPostedTasks: state.tasks?.myPostedTasks || [],
-    allOpenTasks: state.tasks?.allOpenTasks || [],
-    activeTasks: state.tasks?.activeTasks || [],
-    completedTasks: state.tasks?.completedTasks || [],
-    rejectedTasks: state.tasks?.rejectedTasks || [],
-    disputedTasks: state.tasks?.disputedTasks || [],
-  }).breakdowns[0];
-  const bestFor = display.bestUseCases;
   const recentWork = display.recentWork;
   const servicePackages = display.servicePackages.map((item) => buildServicePackageDisplayModel(item, agent));
-  const payoutWallet = agent.profile.ownerWallet || null;
+  const startingPackage = servicePackages[0] || null;
+  const ctaPrimary = startingPackage
+    ? `<button class="hero-primary" data-service-package="${escapeHtml(startingPackage.id)}">Start with package</button>`
+    : `<button class="hero-primary" data-profile-custom-task>Create custom task</button>`;
+  const ctaSecondary = startingPackage
+    ? `<button class="hero-secondary" data-profile-custom-task>Create custom task</button>`
+    : `<button class="hero-secondary" data-route="/agents">Back to agents</button>`;
+  const packageStartingLabel = startingPackage ? startingPackage.priceDisplay : "Custom task only";
+  const readinessTone = display.readinessTone ? `profile-badge--${display.readinessTone}` : "profile-badge--neutral";
 
   el.appRoot.innerHTML = `
-    <section data-structure="agent-profile">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">${escapeHtml(display.typeLabel)}</p>
-        <h1>${escapeHtml(display.name)}</h1>
-        <p class="muted">${escapeHtml(display.description)}</p>
-      </header>
-      <section class="profile-grid reveal-on-scroll">
-        <article class="shell-section surface-page task-main">
-          <div class="section-head">
+    <section data-structure="agent-profile" class="agent-profile-page">
+      <section class="agent-profile-hero reveal-on-scroll is-visible">
+        <div class="agent-profile-hero__main">
+          <button class="agent-profile-back" data-route="/agents">Back to agents</button>
+          <div class="agent-profile-identity">
+            <div class="agent-profile-avatar">${initials(display.name)}</div>
             <div>
-              <p class="mini-label">Performance</p>
-              <h2>Execution summary</h2>
+              <div class="agent-profile-badges">
+                <span class="profile-badge">${escapeHtml(display.typeLabel)}</span>
+                <span class="profile-badge ${readinessTone}">${escapeHtml(display.readinessLabel)}</span>
+              </div>
+              <h1>${escapeHtml(display.name)}</h1>
             </div>
           </div>
-          <div class="agent-tags">
-            ${display.badges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-            <span class="tag">Type: ${escapeHtml(display.typeLabel)}</span>
-            ${agent.profile.originType === "external" ? '<span class="tag">Adapter compatible</span>' : ""}
-            <span class="tag">Connection: ${escapeHtml(display.connectionStatus)}</span>
-            <span class="tag">${escapeHtml(display.verificationLabel)}</span>
-            <span class="status-chip ${agentStatusTone(agent)}">${agentStatusLabel(agent)}</span>
+          <p class="agent-profile-description">${escapeHtml(display.shortDescription || display.description)}</p>
+          <div class="agent-profile-actions">
+            ${ctaPrimary}
+            ${ctaSecondary}
           </div>
-          <div class="task-summary">
-            <div class="metric-card"><strong>${escapeHtml(display.totalEarnedDisplay)}</strong><span>Paid earnings</span></div>
-            <div class="metric-card"><strong>${escapeHtml(earningsBreakdown.pendingLockedDisplay)}</strong><span>Pending/locked value</span></div>
-            <div class="metric-card"><strong>${escapeHtml(earningsBreakdown.disputedLockedDisplay)}</strong><span>Disputed/locked value</span></div>
-            <div class="metric-card"><strong>${escapeHtml(display.completedTasksDisplay)}</strong><span>Paid funded tasks</span></div>
-            <div class="metric-card"><strong>${escapeHtml(display.approvalRateDisplay)}</strong><span>Approval rate</span></div>
-            <div class="metric-card"><strong>${escapeHtml(display.averageScoreDisplay)}</strong><span>Avg evaluation score</span></div>
-            <div class="metric-card"><strong>${escapeHtml(display.averageDeliveryDisplay)}</strong><span>Avg delivery</span></div>
-            <div class="metric-card"><strong>${escapeHtml(display.rankDisplay)}</strong><span>Marketplace rank</span></div>
-            <div class="metric-card"><strong>${escapeHtml(display.reviewsDisplay)}</strong><span>Reviews</span></div>
-            <div class="metric-card"><strong>${agent.performanceSummary.disputeCount || 0}</strong><span>Disputes</span></div>
-            <div class="metric-card"><strong>${escapeHtml(earningsBreakdown.packageStartingPriceDisplay)}</strong><span>Package from</span></div>
+        </div>
+        <aside class="agent-profile-facts">
+          <div>
+            <span>Readiness</span>
+            <strong>${escapeHtml(display.readinessLabel)}</strong>
           </div>
-          <p class="muted">${escapeHtml(display.trustNote)}</p>
-          <div class="agent-tags">
-            ${bestFor.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || '<span class="muted">General-purpose marketplace work.</span>'}
+          <div>
+            <span>Starting point</span>
+            <strong>${escapeHtml(packageStartingLabel)}</strong>
           </div>
-        </article>
-        <aside class="task-side">
-          <article class="shell-panel surface-panel">
-            <p class="mini-label">Best for</p>
-            <h3>Where this agent fits best</h3>
-            <p class="muted">Use this worker when you want structured output, clear review, and payout accountability after approval.</p>
-            <div class="agent-tags">
-              ${bestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("") || '<span class="muted">General-purpose marketplace work.</span>'}
-            </div>
-            <p class="muted" style="margin-top:12px;">Pricing note: ${escapeHtml(display.pricingNote)}</p>
-            <p class="muted" style="margin-top:12px;">Payout wallet: ${escapeHtml(shortWallet(agent.profile.payoutWallet || payoutWallet))}</p>
-            ${agent.profile.developerName ? `<p class="muted">Developer: ${escapeHtml(agent.profile.developerName)}</p>` : ""}
-            ${agent.profile.endpointUrl ? `<p class="muted">Endpoint: ${escapeHtml(agent.profile.endpointUrl)}</p>` : ""}
-            ${agent.profile.outputSchema ? `<p class="muted">Output schema: ${escapeHtml(typeof agent.profile.outputSchema === "string" ? agent.profile.outputSchema : "Structured object schema")}</p>` : ""}
-            <div class="agent-tags" style="margin-top:12px;">
-              ${display.suggestedTemplates.map((template) => `<span class="tag">${escapeHtml(template.name)}</span>`).join("")}
-            </div>
-          </article>
-          <article class="shell-panel surface-panel">
-            <p class="mini-label">Hire flow</p>
-            <h3>Create task with this agent</h3>
-            <textarea id="quickTaskIdea" rows="5" placeholder="Describe the outcome you want from this agent."></textarea>
-            ${agent.profile.originType === "platform"
-              ? '<p class="muted">This worker ships with Dispatch as the launch benchmark. It earns reputation through the same funded-task, review, and settlement loop as future external agents.</p>'
-              : '<p class="muted">External workers can integrate through Dispatch adapters, receive funded job envelopes, submit outputs, and earn after owner approval.</p>'}
-            <footer>
-              <button class="hero-primary" id="hireAgentButton">Create task with this agent</button>
-            </footer>
-          </article>
+          <div>
+            <span>Paid tasks</span>
+            <strong>${escapeHtml(display.completedTasksDisplay)}</strong>
+          </div>
+          <div>
+            <span>Earned</span>
+            <strong>${escapeHtml(display.totalEarnedDisplay)}</strong>
+          </div>
+          <div>
+            <span>Approval</span>
+            <strong>${escapeHtml(display.approvalRateDisplay)}</strong>
+          </div>
         </aside>
       </section>
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="section-head">
+
+      <section class="profile-section profile-packages-section reveal-on-scroll">
+        <div class="profile-section-header">
           <div>
-            <p class="mini-label">Verification readiness</p>
-            <h2>${escapeHtml(display.readinessLabel)}</h2>
-            <p class="muted">${escapeHtml(display.verificationTrustNote)}</p>
+            <p class="profile-eyebrow">Service packages</p>
+            <h2>Start from a package.</h2>
+            <p>Start from a package, then edit the brief before funding.</p>
           </div>
-          <span class="tag">${escapeHtml(display.verificationNextAction)}</span>
         </div>
-        <div class="task-summary">
-          <div class="metric-card"><strong>${escapeHtml(display.readinessLabel)}</strong><span>Readiness state</span></div>
-          <div class="metric-card"><strong>${display.verificationMissingCount}</strong><span>Missing setup items</span></div>
-          <div class="metric-card"><strong>${display.verificationLimitedCount}</strong><span>Limited-data items</span></div>
+        ${servicePackages.length ? `
+          <div class="profile-package-grid">
+            ${servicePackages.map((servicePackage, index) => `
+              <article class="profile-package-card ${index === 1 ? "is-featured" : ""}">
+                <div class="profile-package-card__body">
+                  <span class="profile-package-tier">${escapeHtml(servicePackage.tier)}</span>
+                  <h3>${escapeHtml(servicePackage.name)}</h3>
+                  <div class="profile-package-price">
+                    <strong>${escapeHtml(servicePackage.priceDisplay.replace(/\s*USDC$/i, ""))}</strong>
+                    <span>USDC</span>
+                  </div>
+                  <p>${escapeHtml(servicePackage.description)}</p>
+                  <div class="profile-package-details">
+                    <span>Output: ${escapeHtml(servicePackage.expectedOutput)}</span>
+                    <span>Delivery: ${escapeHtml(servicePackage.deliveryEstimate)}</span>
+                  </div>
+                </div>
+                <button class="${index === 1 ? "hero-primary" : "hero-secondary"}" data-service-package="${escapeHtml(servicePackage.id)}">Start with package</button>
+              </article>
+            `).join("")}
+          </div>
+        ` : `
+          <article class="profile-empty-panel">
+            <h3>Custom task only.</h3>
+            <p>This agent does not have packages yet.</p>
+            <button class="hero-primary" data-profile-custom-task>Create custom task</button>
+          </article>
+        `}
+      </section>
+
+      <section class="profile-section reveal-on-scroll">
+        <div class="profile-section-header">
+          <div>
+            <p class="profile-eyebrow">Trust signals</p>
+            <h2>Performance from available task data.</h2>
+          </div>
         </div>
-        <div class="task-rail">
+        <div class="profile-trust-strip">
+          <div><span>Paid tasks</span><strong>${escapeHtml(display.completedTasksDisplay || "0")}</strong></div>
+          <div><span>Earned USDC</span><strong>${escapeHtml(display.totalEarnedDisplay || "0 USDC")}</strong></div>
+          <div><span>Approval rate</span><strong>${escapeHtml(display.approvalRateDisplay)}</strong></div>
+          <div><span>Delivery / readiness</span><strong>${escapeHtml(display.averageDeliveryDisplay !== "Not enough data yet" ? display.averageDeliveryDisplay : display.readinessLabel)}</strong></div>
+        </div>
+      </section>
+
+      <section class="profile-section reveal-on-scroll">
+        <div class="profile-section-header">
+          <div>
+            <p class="profile-eyebrow">Recent work</p>
+            <h2>Reviewed task history.</h2>
+            <p>Completed and reviewed tasks appear here.</p>
+          </div>
+        </div>
+        ${recentWork.length ? `
+          <div class="profile-work-list">
+            ${recentWork.slice(0, 3).map((item) => `
+              <article class="profile-work-row">
+                <div>
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <p>${escapeHtml(item.category)} | ${formatCurrency(item.rewardAmount)} reward | ${item.evaluationScore === null ? "No score yet" : `${item.evaluationScore} score`}</p>
+                </div>
+                <div class="profile-work-row__meta">
+                  <span>${escapeHtml(item.approvalIndicator)}</span>
+                  <small>${escapeHtml(item.completedAt ? new Date(item.completedAt).toLocaleDateString() : "Date unavailable")}</small>
+                </div>
+              </article>
+            `).join("")}
+          </div>
+        ` : `
+          <article class="profile-empty-panel">
+            <h3>No reviewed work yet.</h3>
+            <p>Completed funded tasks will appear here after approval.</p>
+          </article>
+        `}
+      </section>
+
+      <section class="profile-section profile-readiness-section reveal-on-scroll">
+        <div class="profile-section-header">
+          <div>
+            <p class="profile-eyebrow">Verification readiness</p>
+            <h2>${escapeHtml(display.readinessLabel)}</h2>
+            <p>${escapeHtml(display.verificationTrustNote)}</p>
+          </div>
+          <span class="profile-badge ${readinessTone}">${escapeHtml(display.verificationNextAction)}</span>
+        </div>
+        <div class="profile-readiness-grid">
           ${display.verificationChecklist.map((item) => `
-            <article class="task-row surface-card">
-              <div class="agent-tags">
-                <span class="tag">${escapeHtml(item.stateLabel)}</span>
+            <article class="profile-readiness-row">
+              <span class="profile-readiness-dot"></span>
+              <div>
+                <strong>${escapeHtml(item.label)}</strong>
+                <p>${escapeHtml(item.description)}</p>
               </div>
-              <strong>${escapeHtml(item.label)}</strong>
-              <p class="muted">${escapeHtml(item.description)}</p>
+              <em>${escapeHtml(item.stateLabel)}</em>
             </article>
           `).join("")}
         </div>
       </section>
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">Service packages</p>
-            <h2>Ready-made funded task starters</h2>
-            <p class="muted">Packages prefill task creation only. You still edit the brief, fund with USDC, review output, and release payment only after approval.</p>
-          </div>
-          <span class="tag">${servicePackages.length ? `From ${servicePackages[0].priceDisplay}` : "Custom task"}</span>
+
+      <section class="profile-final-cta reveal-on-scroll">
+        <div>
+          <p class="profile-eyebrow">Hire this agent</p>
+          <h2>Start a funded task with this agent.</h2>
+          <p>Choose a package or create a custom brief before funding.</p>
         </div>
-        <div class="task-rail">
-          ${servicePackages.map((servicePackage) => `
-            <article class="task-row surface-card">
-              <div class="agent-tags">
-                <span class="tag">${escapeHtml(servicePackage.tier)}</span>
-                <span class="tag">${escapeHtml(servicePackage.priceDisplay)}</span>
-              </div>
-              <strong>${escapeHtml(servicePackage.name)}</strong>
-              <p>${escapeHtml(servicePackage.description)}</p>
-              <p class="muted">Expected output: ${escapeHtml(servicePackage.expectedOutput)}</p>
-              <p class="muted">Best for: ${escapeHtml(servicePackage.bestFor)}</p>
-              <p class="muted">Delivery: ${escapeHtml(servicePackage.deliveryEstimate)}</p>
-              <footer>
-                <button class="hero-primary" data-service-package="${escapeHtml(servicePackage.id)}">Start with package</button>
-              </footer>
-            </article>
-          `).join("") || emptyState("No ready-made packages for this agent yet. Create a custom funded task instead.")}
-        </div>
-      </section>
-      <section class="shell-section surface-page reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">Recent work</p>
-            <h2>What this agent has recently completed</h2>
-          </div>
-        </div>
-        <div class="work-history">
-          ${recentWork.map((item) => `
-            <article class="work-history__item surface-flat">
-              <div class="work-history__main">
-                <strong>${escapeHtml(item.title)}</strong>
-                <p>${escapeHtml(item.category)} | ${formatCurrency(item.rewardAmount)} reward | ${item.evaluationScore === null ? "No score yet" : `${item.evaluationScore} score`}</p>
-                <p class="muted">${escapeHtml(item.settlementStatus)}</p>
-              </div>
-              <div class="work-history__meta">
-                <span class="tag">${escapeHtml(item.approvalIndicator)}</span>
-                <small>${escapeHtml(new Date(item.completedAt).toLocaleDateString())}</small>
-              </div>
-            </article>
-          `).join("") || emptyState("No completed work history yet.")}
+        <div class="agent-profile-actions">
+          ${ctaPrimary}
+          ${ctaSecondary}
         </div>
       </section>
     </section>
   `;
 
-  document.getElementById("hireAgentButton")?.addEventListener("click", () => {
-    const quickTaskIdea = document.getElementById("quickTaskIdea")?.value?.trim();
-    state.taskForm.hiringMode = "direct_hire";
-    state.taskForm.selectedAgentId = agent.profile.agentId;
-    const suggestedTemplate = display.suggestedTemplates.find((template) => template.id !== "custom_task") || display.suggestedTemplates[0];
-    if (suggestedTemplate) {
-      state.taskForm.templateId = suggestedTemplate.id;
-      state.taskForm.templateFields = {};
-      state.taskForm.templateMessage = `${suggestedTemplate.name} is suggested for ${agent.profile.publicName}. Fill the template fields or switch to Custom Task.`;
-      if (suggestedTemplate.category) {
-        state.taskForm.category = suggestedTemplate.category;
+  document.querySelectorAll("[data-profile-custom-task]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.taskForm.hiringMode = "direct_hire";
+      state.taskForm.selectedAgentId = agent.profile.agentId;
+      const suggestedTemplate = display.suggestedTemplates.find((template) => template.id !== "custom_task") || display.suggestedTemplates[0];
+      if (suggestedTemplate) {
+        state.taskForm.templateId = suggestedTemplate.id;
+        state.taskForm.templateFields = {};
+        state.taskForm.templateMessage = `${suggestedTemplate.name} is suggested for ${agent.profile.publicName}. Fill the template fields or switch to Custom Task.`;
+        if (suggestedTemplate.category) {
+          state.taskForm.category = suggestedTemplate.category;
+        }
       }
-    }
-    if (quickTaskIdea) {
-      state.taskForm.description = quickTaskIdea;
       if (!state.taskForm.title.trim()) {
         state.taskForm.title = `Task for ${agent.profile.publicName}`;
       }
-    }
-    onNavigate("/post-task");
+      onNavigate("/post-task");
+    });
   });
 
   document.querySelectorAll("[data-service-package]").forEach((node) => {
