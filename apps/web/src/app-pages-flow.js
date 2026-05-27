@@ -234,7 +234,7 @@ export function renderTaskDetailPageView({
             </div>
             <div class="task-secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
-              ${resultModel?.improveAgainUnavailableReason ? `<p>${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
+              ${resultModel?.improveAgainUnavailableReason ? `<p class="disabled-reason">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
               ${reviewModel.advancedActions.includes("dispute") ? `<button data-open-dispute-toggle>Open dispute</button>` : ""}
@@ -254,12 +254,12 @@ export function renderTaskDetailPageView({
               <div><span>Settlement</span><strong>${escapeHtml(settlementLabel)}</strong></div>
             </div>
             <div class="task-payment-links">
-              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span>Funding tx: Not available yet</span>`}
-              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span>Release tx: Not available yet</span>`}
+              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid funding tx link available</span>`}
+              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid release tx link available</span>`}
             </div>
             ${reviewModel.primaryActions.includes("settle")
               ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>`
-              : `<small>${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
+              : `<small class="disabled-reason">${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
           </article>
         </aside>
       </section>
@@ -290,7 +290,10 @@ export function renderTaskDetailPageView({
                 ${item.extraInstruction ? `<p>Extra instruction: ${escapeHtml(item.extraInstruction)}</p>` : ""}
                 <small>${escapeHtml(item.requestedBy)}${item.requestedAt ? ` | ${escapeHtml(new Date(item.requestedAt).toLocaleString())}` : ""}</small>
               </article>
-            `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.")}
+            `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.", {
+              title: "No revision requested.",
+              body: "Revision history will appear here after changes are requested.",
+            })}
           </div>
         </article>
 
@@ -336,7 +339,10 @@ export function renderTaskDetailPageView({
                 <p>Requested resolution: ${escapeHtml(item.requestedResolution)}</p>
                 <small>${escapeHtml(item.statusLabel)} | ${escapeHtml(item.openedBy)}${item.openedAt ? ` | ${escapeHtml(new Date(item.openedAt).toLocaleString())}` : ""}</small>
               </article>
-            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.")}
+            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.", {
+              title: "No dispute open.",
+              body: "Payment dispute notes will appear here if a dispute is opened.",
+            })}
           </div>
           <div class="task-detail-alert task-detail-alert--warning">
             <strong>Payment remains locked</strong>
@@ -359,7 +365,10 @@ export function renderTaskDetailPageView({
                 <strong>${escapeHtml(item.title)}</strong>
                 <p>${escapeHtml(item.description)}</p>
               </article>
-            `).join("") || emptyState("No timeline yet. Waiting for update.")}
+            `).join("") || emptyState("No timeline yet. Waiting for update.", {
+              title: "No activity yet.",
+              body: "Task updates and settlement events will appear here.",
+            })}
           </div>
         </article>
         <aside class="task-history-panel">
@@ -373,7 +382,10 @@ export function renderTaskDetailPageView({
                 <p>${escapeHtml(item.outcome)}</p>
                 ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
               </article>
-            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.")}
+            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.", {
+              title: "No payout receipts yet.",
+              body: "Released or refunded payment receipts will appear here.",
+            })}
           </div>
           ${browserTxHashes.length ? `
             <div class="task-browser-trace">
@@ -466,7 +478,10 @@ export function renderCreateAgentWizardPage({ el, state }) {
       </div>
       <button id="addKnowledge">Add Source</button>
       <div class="live-feed" style="margin-top:16px;">
-        ${state.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.")}
+        ${state.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.", {
+          title: "No sources yet.",
+          body: "Knowledge pointers will appear here after they are added.",
+        })}
       </div>
     `,
     `
@@ -477,7 +492,12 @@ export function renderCreateAgentWizardPage({ el, state }) {
       <button id="runTest">Run Test</button>
       <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
-        <p class="muted">${escapeHtml(state.agentDraft.testRun.result || "No test run yet.")}</p>
+        ${state.agentDraft.testRun.result
+          ? `<p class="muted">${escapeHtml(state.agentDraft.testRun.result)}</p>`
+          : emptyState("Run a test before publishing.", {
+              title: "No test run yet.",
+              body: "Run a test before treating this draft as publish-ready.",
+            })}
         <div class="agent-tags" style="margin-top:12px;">
           ${state.agentDraft.testRun.latencyMs ? `<span class="tag">Latency ${Math.round(state.agentDraft.testRun.latencyMs)}ms</span>` : ""}
           ${state.agentDraft.testRun.valid === true ? `<span class="tag">Schema valid</span>` : ""}
@@ -711,7 +731,10 @@ export function renderConnectExternalAgentPage({ el, state }) {
               <p class="builder-onboarding-eyebrow">Compatibility</p>
               <h3>${escapeHtml(state.externalAgentMeta.compatibilityHeadline)}</h3>
               <div class="builder-note-list">
-                ${compatibilityNotes.map((note) => `<article><p>${escapeHtml(note)}</p></article>`).join("") || emptyState("No compatibility checks yet.")}
+                ${compatibilityNotes.map((note) => `<article><p>${escapeHtml(note)}</p></article>`).join("") || emptyState("No compatibility checks yet.", {
+                  title: "Endpoint not checked yet.",
+                  body: "Compatibility notes will appear after ownership and endpoint checks run.",
+                })}
               </div>
             </article>
             <article class="wizard-snapshot builder-setup-panel">

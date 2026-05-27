@@ -420,22 +420,47 @@ export function taskStatusTone(status) {
   return "neutral";
 }
 
-export function emptyState(message) {
+function stateTitleFromMessage(message, fallback = "Nothing here yet.") {
+  const source = String(message || "").trim();
+  if (!source) return fallback;
+  const firstSentence = source.split(". ")[0]?.trim();
+  if (!firstSentence) return fallback;
+  return firstSentence.length > 48 ? fallback : firstSentence.replace(/\.$/, ".");
+}
+
+export function emptyState(message, options = {}) {
+  const title = options.title || stateTitleFromMessage(message);
+  const body = options.body || (title === message ? "Updates will appear here when data is available." : message) || "Waiting for update.";
+  const variant = options.variant || "empty";
+  const inline = options.inline !== false;
+  const markClass = inline ? "empty-inline__mark" : "empty-state__mark";
+  const className = inline
+    ? `empty-inline state-inline state-inline--${escapeHtml(variant)}`
+    : `empty-state state-card state-card--${escapeHtml(variant)}`;
+  const actionMarkup = options.action
+    ? `<div class="empty-state-actions"><button class="${escapeHtml(options.action.className || "hero-secondary")}" ${options.action.route ? `data-route="${escapeHtml(options.action.route)}"` : ""} ${options.action.id ? `id="${escapeHtml(options.action.id)}"` : ""}>${escapeHtml(options.action.label || "Continue")}</button></div>`
+    : "";
   return `
-    <div class="empty-inline">
-      <span class="empty-inline__mark">${icon("spark", 14)}</span>
-      <span>${escapeHtml(message)}</span>
+    <div class="${className}" role="status">
+      <span class="${markClass}">${icon("spark", inline ? 14 : 16)}</span>
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        ${body ? `<p>${escapeHtml(body)}</p>` : ""}
+        ${actionMarkup}
+      </div>
     </div>
   `;
 }
 
-export function richEmptyState(title, body, actions = []) {
+export function richEmptyState(title, body, actions = [], variant = "empty") {
   return `
-    <div class="empty-state">
+    <div class="empty-state state-card state-card--${escapeHtml(variant)}" role="status">
       <span class="empty-state__mark">${icon("spark", 16)}</span>
-      <strong>${escapeHtml(title)}</strong>
-      <p>${escapeHtml(body)}</p>
-      ${actions.length ? `<div class="empty-state-actions">${actions.join("")}</div>` : ""}
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        <p>${escapeHtml(body)}</p>
+        ${actions.length ? `<div class="empty-state-actions">${actions.join("")}</div>` : ""}
+      </div>
     </div>
   `;
 }

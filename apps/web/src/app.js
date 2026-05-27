@@ -93,7 +93,8 @@ function renderFatalAppError(error, title = "App startup failed") {
   console.error(title, error);
   if (!el.appRoot) return;
   el.appRoot.innerHTML = `
-    <section class="error-state shell-section surface-page">
+    <section class="error-state state-card state-card--error shell-section surface-page">
+      <span class="empty-state__mark" aria-hidden="true"></span>
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(message)}</p>
       <div class="empty-state-actions">
@@ -1362,7 +1363,10 @@ async function renderPostTaskPage() {
                         ${attachment.extractionSource ? `<small>Parsed from ${escapeHtml(attachment.extractionSource.toUpperCase())}${attachment.truncated ? " | truncated for task safety" : ""}</small>` : ""}
                       </div>
                     `).join("")
-                  : emptyState("No supporting material yet. Add briefs, docs, or references to make execution sharper.")}
+                  : emptyState("No supporting material yet. Add briefs, docs, or references to make execution sharper.", {
+                      title: "No supporting material yet.",
+                      body: "Add briefs, docs, or references if the task needs grounded context.",
+                    })}
               </div>
             </div>
           </details>
@@ -1389,7 +1393,7 @@ async function renderPostTaskPage() {
               </div>
             ` : ""}
             <button class="hero-primary" id="fundTaskButton" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
-            <p class="post-funding-hint">${escapeHtml(fundingHint)}</p>
+            <p class="post-funding-hint disabled-reason">${escapeHtml(fundingHint)}</p>
           </article>
 
           <article class="post-route-summary reveal-on-scroll">
@@ -1873,6 +1877,10 @@ async function renderTaskDetail(taskId) {
 
   el.appRoot.innerHTML = `
     <section data-structure="task-detail-loading" class="loading-shell">
+      <div class="loading-shell__copy">
+        <strong>Loading task...</strong>
+        <p>Fetching funded work, review state, and payment history.</p>
+      </div>
       <article class="skeleton"></article>
       <article class="skeleton"></article>
     </section>
@@ -1887,9 +1895,10 @@ async function renderTaskDetail(taskId) {
     state.history = history;
   } catch (error) {
     el.appRoot.innerHTML = `
-      <div class="error-state shell-section surface-page">
-        <strong>Task unavailable</strong>
-        <p>${escapeHtml(error.message)}</p>
+      <div class="error-state state-card state-card--error shell-section surface-page">
+        <span class="empty-state__mark" aria-hidden="true"></span>
+        <strong>Task not found.</strong>
+        <p>${escapeHtml(statusMessage(error, "This task is not available or has not loaded yet."))}</p>
         <div class="empty-state-actions">
           <button class="hero-primary" data-route="/">Go Home</button>
           <button data-route="/post-task">Post Funded Task</button>
@@ -2542,6 +2551,10 @@ async function render() {
   if (!state.tasks) {
     el.appRoot.innerHTML = `
       <section data-structure="app-loading" class="loading-shell">
+        <div class="loading-shell__copy">
+          <strong>Loading Dispatch...</strong>
+          <p>Preparing agents, tasks, and payment state.</p>
+        </div>
         <article class="skeleton"></article>
         <article class="skeleton"></article>
         <article class="skeleton"></article>
@@ -2552,7 +2565,8 @@ async function render() {
       await loadMarketData();
     } catch (error) {
       el.appRoot.innerHTML = `
-        <div class="error-state shell-section surface-page">
+        <div class="error-state state-card state-card--error shell-section surface-page">
+          <span class="empty-state__mark" aria-hidden="true"></span>
           <strong>Network error</strong>
           <p>${escapeHtml(statusMessage(error, "Marketplace data could not be loaded."))}</p>
           <div class="empty-state-actions">

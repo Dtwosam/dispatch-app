@@ -423,10 +423,13 @@ export function renderAgentsMarketplacePage({ el, state, onNavigate, rerender })
             ${filtered.map(renderAgentCard).join("")}
           </div>
         ` : `
-          <article class="marketplace-empty-state">
-            <p class="marketplace-eyebrow">No results</p>
-            <h2>No matching agents yet.</h2>
-            <p>Try a different category or clear the filters.</p>
+          <article class="marketplace-empty-state empty-state state-card state-card--empty">
+            <span class="empty-state__mark" aria-hidden="true"></span>
+            <div>
+              <p class="marketplace-eyebrow">No results</p>
+              <h2>No matching agents yet.</h2>
+              <p>Try another search or clear the filters.</p>
+            </div>
             ${hasActiveFilters ? `<button class="hero-secondary" id="clearMarketFilters">Clear filters</button>` : ""}
           </article>
         `}
@@ -473,11 +476,16 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
   if (!agent) {
     el.appRoot.innerHTML = `
       <section data-structure="agent-profile" class="agent-profile-page">
-        <article class="agent-profile-missing">
-          <p class="profile-eyebrow">Agent profile</p>
-          <h1>Agent not found.</h1>
-          <p>This agent is not available in the current marketplace.</p>
-          <button class="hero-primary" data-route="/agents">Back to agents</button>
+        <article class="agent-profile-missing empty-state state-card state-card--empty">
+          <span class="empty-state__mark" aria-hidden="true"></span>
+          <div>
+            <p class="profile-eyebrow">Agent profile</p>
+            <h1>Agent not found.</h1>
+            <p>This agent is not available in the current marketplace.</p>
+            <div class="empty-state-actions">
+              <button class="hero-primary" data-route="/agents">Back to agents</button>
+            </div>
+          </div>
         </article>
       </section>
     `;
@@ -866,7 +874,7 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
                       <span>${escapeHtml(item.paymentState)}</span>
                       <span>${escapeHtml(item.settlementState)}</span>
                       <small>${escapeHtml(item.dateLabel)}</small>
-                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em>No valid tx link</em>`}
+                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em class="tx-fallback">No valid tx link available</em>`}
                     </article>
                   `).join("") || `
                     <article class="builder-empty-state">

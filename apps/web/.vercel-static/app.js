@@ -47145,11 +47145,29 @@ function taskStatusTone(status) {
   if (["DISPUTED", "REJECTED", "FAILED", "REFUNDED"].includes(normalized)) return "trending";
   return "neutral";
 }
-function emptyState(message) {
+function stateTitleFromMessage(message, fallback = "Nothing here yet.") {
+  const source = String(message || "").trim();
+  if (!source) return fallback;
+  const firstSentence = source.split(". ")[0]?.trim();
+  if (!firstSentence) return fallback;
+  return firstSentence.length > 48 ? fallback : firstSentence.replace(/\.$/, ".");
+}
+function emptyState(message, options = {}) {
+  const title = options.title || stateTitleFromMessage(message);
+  const body = options.body || (title === message ? "Updates will appear here when data is available." : message) || "Waiting for update.";
+  const variant = options.variant || "empty";
+  const inline = options.inline !== false;
+  const markClass = inline ? "empty-inline__mark" : "empty-state__mark";
+  const className = inline ? `empty-inline state-inline state-inline--${escapeHtml(variant)}` : `empty-state state-card state-card--${escapeHtml(variant)}`;
+  const actionMarkup = options.action ? `<div class="empty-state-actions"><button class="${escapeHtml(options.action.className || "hero-secondary")}" ${options.action.route ? `data-route="${escapeHtml(options.action.route)}"` : ""} ${options.action.id ? `id="${escapeHtml(options.action.id)}"` : ""}>${escapeHtml(options.action.label || "Continue")}</button></div>` : "";
   return `
-    <div class="empty-inline">
-      <span class="empty-inline__mark">${icon("spark", 14)}</span>
-      <span>${escapeHtml(message)}</span>
+    <div class="${className}" role="status">
+      <span class="${markClass}">${icon("spark", inline ? 14 : 16)}</span>
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        ${body ? `<p>${escapeHtml(body)}</p>` : ""}
+        ${actionMarkup}
+      </div>
     </div>
   `;
 }
@@ -48637,10 +48655,13 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
             ${filtered.map(renderAgentCard).join("")}
           </div>
         ` : `
-          <article class="marketplace-empty-state">
-            <p class="marketplace-eyebrow">No results</p>
-            <h2>No matching agents yet.</h2>
-            <p>Try a different category or clear the filters.</p>
+          <article class="marketplace-empty-state empty-state state-card state-card--empty">
+            <span class="empty-state__mark" aria-hidden="true"></span>
+            <div>
+              <p class="marketplace-eyebrow">No results</p>
+              <h2>No matching agents yet.</h2>
+              <p>Try another search or clear the filters.</p>
+            </div>
             ${hasActiveFilters ? `<button class="hero-secondary" id="clearMarketFilters">Clear filters</button>` : ""}
           </article>
         `}
@@ -48684,11 +48705,16 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
   if (!agent) {
     el2.appRoot.innerHTML = `
       <section data-structure="agent-profile" class="agent-profile-page">
-        <article class="agent-profile-missing">
-          <p class="profile-eyebrow">Agent profile</p>
-          <h1>Agent not found.</h1>
-          <p>This agent is not available in the current marketplace.</p>
-          <button class="hero-primary" data-route="/agents">Back to agents</button>
+        <article class="agent-profile-missing empty-state state-card state-card--empty">
+          <span class="empty-state__mark" aria-hidden="true"></span>
+          <div>
+            <p class="profile-eyebrow">Agent profile</p>
+            <h1>Agent not found.</h1>
+            <p>This agent is not available in the current marketplace.</p>
+            <div class="empty-state-actions">
+              <button class="hero-primary" data-route="/agents">Back to agents</button>
+            </div>
+          </div>
         </article>
       </section>
     `;
@@ -49060,7 +49086,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                       <span>${escapeHtml(item.paymentState)}</span>
                       <span>${escapeHtml(item.settlementState)}</span>
                       <small>${escapeHtml(item.dateLabel)}</small>
-                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em>No valid tx link</em>`}
+                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em class="tx-fallback">No valid tx link available</em>`}
                     </article>
                   `).join("") || `
                     <article class="builder-empty-state">
@@ -49363,7 +49389,7 @@ function renderTaskDetailPageView({
             </div>
             <div class="task-secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
-              ${resultModel?.improveAgainUnavailableReason ? `<p>${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
+              ${resultModel?.improveAgainUnavailableReason ? `<p class="disabled-reason">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
               ${reviewModel.advancedActions.includes("dispute") ? `<button data-open-dispute-toggle>Open dispute</button>` : ""}
@@ -49383,10 +49409,10 @@ function renderTaskDetailPageView({
               <div><span>Settlement</span><strong>${escapeHtml(settlementLabel)}</strong></div>
             </div>
             <div class="task-payment-links">
-              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span>Funding tx: Not available yet</span>`}
-              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span>Release tx: Not available yet</span>`}
+              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid funding tx link available</span>`}
+              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid release tx link available</span>`}
             </div>
-            ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>` : `<small>${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
+            ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>` : `<small class="disabled-reason">${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
           </article>
         </aside>
       </section>
@@ -49417,7 +49443,10 @@ function renderTaskDetailPageView({
                 ${item.extraInstruction ? `<p>Extra instruction: ${escapeHtml(item.extraInstruction)}</p>` : ""}
                 <small>${escapeHtml(item.requestedBy)}${item.requestedAt ? ` | ${escapeHtml(new Date(item.requestedAt).toLocaleString())}` : ""}</small>
               </article>
-            `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.")}
+            `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.", {
+    title: "No revision requested.",
+    body: "Revision history will appear here after changes are requested."
+  })}
           </div>
         </article>
 
@@ -49463,7 +49492,10 @@ function renderTaskDetailPageView({
                 <p>Requested resolution: ${escapeHtml(item.requestedResolution)}</p>
                 <small>${escapeHtml(item.statusLabel)} | ${escapeHtml(item.openedBy)}${item.openedAt ? ` | ${escapeHtml(new Date(item.openedAt).toLocaleString())}` : ""}</small>
               </article>
-            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.")}
+            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.", {
+    title: "No dispute open.",
+    body: "Payment dispute notes will appear here if a dispute is opened."
+  })}
           </div>
           <div class="task-detail-alert task-detail-alert--warning">
             <strong>Payment remains locked</strong>
@@ -49486,7 +49518,10 @@ function renderTaskDetailPageView({
                 <strong>${escapeHtml(item.title)}</strong>
                 <p>${escapeHtml(item.description)}</p>
               </article>
-            `).join("") || emptyState("No timeline yet. Waiting for update.")}
+            `).join("") || emptyState("No timeline yet. Waiting for update.", {
+    title: "No activity yet.",
+    body: "Task updates and settlement events will appear here."
+  })}
           </div>
         </article>
         <aside class="task-history-panel">
@@ -49500,7 +49535,10 @@ function renderTaskDetailPageView({
                 <p>${escapeHtml(item.outcome)}</p>
                 ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
               </article>
-            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.")}
+            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.", {
+    title: "No payout receipts yet.",
+    body: "Released or refunded payment receipts will appear here."
+  })}
           </div>
           ${browserTxHashes.length ? `
             <div class="task-browser-trace">
@@ -49582,7 +49620,10 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       </div>
       <button id="addKnowledge">Add Source</button>
       <div class="live-feed" style="margin-top:16px;">
-        ${state2.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.")}
+        ${state2.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.", {
+      title: "No sources yet.",
+      body: "Knowledge pointers will appear here after they are added."
+    })}
       </div>
     `,
     `
@@ -49593,7 +49634,10 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       <button id="runTest">Run Test</button>
       <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
-        <p class="muted">${escapeHtml(state2.agentDraft.testRun.result || "No test run yet.")}</p>
+        ${state2.agentDraft.testRun.result ? `<p class="muted">${escapeHtml(state2.agentDraft.testRun.result)}</p>` : emptyState("Run a test before publishing.", {
+      title: "No test run yet.",
+      body: "Run a test before treating this draft as publish-ready."
+    })}
         <div class="agent-tags" style="margin-top:12px;">
           ${state2.agentDraft.testRun.latencyMs ? `<span class="tag">Latency ${Math.round(state2.agentDraft.testRun.latencyMs)}ms</span>` : ""}
           ${state2.agentDraft.testRun.valid === true ? `<span class="tag">Schema valid</span>` : ""}
@@ -49823,7 +49867,10 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
               <p class="builder-onboarding-eyebrow">Compatibility</p>
               <h3>${escapeHtml(state2.externalAgentMeta.compatibilityHeadline)}</h3>
               <div class="builder-note-list">
-                ${compatibilityNotes.map((note) => `<article><p>${escapeHtml(note)}</p></article>`).join("") || emptyState("No compatibility checks yet.")}
+                ${compatibilityNotes.map((note) => `<article><p>${escapeHtml(note)}</p></article>`).join("") || emptyState("No compatibility checks yet.", {
+    title: "Endpoint not checked yet.",
+    body: "Compatibility notes will appear after ownership and endpoint checks run."
+  })}
               </div>
             </article>
             <article class="wizard-snapshot builder-setup-panel">
@@ -49868,7 +49915,8 @@ function renderFatalAppError(error, title = "App startup failed") {
   console.error(title, error);
   if (!el.appRoot) return;
   el.appRoot.innerHTML = `
-    <section class="error-state shell-section surface-page">
+    <section class="error-state state-card state-card--error shell-section surface-page">
+      <span class="empty-state__mark" aria-hidden="true"></span>
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(message)}</p>
       <div class="empty-state-actions">
@@ -50993,7 +51041,10 @@ async function renderPostTaskPage() {
                         <small>${attachment.textContent ? `${Math.min(attachment.textContent.length, 2e4)} chars of inline source text attached` : "Pointer-only reference"}</small>
                         ${attachment.extractionSource ? `<small>Parsed from ${escapeHtml(attachment.extractionSource.toUpperCase())}${attachment.truncated ? " | truncated for task safety" : ""}</small>` : ""}
                       </div>
-                    `).join("") : emptyState("No supporting material yet. Add briefs, docs, or references to make execution sharper.")}
+                    `).join("") : emptyState("No supporting material yet. Add briefs, docs, or references to make execution sharper.", {
+    title: "No supporting material yet.",
+    body: "Add briefs, docs, or references if the task needs grounded context."
+  })}
               </div>
             </div>
           </details>
@@ -51020,7 +51071,7 @@ async function renderPostTaskPage() {
               </div>
             ` : ""}
             <button class="hero-primary" id="fundTaskButton" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
-            <p class="post-funding-hint">${escapeHtml(fundingHint)}</p>
+            <p class="post-funding-hint disabled-reason">${escapeHtml(fundingHint)}</p>
           </article>
 
           <article class="post-route-summary reveal-on-scroll">
@@ -51468,6 +51519,10 @@ async function renderTaskDetail(taskId) {
   );
   el.appRoot.innerHTML = `
     <section data-structure="task-detail-loading" class="loading-shell">
+      <div class="loading-shell__copy">
+        <strong>Loading task...</strong>
+        <p>Fetching funded work, review state, and payment history.</p>
+      </div>
       <article class="skeleton"></article>
       <article class="skeleton"></article>
     </section>
@@ -51481,9 +51536,10 @@ async function renderTaskDetail(taskId) {
     state.history = history2;
   } catch (error) {
     el.appRoot.innerHTML = `
-      <div class="error-state shell-section surface-page">
-        <strong>Task unavailable</strong>
-        <p>${escapeHtml(error.message)}</p>
+      <div class="error-state state-card state-card--error shell-section surface-page">
+        <span class="empty-state__mark" aria-hidden="true"></span>
+        <strong>Task not found.</strong>
+        <p>${escapeHtml(statusMessage(error, "This task is not available or has not loaded yet."))}</p>
         <div class="empty-state-actions">
           <button class="hero-primary" data-route="/">Go Home</button>
           <button data-route="/post-task">Post Funded Task</button>
@@ -52078,6 +52134,10 @@ async function render() {
   if (!state.tasks) {
     el.appRoot.innerHTML = `
       <section data-structure="app-loading" class="loading-shell">
+        <div class="loading-shell__copy">
+          <strong>Loading Dispatch...</strong>
+          <p>Preparing agents, tasks, and payment state.</p>
+        </div>
         <article class="skeleton"></article>
         <article class="skeleton"></article>
         <article class="skeleton"></article>
@@ -52088,7 +52148,8 @@ async function render() {
       await loadMarketData2();
     } catch (error) {
       el.appRoot.innerHTML = `
-        <div class="error-state shell-section surface-page">
+        <div class="error-state state-card state-card--error shell-section surface-page">
+          <span class="empty-state__mark" aria-hidden="true"></span>
           <strong>Network error</strong>
           <p>${escapeHtml(statusMessage(error, "Marketplace data could not be loaded."))}</p>
           <div class="empty-state-actions">
