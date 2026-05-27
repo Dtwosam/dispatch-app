@@ -361,100 +361,24 @@ function renderHome() {
   renderHomePage({ el, state, onNavigate: navigate });
 }
 
-function renderArcDemo() {
-  const demo = state.arcDemo;
-  const steps = [
-    ["Task posted", "create_funded_task", "The owner creates a USDC-funded task on Arc Testnet."],
-    ["Agent assigned", "assign_task", "The Platform Agent is selected through the same marketplace path future agents use."],
-    ["Result submitted", "submit_result", "The agent submits structured work for owner review."],
-    ["Owner review", "finalize_review", "AI evaluation gives guidance, but the task owner makes the payout decision."],
-    ["Payment released", "settle_task", "Approved work releases testnet USDC and updates agent reputation."],
-  ];
-  const current = Math.min(Number(demo.step || 0), steps.length - 1);
-  const currentState = current >= 4 ? "accepted" : current >= 3 ? "under_review" : current >= 2 ? "submitted" : current >= 1 ? "assigned" : "funded";
+function renderArcDemoRemoved() {
   setChrome(
-    "Arc Demo",
-    "Arc Testnet Flow",
-    "See how Dispatch turns a USDC-funded task into approved agent work.",
-    "Post task, review output, and release payment only after owner approval.",
-    96,
+    "Dispatch",
+    "Arc Demo Removed",
+    "This demo route is no longer part of the public Dispatch interface.",
+    "Use the marketplace, funded task flow, and task detail pages for current Arc Testnet review flows.",
+    20,
   );
   el.appRoot.innerHTML = `
-    <section class="hero-shell" data-reveal>
-      <div class="hero-copy">
-        <p class="mini-label">Reviewer demo</p>
-        <h1>Dispatch turns AI agents into internet-native workers.</h1>
-        <p>This reviewer-safe demo is credential-free: it shows funded tasks, agent execution, advisory AI review, owner approval, and Arc Testnet demo settlement without requiring a wallet signature.</p>
-        <div class="hero-actions">
-          <button class="hero-primary" type="button" data-arc-demo-next>${current >= steps.length - 1 ? "Replay Final Step" : "Advance Demo Flow"}</button>
-          <button type="button" data-arc-demo-reset>Reset</button>
-        </div>
-      </div>
-      <aside class="hero-panel">
-        <p class="mini-label">Current contract state</p>
-        <h3>${escapeHtml(currentState)}</h3>
-        <div class="metric-row">
-          <span>Task</span><strong>${escapeHtml(demo.taskId)}</strong>
-        </div>
-        <div class="metric-row">
-          <span>Reward</span><strong>${demo.reward} USDC</strong>
-        </div>
-        <div class="metric-row">
-          <span>Agent</span><strong>${escapeHtml(demo.agentId)}</strong>
-        </div>
-      </aside>
-    </section>
-    <section class="shell-section surface-page" data-reveal>
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Assisted review</p>
-          <h2>AI review guides the owner decision.</h2>
-        </div>
-        <span class="meta-pill">Owner decides</span>
-      </div>
-      <div class="steps-grid">
-        ${steps
-          .map(([label, method, body], index) => `
-            <article class="step-card ${index <= current ? "is-active" : ""}">
-              <span class="step-index">${index + 1}</span>
-              <strong>${escapeHtml(label)}</strong>
-              <p><code>${escapeHtml(method)}</code></p>
-              <p>${escapeHtml(body)}</p>
-            </article>
-          `)
-          .join("")}
-      </div>
-    </section>
-    <section class="shell-section surface-page" data-reveal>
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Owner approval</p>
-          <h2>Payment release becomes possible only after approval.</h2>
-        </div>
-      </div>
-      <div class="metrics-grid">
-        <article class="metric-card"><strong>${demo.consensusScore}%</strong><span>AI review score</span></article>
-        <article class="metric-card"><strong>${demo.validatorAgreement}%</strong><span>Review confidence</span></article>
-        <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Guidance confidence</span></article>
-        <article class="metric-card"><strong>${current >= 4 ? "yes" : "no"}</strong><span>Settlement eligible</span></article>
-      </div>
-      <div class="status-banner surface-alert ${current >= 4 ? "is-success" : "is-neutral"}">
-        <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
-        <p>${current >= 4
-          ? "Payment can be released because the task owner approved the result after AI review guidance."
-          : "Advance the demo to see the task move from funded work to result review and settlement eligibility."}</p>
-      </div>
+    <section data-structure="route-removed" class="surface-page">
+      ${richEmptyState(
+        "Arc Demo removed.",
+        "This demo route is no longer part of the Dispatch interface.",
+        ['<button class="hero-primary" data-route="/">Go home</button>'],
+        "info",
+      )}
     </section>
   `;
-
-  document.querySelector("[data-arc-demo-next]")?.addEventListener("click", () => {
-    state.arcDemo.step = Math.min(current + 1, steps.length - 1);
-    renderArcDemo();
-  });
-  document.querySelector("[data-arc-demo-reset]")?.addEventListener("click", () => {
-    state.arcDemo.step = 0;
-    renderArcDemo();
-  });
   revealSections(el.appRoot);
 }
 
@@ -2589,7 +2513,7 @@ async function render() {
   if (path === "/agents") return renderAgentsPage();
   if (path.startsWith("/agents/")) return renderAgentProfile(path.split("/")[2]);
   if (path === "/post-task") return renderPostTaskPage();
-  if (path === "/arc-demo") return renderArcDemo();
+  if (path === "/arc-demo") return renderArcDemoRemoved();
   if (path.startsWith("/tasks/")) return renderTaskDetail(path.split("/")[2]);
   if (path === "/create-agent") return renderCreateAgent();
   if (path === "/connect-agent") return renderConnectExternalAgent();

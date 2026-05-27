@@ -50,7 +50,6 @@ export const routes = [
   ["/dashboard", "Builder Dashboard"],
   ["/connect-agent", "Connect Agent"],
   ["/create-agent", "Create Agent"],
-  ["/arc-demo", "Arc Demo"],
 ];
 
 export const categories = [

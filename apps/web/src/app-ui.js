@@ -86,7 +86,7 @@ export function setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progres
 
 export function renderNav(el, routes, isActive, state) {
   const primaryOrder = ["/", "/agents", "/post-task", "/dashboard"];
-  const secondaryOrder = ["/connect-agent", "/create-agent", "/arc-demo", "/admin"];
+  const secondaryOrder = ["/connect-agent", "/create-agent"];
   const byPath = new Map(routes);
   const primaryRoutes = primaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
   const secondaryRoutes = [
@@ -211,69 +211,74 @@ export function renderWalletSheet({
     ? (walletNetwork.isArcTestnet ? "Arc Testnet" : `Wrong network (${walletNetwork.chainId})`)
     : "Network not checked";
   const balanceLabel = walletNetwork.usdcBalance == null
-    ? "Connect on Arc Testnet to read balance"
+    ? "Balance unavailable"
     : `${Number(walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} testnet USDC`;
+  const connected = Boolean(state.wallet.trim());
+  const onArc = Boolean(walletNetwork.isArcTestnet);
+  const primaryAction = !connected
+    ? `<button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>${walletAvailable ? `Connect ${escapeHtml(providerLabel)}` : "No injected wallet detected"}</button>`
+    : !onArc
+      ? `<button class="hero-primary" type="button" id="switchArcNetwork">Switch to Arc Testnet</button>`
+      : `<button class="hero-primary" type="button" disabled>Ready to fund tasks</button>`;
+  const readinessLabel = !connected
+    ? "Connect wallet to continue."
+    : !onArc
+      ? "Switch to Arc Testnet."
+      : walletNetwork.usdcBalance == null
+        ? "Balance unavailable."
+        : "Wallet ready for Dispatch task funding.";
   el.walletSheet.innerHTML = `
     <div class="wallet-sheet-backdrop" data-wallet="close"></div>
     <div class="wallet-sheet-panel">
       <div class="wallet-sheet-handle"></div>
-      <div class="wallet-sheet-hero">
+      <div class="wallet-sheet-header">
         <div>
           <p class="mini-label">Wallet</p>
-          <h3>Connect and fund AI work in Dispatch</h3>
-          <p class="muted">Move from browsing to funded execution with an Arc Testnet wallet path, advisory AI review, and owner-controlled payout approval.</p>
+          <h3>${connected ? "Wallet connected" : "Connect wallet"}</h3>
+          <p class="muted">Use Arc Testnet to fund tasks and release USDC after approval.</p>
         </div>
-        <div class="wallet-sheet-badges">
-          <span class="meta-pill">${escapeHtml(providerLabel)}</span>
-          <span class="meta-pill">${escapeHtml(chainMode)}</span>
-          <span class="meta-pill">${escapeHtml(networkLabel)}</span>
-        </div>
+        <button class="wallet-sheet-close" type="button" data-wallet="close" aria-label="Close wallet panel">${icon("plus", 14)}</button>
       </div>
-      <div class="wallet-flow-grid">
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">1</span>
-          <strong>Connect</strong>
-          <p>Attach ${escapeHtml(providerLabel)} to this session and restore the active address.</p>
-        </article>
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">2</span>
-          <strong>Switch network</strong>
-          <p>Confirm Arc Testnet so funding, settlement, and receipt tracking stay aligned.</p>
-        </article>
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">3</span>
-          <strong>Sign funding and settlement</strong>
-          <p>Approve only the exact Arc Testnet action you want to fund or settle. The wallet stays in control.</p>
-        </article>
-      </div>
-      <article class="wallet-session-card">
-        <div>
-          <p class="mini-label">Current session</p>
-          <h3>${state.wallet.trim() ? escapeHtml(shortWallet(state.wallet)) : "No wallet connected"}</h3>
-          <p class="muted">${state.wallet.trim() ? `Connected from ${escapeHtml(providerLabel)}. ${escapeHtml(walletNetwork.message || "Switch to Arc Testnet to fund with testnet USDC.")}` : "Connect once and keep the session ready for task funding, review, and Arc Testnet settlement."}</p>
-          <div class="agent-tags" style="margin-top:12px;">
-            <span class="tag">Network: ${escapeHtml(networkLabel)}</span>
-            <span class="tag">ERC-20 balance: ${escapeHtml(balanceLabel)}</span>
-            ${walletNetwork.nativeGasBalance == null ? "" : `<span class="tag">Native USDC gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>`}
+
+      <div class="wallet-readiness-grid">
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${connected ? "is-ready" : "is-pending"}"></span>
+            <span>Wallet</span>
           </div>
-        </div>
+          <strong>${connected ? "Connected" : "Not connected"}</strong>
+          <p>${connected ? `${escapeHtml(shortWallet(state.wallet))} via ${escapeHtml(providerLabel)}` : `Connect ${escapeHtml(providerLabel)} to start funded work.`}</p>
+        </article>
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${onArc ? "is-ready" : "is-warning"}"></span>
+            <span>Network</span>
+          </div>
+          <strong>${escapeHtml(networkLabel)}</strong>
+          <p>${connected && !onArc ? "Switch to Arc Testnet to continue." : escapeHtml(chainMode)}</p>
+        </article>
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${connected && walletNetwork.usdcBalance != null ? "is-ready" : "is-pending"}"></span>
+            <span>Funding</span>
+          </div>
+          <strong>${escapeHtml(balanceLabel)}</strong>
+          <p>${walletNetwork.nativeGasBalance == null ? "Arc Testnet balance appears here when available." : `Gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}`}</p>
+        </article>
+      </div>
+
+      <article class="wallet-session-card wallet-action-card">
         <div class="wallet-session-actions">
-          <button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>
-            ${walletAvailable ? `${state.wallet.trim() ? "Reconnect" : "Connect"} ${escapeHtml(providerLabel)}` : "No injected wallet detected"}
-          </button>
-          ${state.wallet.trim() && !walletNetwork.isArcTestnet ? `<button type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : ""}
-          ${state.wallet.trim() ? `<button type="button" id="disconnectWallet">Disconnect</button>` : ""}
+          ${primaryAction}
+          ${connected ? `<button type="button" id="connectInjectedWallet">${`Reconnect ${escapeHtml(providerLabel)}`}</button>` : ""}
+          ${connected ? `<button type="button" id="disconnectWallet">Disconnect</button>` : ""}
           <button type="button" data-wallet="close">Close</button>
         </div>
+        <p class="disabled-reason">${escapeHtml(readinessLabel)}</p>
       </article>
       <div class="wallet-sheet-note">
         <span class="live-dot"></span>
-        <p>${state.walletConnectionType === "injected" && state.wallet.trim()
-          ? `Connected from browser wallet: ${escapeHtml(shortWallet(state.wallet))}.`
-          : "Connect once and the marketplace will keep this workspace ready for live task execution."}</p>
-      </div>
-      <div class="wallet-sheet-footer">
-        <small>Dispatch handles execution flow, but each Arc Testnet signature and testnet USDC payment decision stays in your wallet. Testnet USDC has no financial value.</small>
+        <p>Arc Testnet is used for Dispatch task funding and payment review flows. Testnet USDC has no financial value.</p>
       </div>
     </div>
   `;

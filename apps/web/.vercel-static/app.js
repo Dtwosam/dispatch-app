@@ -46621,8 +46621,7 @@ var routes = [
   ["/post-task", "Post Task"],
   ["/dashboard", "Builder Dashboard"],
   ["/connect-agent", "Connect Agent"],
-  ["/create-agent", "Create Agent"],
-  ["/arc-demo", "Arc Demo"]
+  ["/create-agent", "Create Agent"]
 ];
 var categories = [
   "research",
@@ -46932,7 +46931,7 @@ function setChrome(el2, eyebrow, title, sidebarTitle, sidebarLead, progress) {
 }
 function renderNav(el2, routes2, isActive2, state2) {
   const primaryOrder = ["/", "/agents", "/post-task", "/dashboard"];
-  const secondaryOrder = ["/connect-agent", "/create-agent", "/arc-demo", "/admin"];
+  const secondaryOrder = ["/connect-agent", "/create-agent"];
   const byPath = new Map(routes2);
   const primaryRoutes = primaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
   const secondaryRoutes = [
@@ -47027,66 +47026,63 @@ function renderWalletSheet({
   const chainMode = state2.chainStatusError ? "Chain status unavailable" : !state2.chainConfig ? "Checking chain access" : state2.chainConfig.chainMode === "browser_wallet" ? "Browser signing" : state2.chainConfig.chainMode === "server_signer_proxy" ? "Server signer" : "Read only";
   el2.walletSheet.classList.toggle("open", true);
   const networkLabel = walletNetwork.chainId ? walletNetwork.isArcTestnet ? "Arc Testnet" : `Wrong network (${walletNetwork.chainId})` : "Network not checked";
-  const balanceLabel = walletNetwork.usdcBalance == null ? "Connect on Arc Testnet to read balance" : `${Number(walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} testnet USDC`;
+  const balanceLabel = walletNetwork.usdcBalance == null ? "Balance unavailable" : `${Number(walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} testnet USDC`;
+  const connected = Boolean(state2.wallet.trim());
+  const onArc = Boolean(walletNetwork.isArcTestnet);
+  const primaryAction = !connected ? `<button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>${walletAvailable ? `Connect ${escapeHtml(providerLabel)}` : "No injected wallet detected"}</button>` : !onArc ? `<button class="hero-primary" type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : `<button class="hero-primary" type="button" disabled>Ready to fund tasks</button>`;
+  const readinessLabel = !connected ? "Connect wallet to continue." : !onArc ? "Switch to Arc Testnet." : walletNetwork.usdcBalance == null ? "Balance unavailable." : "Wallet ready for Dispatch task funding.";
   el2.walletSheet.innerHTML = `
     <div class="wallet-sheet-backdrop" data-wallet="close"></div>
     <div class="wallet-sheet-panel">
       <div class="wallet-sheet-handle"></div>
-      <div class="wallet-sheet-hero">
+      <div class="wallet-sheet-header">
         <div>
           <p class="mini-label">Wallet</p>
-          <h3>Connect and fund AI work in Dispatch</h3>
-          <p class="muted">Move from browsing to funded execution with an Arc Testnet wallet path, advisory AI review, and owner-controlled payout approval.</p>
+          <h3>${connected ? "Wallet connected" : "Connect wallet"}</h3>
+          <p class="muted">Use Arc Testnet to fund tasks and release USDC after approval.</p>
         </div>
-        <div class="wallet-sheet-badges">
-          <span class="meta-pill">${escapeHtml(providerLabel)}</span>
-          <span class="meta-pill">${escapeHtml(chainMode)}</span>
-          <span class="meta-pill">${escapeHtml(networkLabel)}</span>
-        </div>
+        <button class="wallet-sheet-close" type="button" data-wallet="close" aria-label="Close wallet panel">${icon("plus", 14)}</button>
       </div>
-      <div class="wallet-flow-grid">
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">1</span>
-          <strong>Connect</strong>
-          <p>Attach ${escapeHtml(providerLabel)} to this session and restore the active address.</p>
-        </article>
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">2</span>
-          <strong>Switch network</strong>
-          <p>Confirm Arc Testnet so funding, settlement, and receipt tracking stay aligned.</p>
-        </article>
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">3</span>
-          <strong>Sign funding and settlement</strong>
-          <p>Approve only the exact Arc Testnet action you want to fund or settle. The wallet stays in control.</p>
-        </article>
-      </div>
-      <article class="wallet-session-card">
-        <div>
-          <p class="mini-label">Current session</p>
-          <h3>${state2.wallet.trim() ? escapeHtml(shortWallet2(state2.wallet)) : "No wallet connected"}</h3>
-          <p class="muted">${state2.wallet.trim() ? `Connected from ${escapeHtml(providerLabel)}. ${escapeHtml(walletNetwork.message || "Switch to Arc Testnet to fund with testnet USDC.")}` : "Connect once and keep the session ready for task funding, review, and Arc Testnet settlement."}</p>
-          <div class="agent-tags" style="margin-top:12px;">
-            <span class="tag">Network: ${escapeHtml(networkLabel)}</span>
-            <span class="tag">ERC-20 balance: ${escapeHtml(balanceLabel)}</span>
-            ${walletNetwork.nativeGasBalance == null ? "" : `<span class="tag">Native USDC gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(void 0, { maximumFractionDigits: 6 }))}</span>`}
+
+      <div class="wallet-readiness-grid">
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${connected ? "is-ready" : "is-pending"}"></span>
+            <span>Wallet</span>
           </div>
-        </div>
+          <strong>${connected ? "Connected" : "Not connected"}</strong>
+          <p>${connected ? `${escapeHtml(shortWallet2(state2.wallet))} via ${escapeHtml(providerLabel)}` : `Connect ${escapeHtml(providerLabel)} to start funded work.`}</p>
+        </article>
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${onArc ? "is-ready" : "is-warning"}"></span>
+            <span>Network</span>
+          </div>
+          <strong>${escapeHtml(networkLabel)}</strong>
+          <p>${connected && !onArc ? "Switch to Arc Testnet to continue." : escapeHtml(chainMode)}</p>
+        </article>
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${connected && walletNetwork.usdcBalance != null ? "is-ready" : "is-pending"}"></span>
+            <span>Funding</span>
+          </div>
+          <strong>${escapeHtml(balanceLabel)}</strong>
+          <p>${walletNetwork.nativeGasBalance == null ? "Arc Testnet balance appears here when available." : `Gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(void 0, { maximumFractionDigits: 6 }))}`}</p>
+        </article>
+      </div>
+
+      <article class="wallet-session-card wallet-action-card">
         <div class="wallet-session-actions">
-          <button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>
-            ${walletAvailable ? `${state2.wallet.trim() ? "Reconnect" : "Connect"} ${escapeHtml(providerLabel)}` : "No injected wallet detected"}
-          </button>
-          ${state2.wallet.trim() && !walletNetwork.isArcTestnet ? `<button type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : ""}
-          ${state2.wallet.trim() ? `<button type="button" id="disconnectWallet">Disconnect</button>` : ""}
+          ${primaryAction}
+          ${connected ? `<button type="button" id="connectInjectedWallet">${`Reconnect ${escapeHtml(providerLabel)}`}</button>` : ""}
+          ${connected ? `<button type="button" id="disconnectWallet">Disconnect</button>` : ""}
           <button type="button" data-wallet="close">Close</button>
         </div>
+        <p class="disabled-reason">${escapeHtml(readinessLabel)}</p>
       </article>
       <div class="wallet-sheet-note">
         <span class="live-dot"></span>
-        <p>${state2.walletConnectionType === "injected" && state2.wallet.trim() ? `Connected from browser wallet: ${escapeHtml(shortWallet2(state2.wallet))}.` : "Connect once and the marketplace will keep this workspace ready for live task execution."}</p>
-      </div>
-      <div class="wallet-sheet-footer">
-        <small>Dispatch handles execution flow, but each Arc Testnet signature and testnet USDC payment decision stays in your wallet. Testnet USDC has no financial value.</small>
+        <p>Arc Testnet is used for Dispatch task funding and payment review flows. Testnet USDC has no financial value.</p>
       </div>
     </div>
   `;
@@ -47167,6 +47163,18 @@ function emptyState(message, options = {}) {
         <strong>${escapeHtml(title)}</strong>
         ${body ? `<p>${escapeHtml(body)}</p>` : ""}
         ${actionMarkup}
+      </div>
+    </div>
+  `;
+}
+function richEmptyState(title, body, actions = [], variant = "empty") {
+  return `
+    <div class="empty-state state-card state-card--${escapeHtml(variant)}" role="status">
+      <span class="empty-state__mark">${icon("spark", 16)}</span>
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        <p>${escapeHtml(body)}</p>
+        ${actions.length ? `<div class="empty-state-actions">${actions.join("")}</div>` : ""}
       </div>
     </div>
   `;
@@ -50156,95 +50164,24 @@ function renderHome() {
   );
   renderHomePage({ el, state, onNavigate: navigate });
 }
-function renderArcDemo() {
-  const demo = state.arcDemo;
-  const steps = [
-    ["Task posted", "create_funded_task", "The owner creates a USDC-funded task on Arc Testnet."],
-    ["Agent assigned", "assign_task", "The Platform Agent is selected through the same marketplace path future agents use."],
-    ["Result submitted", "submit_result", "The agent submits structured work for owner review."],
-    ["Owner review", "finalize_review", "AI evaluation gives guidance, but the task owner makes the payout decision."],
-    ["Payment released", "settle_task", "Approved work releases testnet USDC and updates agent reputation."]
-  ];
-  const current = Math.min(Number(demo.step || 0), steps.length - 1);
-  const currentState = current >= 4 ? "accepted" : current >= 3 ? "under_review" : current >= 2 ? "submitted" : current >= 1 ? "assigned" : "funded";
+function renderArcDemoRemoved() {
   setChrome2(
-    "Arc Demo",
-    "Arc Testnet Flow",
-    "See how Dispatch turns a USDC-funded task into approved agent work.",
-    "Post task, review output, and release payment only after owner approval.",
-    96
+    "Dispatch",
+    "Arc Demo Removed",
+    "This demo route is no longer part of the public Dispatch interface.",
+    "Use the marketplace, funded task flow, and task detail pages for current Arc Testnet review flows.",
+    20
   );
   el.appRoot.innerHTML = `
-    <section class="hero-shell" data-reveal>
-      <div class="hero-copy">
-        <p class="mini-label">Reviewer demo</p>
-        <h1>Dispatch turns AI agents into internet-native workers.</h1>
-        <p>This reviewer-safe demo is credential-free: it shows funded tasks, agent execution, advisory AI review, owner approval, and Arc Testnet demo settlement without requiring a wallet signature.</p>
-        <div class="hero-actions">
-          <button class="hero-primary" type="button" data-arc-demo-next>${current >= steps.length - 1 ? "Replay Final Step" : "Advance Demo Flow"}</button>
-          <button type="button" data-arc-demo-reset>Reset</button>
-        </div>
-      </div>
-      <aside class="hero-panel">
-        <p class="mini-label">Current contract state</p>
-        <h3>${escapeHtml(currentState)}</h3>
-        <div class="metric-row">
-          <span>Task</span><strong>${escapeHtml(demo.taskId)}</strong>
-        </div>
-        <div class="metric-row">
-          <span>Reward</span><strong>${demo.reward} USDC</strong>
-        </div>
-        <div class="metric-row">
-          <span>Agent</span><strong>${escapeHtml(demo.agentId)}</strong>
-        </div>
-      </aside>
-    </section>
-    <section class="shell-section surface-page" data-reveal>
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Assisted review</p>
-          <h2>AI review guides the owner decision.</h2>
-        </div>
-        <span class="meta-pill">Owner decides</span>
-      </div>
-      <div class="steps-grid">
-        ${steps.map(([label, method, body], index2) => `
-            <article class="step-card ${index2 <= current ? "is-active" : ""}">
-              <span class="step-index">${index2 + 1}</span>
-              <strong>${escapeHtml(label)}</strong>
-              <p><code>${escapeHtml(method)}</code></p>
-              <p>${escapeHtml(body)}</p>
-            </article>
-          `).join("")}
-      </div>
-    </section>
-    <section class="shell-section surface-page" data-reveal>
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Owner approval</p>
-          <h2>Payment release becomes possible only after approval.</h2>
-        </div>
-      </div>
-      <div class="metrics-grid">
-        <article class="metric-card"><strong>${demo.consensusScore}%</strong><span>AI review score</span></article>
-        <article class="metric-card"><strong>${demo.validatorAgreement}%</strong><span>Review confidence</span></article>
-        <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Guidance confidence</span></article>
-        <article class="metric-card"><strong>${current >= 4 ? "yes" : "no"}</strong><span>Settlement eligible</span></article>
-      </div>
-      <div class="status-banner surface-alert ${current >= 4 ? "is-success" : "is-neutral"}">
-        <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
-        <p>${current >= 4 ? "Payment can be released because the task owner approved the result after AI review guidance." : "Advance the demo to see the task move from funded work to result review and settlement eligibility."}</p>
-      </div>
+    <section data-structure="route-removed" class="surface-page">
+      ${richEmptyState(
+    "Arc Demo removed.",
+    "This demo route is no longer part of the Dispatch interface.",
+    ['<button class="hero-primary" data-route="/">Go home</button>'],
+    "info"
+  )}
     </section>
   `;
-  document.querySelector("[data-arc-demo-next]")?.addEventListener("click", () => {
-    state.arcDemo.step = Math.min(current + 1, steps.length - 1);
-    renderArcDemo();
-  });
-  document.querySelector("[data-arc-demo-reset]")?.addEventListener("click", () => {
-    state.arcDemo.step = 0;
-    renderArcDemo();
-  });
   revealSections(el.appRoot);
 }
 function renderAgentsPage() {
@@ -52170,7 +52107,7 @@ async function render() {
   if (path === "/agents") return renderAgentsPage();
   if (path.startsWith("/agents/")) return renderAgentProfile(path.split("/")[2]);
   if (path === "/post-task") return renderPostTaskPage();
-  if (path === "/arc-demo") return renderArcDemo();
+  if (path === "/arc-demo") return renderArcDemoRemoved();
   if (path.startsWith("/tasks/")) return renderTaskDetail(path.split("/")[2]);
   if (path === "/create-agent") return renderCreateAgent();
   if (path === "/connect-agent") return renderConnectExternalAgent();
