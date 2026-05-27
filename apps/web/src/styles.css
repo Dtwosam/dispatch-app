@@ -2993,6 +2993,439 @@ button[data-open-dispute] {
   font-weight: 650;
 }
 
+.builder-onboarding-page {
+  display: grid;
+  gap: 28px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 32px 0;
+}
+
+.builder-onboarding-header {
+  display: grid;
+  gap: 14px;
+  max-width: 680px;
+}
+
+.builder-onboarding-eyebrow {
+  margin: 0;
+  color: #96fff0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.builder-onboarding-header h1 {
+  margin: 0;
+  color: #f4fbff;
+  font-size: clamp(2rem, 5vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.builder-onboarding-header p {
+  max-width: 620px;
+  margin: 0;
+  color: #9bb1c5;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.builder-flow-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid rgba(142, 255, 240, 0.1);
+  border-radius: 28px;
+  background: rgba(9, 25, 42, 0.6);
+}
+
+.builder-flow-strip article {
+  min-height: 104px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.builder-flow-strip strong {
+  display: block;
+  margin-bottom: 14px;
+  color: #96fff0;
+  font-size: 1.1rem;
+}
+
+.builder-flow-strip h3 {
+  margin: 0 0 6px;
+  color: #f4fbff;
+  font-size: 1rem;
+}
+
+.builder-flow-strip p {
+  margin: 0;
+  color: #9bb1c5;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.builder-onboarding-page .wizard-shell {
+  display: grid;
+  gap: 24px;
+}
+
+.builder-onboarding-page .wizard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.66fr) minmax(320px, 0.34fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.builder-onboarding-page .wizard-main,
+.builder-onboarding-page .wizard-side {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+.builder-progress-panel,
+.builder-form-panel,
+.builder-action-panel,
+.builder-setup-panel {
+  border: 1px solid rgba(142, 255, 240, 0.1);
+  background: rgba(9, 25, 42, 0.68);
+}
+
+.builder-progress-panel {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 28px;
+}
+
+.builder-onboarding-page .wizard-progress__bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.builder-onboarding-page .wizard-progress__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #63e6d3, #96fff0);
+}
+
+.builder-onboarding-page .wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.builder-onboarding-page .wizard-steps button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.022);
+  color: #9bb1c5;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.builder-onboarding-page .wizard-steps button span {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(142, 255, 240, 0.12);
+  border-radius: 999px;
+  color: #96fff0;
+  font-size: 0.72rem;
+}
+
+.builder-onboarding-page .wizard-steps button.active,
+.builder-onboarding-page .wizard-steps button.done {
+  border-color: rgba(150, 255, 240, 0.16);
+  background: rgba(150, 255, 240, 0.06);
+  color: #f4fbff;
+}
+
+.builder-form-panel {
+  display: grid;
+  gap: 20px;
+  padding: 32px;
+  border-radius: 30px;
+  background: rgba(9, 25, 42, 0.7);
+}
+
+.builder-form-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.builder-form-head h2 {
+  margin: 0;
+  color: #f4fbff;
+  font-size: clamp(1.5rem, 3vw, 1.75rem);
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+.builder-form-head > span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid rgba(142, 255, 240, 0.12);
+  border-radius: 999px;
+  color: #9bb1c5;
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.builder-form-panel > p {
+  max-width: 620px;
+  margin: 0;
+  color: #9bb1c5;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.builder-onboarding-page .form-grid {
+  gap: 16px;
+}
+
+.builder-onboarding-page .field-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.builder-onboarding-page .field-stack span,
+.builder-onboarding-page label > span.muted {
+  color: #f4fbff;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.builder-onboarding-page input,
+.builder-onboarding-page select,
+.builder-onboarding-page textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #f4fbff;
+  font-size: 0.92rem;
+}
+
+.builder-onboarding-page input,
+.builder-onboarding-page select {
+  min-height: 50px;
+}
+
+.builder-onboarding-page textarea {
+  min-height: 150px;
+  padding: 16px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.builder-onboarding-page .wizard-stage-body {
+  display: grid;
+  gap: 18px;
+}
+
+.builder-helper-panel,
+.builder-details-panel,
+.builder-action-panel,
+.builder-setup-panel {
+  padding: 20px;
+  border-radius: 22px;
+}
+
+.builder-helper-panel,
+.builder-details-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.builder-helper-panel strong,
+.builder-details-panel strong,
+.builder-setup-panel h3 {
+  color: #f4fbff;
+}
+
+.builder-helper-panel p,
+.builder-details-panel p,
+.builder-setup-panel p {
+  margin: 0;
+  color: #9bb1c5;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.builder-endpoint-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.builder-endpoint-list div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.builder-endpoint-list code {
+  color: #96fff0;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.builder-endpoint-list span {
+  color: #9bb1c5;
+  font-size: 0.78rem;
+}
+
+.builder-details-panel summary {
+  cursor: pointer;
+  color: #f4fbff;
+  font-weight: 700;
+  list-style: none;
+}
+
+.builder-details-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.builder-details-panel > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.builder-action-panel .review-actions {
+  justify-content: flex-end;
+}
+
+.builder-action-panel button {
+  min-height: 48px;
+  border-radius: 14px;
+}
+
+.builder-setup-panel {
+  display: grid;
+  gap: 14px;
+  border-color: rgba(142, 255, 240, 0.08);
+  background: rgba(9, 25, 42, 0.62);
+}
+
+.builder-setup-panel h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.builder-setup-panel small {
+  color: #6f879d;
+  font-size: 0.78rem;
+}
+
+.builder-onboarding-page .launch-checklist,
+.builder-check-list,
+.builder-note-list {
+  display: grid;
+  gap: 10px;
+}
+
+.builder-onboarding-page .checklist-row,
+.builder-check-list > div,
+.builder-note-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.builder-note-list article {
+  align-items: flex-start;
+  display: grid;
+}
+
+.builder-onboarding-page .checklist-row span,
+.builder-check-list span {
+  color: #6f879d;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.builder-onboarding-page .checklist-row strong,
+.builder-check-list strong {
+  color: #f4fbff;
+  font-size: 0.86rem;
+}
+
+.builder-onboarding-page .checklist-row.is-ready span,
+.builder-check-list .is-ready span {
+  color: #96fff0;
+}
+
+.builder-preview-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.builder-preview-facts div {
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.builder-preview-facts span {
+  color: #6f879d;
+  font-size: 0.72rem;
+}
+
+.builder-preview-facts strong {
+  display: block;
+  margin-top: 5px;
+  color: #f4fbff;
+  font-size: 0.84rem;
+  line-height: 1.25;
+}
+
+.builder-onboarding-page .wizard-preview-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .profile-grid .shell-panel,
 .profile-grid .shell-section,
 .task-grid .shell-panel,
@@ -6123,7 +6556,9 @@ body::after {
   .builder-attention-row,
   .builder-earning-row,
   .builder-activity-row,
-  .builder-readiness-panel {
+  .builder-readiness-panel,
+  .builder-flow-strip,
+  .builder-onboarding-page .wizard-layout {
     grid-template-columns: 1fr;
   }
 
@@ -6236,24 +6671,33 @@ body::after {
     padding: 32px 20px 0;
   }
 
+  .builder-onboarding-page {
+    gap: 22px;
+    padding: 32px 20px 0;
+  }
+
   .builder-dashboard-header {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .builder-dashboard-header h1 {
+  .builder-dashboard-header h1,
+  .builder-onboarding-header h1 {
     font-size: 32px;
   }
 
   .builder-dashboard-header button,
   .builder-agent-row footer button,
   .builder-attention-row button,
-  .builder-empty-state button {
+  .builder-empty-state button,
+  .builder-action-panel button {
     width: 100%;
   }
 
   .builder-summary-grid,
-  .builder-agent-performance {
+  .builder-agent-performance,
+  .builder-preview-facts,
+  .builder-onboarding-page .form-grid {
     grid-template-columns: 1fr;
   }
 
@@ -6268,14 +6712,27 @@ body::after {
 
   .builder-tab-panel,
   .builder-readiness-panel,
-  .builder-payment-activity {
+  .builder-payment-activity,
+  .builder-form-panel,
+  .builder-progress-panel {
     padding: 22px;
     border-radius: 24px;
   }
 
-  .builder-section-head {
+  .builder-section-head,
+  .builder-form-head,
+  .builder-action-panel .review-actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .builder-onboarding-page .field-wide {
+    grid-column: auto;
+  }
+
+  .builder-onboarding-page .wizard-steps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
