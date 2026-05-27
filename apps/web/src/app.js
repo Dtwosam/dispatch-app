@@ -32,6 +32,7 @@ import {
   isActive,
   labelize,
   renderNav as mountNav,
+  renderAppFooter as mountFooter,
   renderTopbar as mountTopbar,
   renderWalletSheet as mountWalletSheet,
   requireWallet as requireConnectedWallet,
@@ -54,13 +55,31 @@ import {
   validateTaskDetailResponse,
   validateTaskListResponse,
 } from "./api-contracts.js";
-import { buildPostTaskChecklist, buildReviewPanelModel, buildTaskResultModel, shortWallet } from "./ui-models.js";
+import {
+  buildPostTaskChecklist,
+  buildReviewPanelModel,
+  buildTaskDisputeDisplayModel,
+  buildTaskResultModel,
+  buildTaskRevisionDisplayModel,
+  buildTaskTemplateBrief,
+  getTaskBriefTemplate,
+  shortWallet,
+  taskBriefTemplates,
+} from "./ui-models.js";
 const state = createInitialState();
 const el = getAppElements();
 let ambientRefreshPending = false;
 let attachmentIngestionModulePromise = null;
 const pendingTaskAutoChecks = new Set();
 let activeTaskDetailRenderToken = 0;
+
+function persistRevisionRequests() {
+  localStorage.setItem("dispatchRevisionRequests", JSON.stringify(state.revisionRequests || {}));
+}
+
+function persistDisputeRecords() {
+  localStorage.setItem("dispatchDisputeRecords", JSON.stringify(state.disputeRecords || {}));
+}
 
 function loadAttachmentIngestionModule() {
   if (!attachmentIngestionModulePromise) {
@@ -74,7 +93,8 @@ function renderFatalAppError(error, title = "App startup failed") {
   console.error(title, error);
   if (!el.appRoot) return;
   el.appRoot.innerHTML = `
-    <section class="error-state shell-section">
+    <section class="error-state state-card state-card--error shell-section surface-page">
+      <span class="empty-state__mark" aria-hidden="true"></span>
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(message)}</p>
       <div class="empty-state-actions">
@@ -166,6 +186,8 @@ document.addEventListener("click", (event) => {
 
   const walletToggle = event.target.closest("[data-wallet]");
   if (walletToggle) {
+    state.mobileNavOpen = false;
+    renderNav();
     renderWalletSheet(walletToggle.dataset.wallet === "open");
   }
 
@@ -316,6 +338,10 @@ function renderTopbar() {
   return mountTopbar(el, state, shortWallet);
 }
 
+function renderFooter() {
+  return mountFooter(el, routes);
+}
+
 function setChrome(eyebrow, title, sidebarTitle, sidebarLead, progress) {
   return mountChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progress);
 }
@@ -335,100 +361,24 @@ function renderHome() {
   renderHomePage({ el, state, onNavigate: navigate });
 }
 
-function renderArcDemo() {
-  const demo = state.arcDemo;
-  const steps = [
-    ["Task posted", "create_funded_task", "The owner creates a USDC-funded task on Arc Testnet."],
-    ["Agent assigned", "assign_task", "The Platform Agent is selected through the same marketplace path future agents use."],
-    ["Result submitted", "submit_result", "The agent submits structured work for owner review."],
-    ["Owner review", "finalize_review", "AI evaluation gives guidance, but the task owner makes the payout decision."],
-    ["Payment released", "settle_task", "Approved work releases testnet USDC and updates agent reputation."],
-  ];
-  const current = Math.min(Number(demo.step || 0), steps.length - 1);
-  const currentState = current >= 4 ? "accepted" : current >= 3 ? "under_review" : current >= 2 ? "submitted" : current >= 1 ? "assigned" : "funded";
+function renderArcDemoRemoved() {
   setChrome(
-    "Arc Demo",
-    "Arc Testnet Flow",
-    "See how Dispatch turns a USDC-funded task into approved agent work.",
-    "Post task, review output, and release payment only after owner approval.",
-    96,
+    "Dispatch",
+    "Arc Demo Removed",
+    "This demo route is no longer part of the public Dispatch interface.",
+    "Use the marketplace, funded task flow, and task detail pages for current Arc Testnet review flows.",
+    20,
   );
   el.appRoot.innerHTML = `
-    <section class="hero-shell" data-reveal>
-      <div class="hero-copy">
-        <p class="mini-label">Reviewer demo</p>
-        <h1>Dispatch turns AI agents into internet-native workers.</h1>
-        <p>This reviewer-safe demo is credential-free: it shows funded tasks, agent execution, advisory AI review, owner approval, and Arc Testnet demo settlement without requiring a wallet signature.</p>
-        <div class="hero-actions">
-          <button class="hero-primary" type="button" data-arc-demo-next>${current >= steps.length - 1 ? "Replay Final Step" : "Advance Demo Flow"}</button>
-          <button type="button" data-arc-demo-reset>Reset</button>
-        </div>
-      </div>
-      <aside class="hero-panel">
-        <p class="mini-label">Current contract state</p>
-        <h3>${escapeHtml(currentState)}</h3>
-        <div class="metric-row">
-          <span>Task</span><strong>${escapeHtml(demo.taskId)}</strong>
-        </div>
-        <div class="metric-row">
-          <span>Reward</span><strong>${demo.reward} USDC</strong>
-        </div>
-        <div class="metric-row">
-          <span>Agent</span><strong>${escapeHtml(demo.agentId)}</strong>
-        </div>
-      </aside>
-    </section>
-    <section class="shell-section" data-reveal>
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Assisted review</p>
-          <h2>AI review guides the owner decision.</h2>
-        </div>
-        <span class="meta-pill">Owner decides</span>
-      </div>
-      <div class="steps-grid">
-        ${steps
-          .map(([label, method, body], index) => `
-            <article class="step-card ${index <= current ? "is-active" : ""}">
-              <span class="step-index">${index + 1}</span>
-              <strong>${escapeHtml(label)}</strong>
-              <p><code>${escapeHtml(method)}</code></p>
-              <p>${escapeHtml(body)}</p>
-            </article>
-          `)
-          .join("")}
-      </div>
-    </section>
-    <section class="shell-section" data-reveal>
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Owner approval</p>
-          <h2>Payment release becomes possible only after approval.</h2>
-        </div>
-      </div>
-      <div class="metrics-grid">
-        <article class="metric-card"><strong>${demo.consensusScore}%</strong><span>AI review score</span></article>
-        <article class="metric-card"><strong>${demo.validatorAgreement}%</strong><span>Review confidence</span></article>
-        <article class="metric-card"><strong>${demo.consensusConfidence}%</strong><span>Guidance confidence</span></article>
-        <article class="metric-card"><strong>${current >= 4 ? "yes" : "no"}</strong><span>Settlement eligible</span></article>
-      </div>
-      <div class="status-banner ${current >= 4 ? "is-success" : "is-neutral"}">
-        <strong>${current >= 4 ? "Accepted and payout-safe" : "Still moving through the marketplace lifecycle"}</strong>
-        <p>${current >= 4
-          ? "Payment can be released because the task owner approved the result after AI review guidance."
-          : "Advance the demo to see the task move from funded work to result review and settlement eligibility."}</p>
-      </div>
+    <section data-structure="route-removed" class="surface-page">
+      ${richEmptyState(
+        "Arc Demo removed.",
+        "This demo route is no longer part of the Dispatch interface.",
+        ['<button class="hero-primary" data-route="/">Go home</button>'],
+        "info",
+      )}
     </section>
   `;
-
-  document.querySelector("[data-arc-demo-next]")?.addEventListener("click", () => {
-    state.arcDemo.step = Math.min(current + 1, steps.length - 1);
-    renderArcDemo();
-  });
-  document.querySelector("[data-arc-demo-reset]")?.addEventListener("click", () => {
-    state.arcDemo.step = 0;
-    renderArcDemo();
-  });
   revealSections(el.appRoot);
 }
 
@@ -1001,6 +951,10 @@ async function createTask() {
 
     state.taskForm.title = "";
     state.taskForm.description = "";
+    state.taskForm.templateId = "custom_task";
+    state.taskForm.templateFields = {};
+    state.taskForm.templateMessage = "";
+    state.taskForm.selectedServicePackage = null;
     state.taskForm.structuredNotes = "";
     state.taskForm.attachments = [];
     state.taskForm.rewardAmount = "";
@@ -1120,6 +1074,8 @@ async function renderPostTaskPage() {
   const selectedAgentBestFor = selectedAgent ? bestFitLabels(selectedAgent) : [];
   const selectedAgentIdeas = selectedAgent ? starterIdeasForAgent(selectedAgent) : [];
   const taskChecklist = buildPostTaskChecklist(state.taskForm, selectedAgent);
+  const selectedTemplate = getTaskBriefTemplate(state.taskForm.templateId || "custom_task");
+  const templateResult = buildTaskTemplateBrief(selectedTemplate.id, state.taskForm.templateFields || {});
   const walletReady = Boolean(state.wallet.trim());
   if (walletReady) {
     await refreshWalletNetworkState();
@@ -1184,59 +1140,102 @@ async function renderPostTaskPage() {
             }
         : null;
   el.appRoot.innerHTML = `
-    <section data-structure="task-composer">
-      <header>
-        <p class="mini-label">Funded Execution Input</p>
-        <h1>Post a USDC-funded task for AI agents.</h1>
-        <p>Describe the work, pick or open the agent assignment, fund in testnet USDC, then review the submitted output before payment is released.</p>
+    <section data-structure="task-composer" class="post-task-page">
+      <header class="post-task-header reveal-on-scroll is-visible">
+        <p class="post-task-eyebrow">Post funded task</p>
+        <h1>Create funded work for an AI agent.</h1>
+        <p>Set the brief, choose an agent, and fund the task in USDC.</p>
+        <span>Arc Testnet | USDC payment flow | Owner approval</span>
       </header>
-      <section class="composer-grid">
-        <div class="composer-main">
-          <article class="composer-intro reveal-on-scroll">
-            <div class="composer-title-row">
-              <div>
-                <p class="mini-label">Funded command</p>
-                <h2>Turn a request into funded work with a clear payout path.</h2>
-              </div>
-              <div class="composer-badges">
-                <span class="meta-pill">${escapeHtml(state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market")}</span>
-                <span class="meta-pill">${walletReady ? "Wallet connected" : "Connect wallet to fund"}</span>
-              </div>
-            </div>
-            <p class="muted">Write the task once, route it cleanly, and keep funding, owner review, and settlement obvious. This surface is optimized for real AI work, not a generic prompt box.</p>
+
+      <section class="post-task-flow reveal-on-scroll">
+        ${[
+          ["01", "Brief", "Write or generate the task brief"],
+          ["02", "Agent", "Choose a package or route"],
+          ["03", "Fund", "Lock USDC before work starts"],
+          ["04", "Review", "Approve before payment release"],
+        ].map(([number, title, helper]) => `
+          <article>
+            <strong>${number}</strong>
+            <h3>${title}</h3>
+            <p>${helper}</p>
           </article>
+        `).join("")}
+      </section>
+
+      <section class="post-task-layout">
+        <div class="post-task-main">
           ${chainBanner ? `
-            <article class="status-banner ${chainBanner.tone} reveal-on-scroll">
+            <article class="post-task-alert post-task-alert--${chainBanner.tone} reveal-on-scroll">
               <strong>${escapeHtml(chainBanner.title)}</strong>
               <p>${escapeHtml(chainBanner.body)}</p>
             </article>
           ` : ""}
-          <article class="status-banner info reveal-on-scroll">
-            <strong>3-minute Arc Testnet demo</strong>
-            <p>Start a polished Thread Writer demo task with 10 USDC demo funding, structured output, owner approval, demo payment release, reputation update, and external-agent context.</p>
-            <div class="secondary-actions" style="margin-top:12px;">
-              <button type="button" data-start-demo-flow>Start Demo Flow</button>
-            </div>
-          </article>
-          <article class="shell-section reveal-on-scroll">
-              <div class="section-head">
+
+          <article class="post-task-composer reveal-on-scroll">
+            <div class="post-task-section-head">
               <div>
-                <p class="mini-label">Composer</p>
-                <h2>Funded task brief</h2>
+                <p class="post-task-eyebrow">Task brief</p>
+                <h2>Describe the outcome.</h2>
+                <p>Describe the outcome the agent should deliver.</p>
               </div>
-                <div class="meta-inline">
-                <span class="meta-pill">${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
-                <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
-                </div>
+              <div class="post-task-meta">
+                <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
+                <span>${state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market"}</span>
+              </div>
             </div>
-            <div class="form-grid field-stack">
-              <label class="field-wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
-              <label class="field-wide"><strong>Description</strong><textarea id="taskDescription" rows="7" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
-              <label><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
-              <label><strong>Reward (USDC)</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /></label>
-              <label><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
-              <div class="field-wide">
-                <p class="mini-label">Route</p>
+
+            ${state.taskForm.selectedServicePackage ? `
+              <div class="post-package-summary">
+                <div>
+                  <span>Selected package</span>
+                  <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)}: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
+                  <p>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Agent selected from package"} | You can edit the brief before funding.</p>
+                </div>
+                <strong>${escapeHtml(Number(state.taskForm.selectedServicePackage.priceUsdc || 0).toLocaleString(undefined, { maximumFractionDigits: 6 }))} USDC</strong>
+              </div>
+            ` : ""}
+
+            <section class="post-template-section">
+              <div class="post-task-section-head post-task-section-head--compact">
+                <div>
+                  <p class="post-task-eyebrow">Template</p>
+                  <h3>Start from a task shape.</h3>
+                </div>
+                <span>${escapeHtml(selectedTemplate.name)}</span>
+              </div>
+              <div class="post-template-grid">
+                ${taskBriefTemplates.map((template) => `
+                  <button type="button" data-template-card="${template.id}" class="${selectedTemplate.id === template.id ? "is-selected" : ""}">
+                    <strong>${escapeHtml(template.name)}</strong>
+                    <span>${escapeHtml(template.category ? labelize(template.category) : "Custom brief")}</span>
+                  </button>
+                `).join("")}
+              </div>
+              ${selectedTemplate.id === "custom_task" ? `
+                <p class="post-helper">Custom Task keeps the blank composer. Write directly below.</p>
+              ` : `
+                <div class="post-template-fields">
+                  ${selectedTemplate.fields.map((field) => {
+                    const value = state.taskForm.templateFields?.[field.key] || "";
+                    return field.multiline
+                      ? `<label class="post-field post-field--wide"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><textarea data-template-field="${field.key}" rows="3" placeholder="${escapeHtml(field.label)}">${escapeHtml(value)}</textarea></label>`
+                      : `<label class="post-field"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><input data-template-field="${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.label)}" /></label>`;
+                  }).join("")}
+                </div>
+                <button type="button" class="post-quiet-button" id="generateTaskBrief">Generate / Update Brief</button>
+                ${state.taskForm.templateMessage ? `<div class="post-task-alert post-task-alert--${templateResult.missingFields.length ? "warning" : "info"}"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
+              `}
+            </section>
+
+            <section class="post-brief-fields">
+              <label class="post-field post-field--wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
+              <label class="post-field post-field--wide"><strong>Final editable brief</strong><textarea id="taskDescription" rows="9" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
+              <label class="post-field"><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
+              <label class="post-field"><strong>USDC reward</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /><span>This amount is locked before the agent starts.</span></label>
+              <label class="post-field"><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
+              <div class="post-route-control">
+                <p class="post-task-eyebrow">Agent route</p>
                 <div class="segmented">
                   <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Direct Hire</button>
                   <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Open Market</button>
@@ -1244,7 +1243,7 @@ async function renderPostTaskPage() {
               </div>
               ${state.taskForm.hiringMode === "direct_hire"
                 ? `
-                  <label class="field-wide"><strong>Selected agent</strong>
+                  <label class="post-field post-field--wide"><strong>Selected agent</strong>
                     <select id="selectedAgentId">
                       <option value="">Choose an agent</option>
                       ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} trust</option>`).join("")}
@@ -1252,37 +1251,32 @@ async function renderPostTaskPage() {
                   </label>
                 `
                 : `
-                  <label class="field-wide"><strong>Max participants</strong><input id="taskParticipants" type="number" min="1" max="20" value="${state.taskForm.maxParticipants}" /></label>
+                  <label class="post-field post-field--wide"><strong>Max participants</strong><input id="taskParticipants" type="number" min="1" max="20" value="${state.taskForm.maxParticipants}" /></label>
                 `}
-            </div>
+            </section>
           </article>
-          <details class="shell-section disclosure-panel reveal-on-scroll">
-            <summary>Advanced options</summary>
-            <div class="disclosure-panel__body">
-              <div class="section-head">
-                <div>
-                  <p class="mini-label">Advanced</p>
-                  <h2>Review settings and extra context</h2>
-                </div>
-                <span class="meta-pill">${state.taskForm.attachments.length ? `${state.taskForm.attachments.length} attachment${state.taskForm.attachments.length === 1 ? "" : "s"}` : "Optional"}</span>
-              </div>
-              <div class="form-grid field-stack">
-                <label><strong>Evaluation preference</strong>
+
+          <details class="post-advanced reveal-on-scroll">
+            <summary>
+              <span>Advanced options</span>
+              <small>Optional evaluation and attachment settings</small>
+            </summary>
+            <div class="post-advanced__body">
+              <div class="post-advanced-grid">
+                <label class="post-field"><strong>Evaluation preference</strong>
                   <select id="taskEvaluationPreference">
                     <option value="user_review_only" ${state.taskForm.evaluationPreference === "user_review_only" ? "selected" : ""}>User review only</option>
                     <option value="assisted_evaluation" ${state.taskForm.evaluationPreference === "assisted_evaluation" ? "selected" : ""}>Assisted evaluation</option>
                     <option value="hybrid_review" ${state.taskForm.evaluationPreference === "hybrid_review" ? "selected" : ""}>Hybrid review</option>
                   </select>
                 </label>
-                <label class="field-wide"><strong>Structured notes</strong><textarea id="taskStructuredNotes" rows="4" placeholder="Formatting rules, references, or approval hints.">${escapeHtml(state.taskForm.structuredNotes)}</textarea></label>
-                <label><strong>Attachment title</strong><input id="attachmentTitle" placeholder="Product brief" /></label>
-                <label><strong>Attachment pointer</strong><input id="attachmentPointer" placeholder="https://... or ipfs://..." /></label>
-                <label class="field-wide"><strong>Attachment text</strong><textarea id="attachmentText" rows="5" placeholder="Paste source text here if you want grounded summarization, extraction, or clause review."></textarea></label>
-                <label class="field-wide"><strong>Upload file</strong><input id="attachmentFile" type="file" accept=".txt,.md,.csv,.json,.pdf,.docx,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/json,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp" /></label>
+                <label class="post-field post-field--wide"><strong>Structured notes</strong><textarea id="taskStructuredNotes" rows="4" placeholder="Formatting rules, references, or approval hints.">${escapeHtml(state.taskForm.structuredNotes)}</textarea></label>
+                <label class="post-field"><strong>Attachment title</strong><input id="attachmentTitle" placeholder="Product brief" /></label>
+                <label class="post-field"><strong>Attachment pointer</strong><input id="attachmentPointer" placeholder="https://... or ipfs://..." /></label>
+                <label class="post-field post-field--wide"><strong>Attachment text</strong><textarea id="attachmentText" rows="5" placeholder="Paste source text here if you want grounded summarization, extraction, or clause review."></textarea></label>
+                <label class="post-field post-field--wide"><strong>Upload file</strong><input id="attachmentFile" type="file" accept=".txt,.md,.csv,.json,.pdf,.docx,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/json,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp" /></label>
               </div>
-              <div class="ops-actions">
-                <button type="button" id="addAttachment">Add Attachment</button>
-              </div>
+              <button type="button" class="post-quiet-button" id="addAttachment">Add Attachment</button>
               <div class="attachment-list">
                 ${state.taskForm.attachments.length
                   ? state.taskForm.attachments.map((attachment) => `
@@ -1293,69 +1287,79 @@ async function renderPostTaskPage() {
                         ${attachment.extractionSource ? `<small>Parsed from ${escapeHtml(attachment.extractionSource.toUpperCase())}${attachment.truncated ? " | truncated for task safety" : ""}</small>` : ""}
                       </div>
                     `).join("")
-                  : emptyState("No supporting material yet. Add briefs, docs, or references to make execution sharper.")}
+                  : emptyState("No supporting material yet. Add briefs, docs, or references to make execution sharper.", {
+                      title: "No supporting material yet.",
+                      body: "Add briefs, docs, or references if the task needs grounded context.",
+                    })}
               </div>
             </div>
           </details>
         </div>
-        <aside class="composer-side">
-          <article class="shell-panel task-preview reveal-on-scroll">
-            <p class="mini-label">Preview</p>
-            <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
-              <p class="muted">${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
-              <div class="preview-tags">
-                <span class="meta-pill">${labelize(state.taskForm.category)}</span>
-                <span class="meta-pill">${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
-                <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
-              </div>
-          </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Readiness</p>
-            <h3>Ready to route</h3>
-            <p class="muted">${escapeHtml(taskChecklist.summary)}</p>
-            <div class="tag-cloud">${taskChecklist.items.map((item) => `<span class="tag ${item.complete ? "tag-success" : "tag-muted"}">${escapeHtml(item.label)}</span>`).join("")}</div>
-          </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Assignment</p>
-            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Open execution path"}</h3>
-            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the funded task through the same owner-approved work loop."}</p>
-            ${selectedAgent ? `
-              <div class="tag-cloud">
-                ${selectedAgentBestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}
-              </div>
-              <div class="attachment-list">
-                ${selectedAgentIdeas.map((idea, index) => `
-                  <button type="button" class="task-row suggested-task" data-suggested-task="${index}">
-                    <strong>Starter idea ${index + 1}</strong>
-                    <p>${escapeHtml(idea)}</p>
-                  </button>
-                `).join("")}
-              </div>
-            ` : ""}
-          </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Funding state</p>
-            <h3>${escapeHtml(primaryActionLabel)}</h3>
-            <p class="muted">${escapeHtml(fundingHint)} Wallet mode uses Arc Testnet ERC-20 USDC for task funding; payment is released only after owner approval. Demo settlement stays separate from wallet-funded tasks.</p>
-            ${walletReady ? `
-              <div class="agent-tags" style="margin-top:12px;">
-                <span class="tag">Network: ${escapeHtml(state.walletNetwork?.isArcTestnet ? "Arc Testnet" : state.walletNetwork?.chainId ? `Wrong network ${state.walletNetwork.chainId}` : "Unknown")}</span>
-                <span class="tag">Testnet USDC balance: ${escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>
-                ${state.walletNetwork?.nativeGasBalance == null ? "" : `<span class="tag">Native USDC gas: ${escapeHtml(Number(state.walletNetwork.nativeGasBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>`}
-              </div>
-              ${!walletOnArc ? `<div class="secondary-actions" style="margin-top:12px;"><button type="button" id="switchArcFromPost">Switch to Arc Testnet</button></div>` : ""}
-            ` : ""}
+
+        <aside class="post-task-side">
+          <article class="post-funding-summary reveal-on-scroll">
+            <p class="post-task-eyebrow">Funding summary</p>
+            <h2>${escapeHtml(primaryActionLabel)}</h2>
+            <div class="post-summary-list">
+              <div><span>Reward</span><strong>${state.taskForm.rewardAmount ? formatCurrency(state.taskForm.rewardAmount) : "Not set"}</strong></div>
+              <div><span>Network</span><strong>Arc Testnet</strong></div>
+              <div><span>Payment token</span><strong>USDC</strong></div>
+              <div><span>Wallet</span><strong>${walletReady ? shortWallet(state.wallet) : "Required"}</strong></div>
+              <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
+              <div><span>Agent route</span><strong>${state.taskForm.hiringMode === "direct_hire" ? (selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose agent") : "Open market"}</strong></div>
+              <div><span>Package</span><strong>${state.taskForm.selectedServicePackage ? escapeHtml(state.taskForm.selectedServicePackage.name) : "Custom task"}</strong></div>
+            </div>
+            ${!walletOnArc && walletReady ? `<button type="button" class="hero-secondary post-switch-button" id="switchArcFromPost">Switch to Arc Testnet</button>` : ""}
             ${state.chainTransaction?.state && state.chainTransaction.state !== "idle" ? `
-              <div class="status-banner ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
+              <div class="post-task-alert post-task-alert--${state.chainTransaction.state === "failed" ? "warning" : "info"}">
                 <strong>${escapeHtml(labelize(state.chainTransaction.state))}</strong>
                 <p>${escapeHtml(state.chainTransaction.message)}</p>
               </div>
             ` : ""}
             <button class="hero-primary" id="fundTaskButton" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
+            <p class="post-funding-hint disabled-reason">${escapeHtml(fundingHint)}</p>
+          </article>
+
+          <article class="post-route-summary reveal-on-scroll">
+            <p class="post-task-eyebrow">Agent route</p>
+            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose an agent or open market"}</h3>
+            <p>${selectedAgent ? escapeHtml(selectedAgent.profile.description) : "Choose an agent directly or post to available agents."}</p>
+            ${selectedAgent ? `
+              <div class="post-route-tags">
+                ${selectedAgentBestFor.slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+              </div>
+              <div class="post-suggested-list">
+                ${selectedAgentIdeas.slice(0, 2).map((idea, index) => `
+                  <button type="button" data-suggested-task="${index}">
+                    <strong>Starter idea ${index + 1}</strong>
+                    <span>${escapeHtml(idea)}</span>
+                  </button>
+                `).join("")}
+              </div>
+            ` : ""}
+          </article>
+
+          <article class="post-preview-card reveal-on-scroll">
+            <p class="post-task-eyebrow">Preview</p>
+            <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
+            <p>${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
+            <div>
+              <span>${labelize(state.taskForm.category)}</span>
+              <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
+              <span>${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
+            </div>
+          </article>
+
+          <article class="post-demo-card reveal-on-scroll">
+            <strong>Arc Testnet demo mode</strong>
+            <p>Demo flow stays separate from wallet-funded tasks.</p>
+            <button type="button" data-start-demo-flow>Start Demo Flow</button>
           </article>
         </aside>
       </section>
-      <section class="mobile-action">
+
+      <section class="mobile-action post-mobile-action">
+        <span>${state.taskForm.rewardAmount ? formatCurrency(state.taskForm.rewardAmount) : "Reward not set"}</span>
         <button id="fundTaskMobile" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
       </section>
     </section>
@@ -1378,6 +1382,66 @@ async function renderPostTaskPage() {
       state.taskForm[key] = event.target.value;
       if (id === "selectedAgentId") renderPostTaskPage();
     });
+  });
+
+  document.getElementById("taskTemplateId")?.addEventListener("input", (event) => {
+    state.taskForm.templateId = event.target.value;
+    state.taskForm.templateFields = {};
+    state.taskForm.selectedServicePackage = null;
+    state.taskForm.templateMessage = event.target.value === "custom_task"
+      ? "Custom Task selected. Write your own brief below."
+      : "Fill the template fields, then generate an editable task brief.";
+    const template = getTaskBriefTemplate(event.target.value);
+    if (template?.category) state.taskForm.category = template.category;
+    renderPostTaskPage();
+  });
+
+  document.querySelectorAll("[data-template-card]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const templateId = node.dataset.templateCard;
+      state.taskForm.templateId = templateId;
+      state.taskForm.templateFields = {};
+      state.taskForm.selectedServicePackage = null;
+      state.taskForm.templateMessage = templateId === "custom_task"
+        ? "Custom Task selected. Write your own brief below."
+        : "Fill the template fields, then generate an editable task brief.";
+      const template = getTaskBriefTemplate(templateId);
+      if (template?.category) state.taskForm.category = template.category;
+      renderPostTaskPage();
+    });
+  });
+
+  document.querySelectorAll("[data-template-field]").forEach((node) => {
+    node.addEventListener("input", (event) => {
+      state.taskForm.templateFields = {
+        ...(state.taskForm.templateFields || {}),
+        [node.dataset.templateField]: event.target.value,
+      };
+      state.taskForm.templateMessage = "";
+    });
+  });
+
+  document.getElementById("generateTaskBrief")?.addEventListener("click", () => {
+    const result = buildTaskTemplateBrief(state.taskForm.templateId, state.taskForm.templateFields || {});
+    if (result.isCustom) {
+      state.taskForm.templateMessage = "Custom Task selected. Write your own brief below.";
+      renderPostTaskPage();
+      return;
+    }
+    if (result.missingFields.length) {
+      state.taskForm.templateMessage = `Add required template fields first: ${result.missingFields.join(", ")}.`;
+      renderPostTaskPage();
+      return;
+    }
+    state.taskForm.description = result.brief;
+    if (!state.taskForm.title.trim()) {
+      state.taskForm.title = result.template.name;
+    }
+    if (result.template.category) {
+      state.taskForm.category = result.template.category;
+    }
+    state.taskForm.templateMessage = "Brief generated. Review and edit it before funding the task.";
+    renderPostTaskPage();
   });
 
   document.querySelectorAll("[data-mode]").forEach((node) => {
@@ -1620,6 +1684,93 @@ async function runUserDecision(taskId, decision, trigger) {
   }
 }
 
+async function requestRevision(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Saving");
+    requireWallet();
+    const changeRequest = document.getElementById("revisionChangeRequest")?.value?.trim() || "";
+    const missingDetails = document.getElementById("revisionMissingDetails")?.value?.trim() || "";
+    const extraInstruction = document.getElementById("revisionExtraInstruction")?.value?.trim() || "";
+    if (!changeRequest && !missingDetails) {
+      updateStatus("Revision note needed", "Add what needs to change or what was missing before requesting a revision.", "warn");
+      return;
+    }
+
+    const existing = state.revisionRequests?.[taskId] || [];
+    const revisionRequest = {
+      id: `revision_${Date.now()}`,
+      taskId,
+      changeRequest,
+      missingDetails,
+      extraInstruction,
+      requestedAt: new Date().toISOString(),
+      requestedBy: state.wallet,
+    };
+    state.revisionRequests = {
+      ...(state.revisionRequests || {}),
+      [taskId]: [revisionRequest, ...existing],
+    };
+    persistRevisionRequests();
+
+    updateStatus(
+      "Revision requested",
+      "The request was saved locally. Payment remains funded and locked until the owner approves revised work.",
+      "success",
+    );
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus("Revision request failed", statusMessage(error, "Revision request failed"), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
+
+async function openLocalDispute(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Opening");
+    requireWallet();
+    const reason = document.getElementById("disputeReason")?.value?.trim() || "";
+    const details = document.getElementById("disputeDetails")?.value?.trim() || "";
+    const requestedResolution = document.getElementById("disputeResolution")?.value?.trim() || "Request platform review";
+    if (!reason) {
+      updateStatus("Dispute reason needed", "Choose a reason before opening a dispute.", "warn");
+      return;
+    }
+    if (!details) {
+      updateStatus("Dispute details needed", "Add evidence or details so the dispute can be reviewed.", "warn");
+      return;
+    }
+
+    const existing = state.disputeRecords?.[taskId] || [];
+    const disputeRecord = {
+      id: `dispute_${Date.now()}`,
+      taskId,
+      reason,
+      details,
+      requestedResolution,
+      status: "under_review",
+      openedAt: new Date().toISOString(),
+      openedBy: state.wallet,
+    };
+    state.disputeRecords = {
+      ...(state.disputeRecords || {}),
+      [taskId]: [disputeRecord, ...existing],
+    };
+    persistDisputeRecords();
+
+    updateStatus(
+      "Dispute opened",
+      "The dispute was saved locally. Payment remains funded and locked; no refund, payout, or settlement transaction was created.",
+      "warn",
+    );
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus("Dispute failed", statusMessage(error, "Dispute failed"), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
+
 async function runImproveAgain(taskId, trigger) {
   try {
     setButtonLoading(trigger, true, "Improving");
@@ -1650,6 +1801,10 @@ async function renderTaskDetail(taskId) {
 
   el.appRoot.innerHTML = `
     <section data-structure="task-detail-loading" class="loading-shell">
+      <div class="loading-shell__copy">
+        <strong>Loading task...</strong>
+        <p>Fetching funded work, review state, and payment history.</p>
+      </div>
       <article class="skeleton"></article>
       <article class="skeleton"></article>
     </section>
@@ -1664,9 +1819,10 @@ async function renderTaskDetail(taskId) {
     state.history = history;
   } catch (error) {
     el.appRoot.innerHTML = `
-      <div class="error-state shell-section">
-        <strong>Task unavailable</strong>
-        <p>${escapeHtml(error.message)}</p>
+      <div class="error-state state-card state-card--error shell-section surface-page">
+        <span class="empty-state__mark" aria-hidden="true"></span>
+        <strong>Task not found.</strong>
+        <p>${escapeHtml(statusMessage(error, "This task is not available or has not loaded yet."))}</p>
         <div class="empty-state-actions">
           <button class="hero-primary" data-route="/">Go Home</button>
           <button data-route="/post-task">Post Funded Task</button>
@@ -1677,21 +1833,26 @@ async function renderTaskDetail(taskId) {
   }
 
   const task = state.task;
+  const localRevisionRequests = state.revisionRequests?.[task.taskId] || [];
+  const localDisputeRecords = state.disputeRecords?.[task.taskId] || [];
+  const displayTask = { ...task, revisionRequests: localRevisionRequests, disputeRecords: localDisputeRecords };
   const shouldProbeOnchainTask = Boolean(task.onchainTaskRef)
     || ["pending_wallet", "pending_chain"].includes(task.transactionState)
     || Boolean(task.latestCreateTxHash)
     || Boolean(task.latestFundTxHash)
     || Boolean(task.latestAssignTxHash);
-  const reviewModel = buildReviewPanelModel(task);
+  const reviewModel = buildReviewPanelModel(displayTask);
   renderTaskDetailPageView({
     el,
-    task,
+    task: displayTask,
     history: state.history,
     onchainSnapshot: null,
     reviewModel,
-    resultModel: buildTaskResultModel(task, []),
+    resultModel: buildTaskResultModel(displayTask, []),
+    revisionModel: buildTaskRevisionDisplayModel(displayTask),
+    disputeModel: buildTaskDisputeDisplayModel(displayTask),
   });
-  bindTaskDetailActions(task);
+  bindTaskDetailActions(displayTask);
 
   const shouldAutoCheckFunding = ["pending_wallet", "pending_chain"].includes(task.transactionState)
     && (task.latestCreateTxHash || task.latestFundTxHash || task.latestAssignTxHash)
@@ -1715,13 +1876,15 @@ async function renderTaskDetail(taskId) {
     }
     renderTaskDetailPageView({
       el,
-      task,
+      task: displayTask,
       history: state.history,
       onchainSnapshot,
       reviewModel,
-      resultModel: buildTaskResultModel(task, taskRuns.items || []),
+      resultModel: buildTaskResultModel(displayTask, taskRuns.items || []),
+      revisionModel: buildTaskRevisionDisplayModel(displayTask),
+      disputeModel: buildTaskDisputeDisplayModel(displayTask),
     });
-    bindTaskDetailActions(task);
+    bindTaskDetailActions(displayTask);
   });
 }
 
@@ -1734,6 +1897,18 @@ function bindTaskDetailActions(task) {
   });
   document.querySelectorAll("[data-user-review]").forEach((node) => {
     node.addEventListener("click", () => runUserDecision(task.taskId, node.dataset.userReview, node));
+  });
+  document.querySelectorAll("[data-request-revision]").forEach((node) => {
+    node.addEventListener("click", () => requestRevision(node.dataset.requestRevision || task.taskId, node));
+  });
+  document.querySelectorAll("[data-request-revision-toggle]").forEach((node) => {
+    node.addEventListener("click", () => document.getElementById("revisionChangeRequest")?.focus());
+  });
+  document.querySelectorAll("[data-open-dispute]").forEach((node) => {
+    node.addEventListener("click", () => openLocalDispute(node.dataset.openDispute || task.taskId, node));
+  });
+  document.querySelectorAll("[data-open-dispute-toggle]").forEach((node) => {
+    node.addEventListener("click", () => document.getElementById("disputeReason")?.focus());
   });
   document.querySelectorAll("[data-platform-improve]").forEach((node) => {
     node.addEventListener("click", () => runImproveAgain(task.taskId, node));
@@ -2141,37 +2316,37 @@ async function renderAdmin() {
       </section>
       <section class="ops-grid">
       <div class="ops-stack">
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Queue</p><h2>Work queue</h2></div><span class="meta-pill">${allTasks.length} tasks</span></div>
         <div class="audit-list">${allTasks.slice(0, 10).map((task) => `<div class="audit-item"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.status)} | ${formatCurrency(task.rewardAmount)}</p><div class="ops-actions"><button data-admin-pause="${task.taskId}">Pause Task</button><button data-admin-refund="${task.taskId}">Refund Task</button></div></div>`).join("") || emptyState("No tasks loaded.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Review</p><h2>Manual resolution</h2></div><span class="meta-pill">${disputes.length} disputes</span></div>
         <div class="audit-list">${disputes.map((task) => `<div class="audit-item"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.status)} | ${formatCurrency(task.rewardAmount)} reward</p><div class="ops-actions"><button data-route="/tasks/${task.taskId}">Open Task</button><button data-admin-resolve="${task.taskId}" data-outcome="approve_payout">Approve Payout</button><button data-admin-resolve="${task.taskId}" data-outcome="refund_buyer">Refund Buyer</button></div></div>`).join("") || emptyState("No open disputes.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Risk</p><h2>Risk monitoring</h2></div><span class="meta-pill">${suspiciousAgents.length} flagged</span></div>
         <div class="audit-list">${suspiciousAgents.map((agent) => `<div class="audit-item"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${escapeHtml(agent.compatibilityStatus)} | ${escapeHtml(agent.healthStatus)}</p><div class="ops-actions"><button data-admin-disable="${agent.profile.agentId}">Disable Agent</button>${agent.profile.endpointUrl ? `<button data-admin-blacklist="${escapeHtml(agent.profile.endpointUrl)}">Blacklist Endpoint</button>` : ""}</div></div>`).join("") || emptyState("No suspicious endpoints.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Failures</p><h2>Debug queue</h2></div><span class="meta-pill">${failures.items.length} failed</span></div>
         <div class="audit-list">${failures.items.map((run) => `<div class="audit-item"><strong>${escapeHtml(run.taskId)}</strong><p>${escapeHtml(run.failureCategory || "unknown")} | ${escapeHtml(run.lastErrorMessage || "Execution failed")}</p><div class="ops-actions"><button data-route="/tasks/${run.taskId}">Inspect Task</button><button data-admin-debug="${run.taskId}">Debug Trace</button></div></div>`).join("") || emptyState("No failed executions.")}</div>
       </article>
       </div>
       <div class="ops-stack">
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Signals</p><h2>Pattern detection</h2></div><span class="meta-pill">${overview.suspiciousPatterns.length} signals</span></div>
         <div class="audit-list">${overview.suspiciousPatterns.map((flag) => `<div class="audit-item"><strong>${escapeHtml(labelize(flag.kind))}</strong><p>${escapeHtml(flag.summary)}</p><small>${escapeHtml(flag.subjectType)} | ${escapeHtml(flag.subjectId)}</small></div>`).join("") || emptyState("No suspicious patterns right now.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Blocks</p><h2>Hard blocks</h2></div><span class="meta-pill">${overview.blacklistedEndpoints.length} endpoints</span></div>
         <div class="audit-list">${overview.blacklistedEndpoints.map((row) => `<div class="audit-item"><strong>${escapeHtml(row.endpointUrl)}</strong><p>${escapeHtml(row.reason)}</p></div>`).join("") || emptyState("No blacklisted endpoints.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Audit</p><h2>Decision trail</h2></div><span class="meta-pill">${overview.auditLogs.length} events</span></div>
         <div class="audit-list">${overview.auditLogs.slice(0, 12).map((item) => `<div class="audit-item"><strong>${escapeHtml(labelize(item.action))}</strong><p>${escapeHtml(item.reason)}</p><small>${escapeHtml(item.subjectType)} | ${escapeHtml(item.subjectId)}</small></div>`).join("") || emptyState("No audit logs yet.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Inspect</p><h2>Deep inspection</h2></div>${debug ? `<span class="meta-pill">${escapeHtml(debug.task.taskId)}</span>` : ""}</div>
         ${debug
           ? `
@@ -2295,10 +2470,15 @@ async function renderAdmin() {
 async function render() {
   renderNav();
   renderTopbar();
+  renderFooter();
 
   if (!state.tasks) {
     el.appRoot.innerHTML = `
       <section data-structure="app-loading" class="loading-shell">
+        <div class="loading-shell__copy">
+          <strong>Loading Dispatch...</strong>
+          <p>Preparing agents, tasks, and payment state.</p>
+        </div>
         <article class="skeleton"></article>
         <article class="skeleton"></article>
         <article class="skeleton"></article>
@@ -2309,7 +2489,8 @@ async function render() {
       await loadMarketData();
     } catch (error) {
       el.appRoot.innerHTML = `
-        <div class="error-state shell-section">
+        <div class="error-state state-card state-card--error shell-section surface-page">
+          <span class="empty-state__mark" aria-hidden="true"></span>
           <strong>Network error</strong>
           <p>${escapeHtml(statusMessage(error, "Marketplace data could not be loaded."))}</p>
           <div class="empty-state-actions">
@@ -2332,7 +2513,7 @@ async function render() {
   if (path === "/agents") return renderAgentsPage();
   if (path.startsWith("/agents/")) return renderAgentProfile(path.split("/")[2]);
   if (path === "/post-task") return renderPostTaskPage();
-  if (path === "/arc-demo") return renderArcDemo();
+  if (path === "/arc-demo") return renderArcDemoRemoved();
   if (path.startsWith("/tasks/")) return renderTaskDetail(path.split("/")[2]);
   if (path === "/create-agent") return renderCreateAgent();
   if (path === "/connect-agent") return renderConnectExternalAgent();

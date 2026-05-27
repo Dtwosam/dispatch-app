@@ -6,6 +6,7 @@ export function getAppElements() {
     routeList: document.getElementById("routeList"),
     statusToast: document.getElementById("statusToast"),
     appRoot: document.getElementById("appRoot"),
+    appFooter: document.getElementById("appFooter"),
     topbarActions: document.getElementById("topbarActions"),
     walletSheet: document.getElementById("walletSheet"),
     burstLayer: document.getElementById("burstLayer"),

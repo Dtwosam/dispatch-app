@@ -29,16 +29,27 @@ function readConfiguredApiBase() {
   return isLocalHost ? "http://localhost:4020" : hostedDefaultApiBase || origin;
 }
 
+function readJsonStorage(key, fallback) {
+  if (typeof localStorage === "undefined") return fallback;
+  try {
+    const value = localStorage.getItem(key);
+    if (!value) return fallback;
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export const API_BASE = readConfiguredApiBase();
 
 export const routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
-  ["/post-task", "Post Funded Task"],
-  ["/arc-demo", "Arc Demo"],
-  ["/create-agent", "Create Agent"],
+  ["/post-task", "Post Task"],
+  ["/dashboard", "Builder Dashboard"],
   ["/connect-agent", "Connect Agent"],
-  ["/dashboard", "Dashboard"],
+  ["/create-agent", "Create Agent"],
 ];
 
 export const categories = [
@@ -115,10 +126,12 @@ export function createInitialState() {
     },
     task: null,
     history: { items: [] },
+    revisionRequests: readJsonStorage("dispatchRevisionRequests", {}),
+    disputeRecords: readJsonStorage("dispatchDisputeRecords", {}),
     mobileNavOpen: false,
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
-    dashboardTab: "my_tasks",
+    dashboardTab: "agents",
     wizardStep: 1,
     agentDraftMeta: {
       draftId: null,
@@ -157,6 +170,10 @@ export function createInitialState() {
     taskForm: {
       title: "",
       description: "",
+      templateId: "custom_task",
+      templateFields: {},
+      templateMessage: "",
+      selectedServicePackage: null,
       category: "research",
       rewardAmount: "",
       deadline: "",

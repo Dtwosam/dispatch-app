@@ -6,9 +6,8 @@ import {
   formatCurrency,
   labelize,
   revealSections,
-  taskStatusTone,
 } from "./app-ui.js";
-import { buildTaskLifecycleModel } from "./ui-models.js";
+import { buildArcTransactionLink, buildTaskLifecycleModel } from "./ui-models.js";
 
 function renderResultMarkup(resultModel) {
   const sectionMarkup = Array.isArray(resultModel?.sections) && resultModel.sections.length
@@ -51,9 +50,7 @@ function readBigIntLike(value) {
 }
 
 function arcTxLink(hash) {
-  const value = String(hash || "").trim();
-  if (!/^0x[a-fA-F0-9]{64}$/.test(value)) return null;
-  return `https://testnet.arcscan.app/tx/${value}`;
+  return buildArcTransactionLink(hash);
 }
 
 export function renderTaskDetailPageView({
@@ -63,6 +60,8 @@ export function renderTaskDetailPageView({
   onchainSnapshot,
   reviewModel,
   resultModel,
+  revisionModel,
+  disputeModel,
 }) {
   const agents = task.selectedAgents || [];
   const reviewActions = task.reviewActions || [];
@@ -109,262 +108,301 @@ export function renderTaskDetailPageView({
     : browserTxHashes.length
       ? "Funding Syncing"
       : "Awaiting Funding";
-  const executionHeadline = task.status === "EXECUTING"
-    ? "Agent is actively working and this task surface is waiting for the next result update."
-    : task.status === "SUBMITTED"
-      ? "Execution finished and the result is ready for a review decision."
-      : fundingConfirmed
-        ? "The task is staged and waiting for the next execution event."
-        : browserTxHashes.length
-          ? "Signed wallet transactions were captured and the marketplace is syncing the latest onchain state."
-          : "This task has not been funded onchain yet.";
-  const nextStepSummary = task.status === "SUBMITTED"
-    ? "Review the output, then approve and settle if it looks good."
-    : task.status === "EXECUTING"
-      ? "The assigned agent is still working. This page will update as execution moves."
-      : fundingConfirmed
-        ? "This task is waiting for the next marketplace action."
-        : browserTxHashes.length
-          ? "The wallet signing flow completed and the marketplace is finalizing funding and assignment status."
-          : "Fund this task onchain before it can move into assignment and execution.";
+  const payment = lifecycle.paymentDisplay;
+  const taskStatus = lifecycle.statusDisplay;
 
   el.appRoot.innerHTML = `
-    <section data-structure="task-detail">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Task</p>
-        <h1>${escapeHtml(task.title)}</h1>
-        <p class="muted">${escapeHtml(task.description)}</p>
+    <section data-structure="task-detail" class="task-detail-page">
+      <header class="task-detail-hero reveal-on-scroll is-visible">
+        <div class="task-detail-hero__main">
+          <button class="task-back-link" data-route="/dashboard">Back to dashboard</button>
+          <p class="task-detail-eyebrow">Funded task</p>
+          <h1>${escapeHtml(task.title)}</h1>
+          <p>${escapeHtml(task.description || "Task details will appear here when available.")}</p>
+          <div class="task-detail-badges">
+            <span>${escapeHtml(taskStatus.label)}</span>
+            <span>${escapeHtml(payment.label)}</span>
+            ${(disputeModel?.hasOpenDispute || revisionModel?.hasRevisionRequested)
+              ? `<span>${escapeHtml(disputeModel?.hasOpenDispute ? "Dispute open" : "Revision requested")}</span>`
+              : `<span>${escapeHtml(lifecycle.reviewStateLabel)}</span>`}
+          </div>
+        </div>
+        <aside class="task-next-panel">
+          <p class="task-detail-eyebrow">Next action</p>
+          <h2>${escapeHtml(taskStatus.primaryCtaText)}</h2>
+          <div class="task-next-rows">
+            <div><span>Who acts next</span><strong>${escapeHtml(lifecycle.nextActor)}</strong></div>
+            <div><span>Required action</span><strong>${escapeHtml(taskStatus.nextActionText)}</strong></div>
+            <div><span>Reward</span><strong>${formatCurrency(task.rewardAmount || 0)}</strong></div>
+            <div><span>Assigned agent</span><strong>${agents.length ? escapeHtml(agents[0].displayName) : "Not assigned yet"}</strong></div>
+          </div>
+          <button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>
+        </aside>
       </header>
 
-      <section class="shell-section reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">Lifecycle</p>
-            <h2>Funded work progress</h2>
-          </div>
-          <span class="tag">${escapeHtml(lifecycle.currentLabel)}</span>
-        </div>
-        <div class="task-summary">
-          <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>USDC reward</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.fundingLabel)}</strong><span>Funding</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
-          <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
-        </div>
-        <div class="status-banner ${lifecycle.isSettled ? "success" : lifecycle.isRefunded || lifecycle.isRejected || lifecycle.isDisputed || lifecycle.isUnresolved ? "warning" : "info"}">
-          <strong>Lifecycle summary</strong>
-          <p>${escapeHtml(lifecycle.settlementMessage)}</p>
-        </div>
-        ${isDemoTask ? `
-          <div class="status-banner info">
-            <strong>Arc Testnet demo mode</strong>
-            <p>Demo USDC settlement is shown for this walkthrough. Dispatch keeps owner approval and payout eligibility clear while external agents can integrate through ERC-8183-compatible adapter job flows.</p>
-            ${demoCanAdvance ? `<div class="secondary-actions" style="margin-top:12px;"><button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button></div>` : ""}
-          </div>
-        ` : ""}
-        <div class="steps-grid" style="margin-top:18px;">
-          ${lifecycle.steps.map((step) => `
-            <article class="step-card">
-              <div class="step-icon">${escapeHtml(step.status === "complete" ? "✓" : step.status === "current" ? "•" : step.status === "warning" || step.status === "failed" ? "!" : "·")}</div>
-              <strong>${escapeHtml(step.label)}</strong>
-              <p>${escapeHtml(step.helper)}</p>
-              <div class="agent-tags" style="margin-top:10px;">
-                <span class="tag">${escapeHtml(labelize(step.status))}</span>
-                ${step.timestamp ? `<span class="tag">${escapeHtml(new Date(step.timestamp).toLocaleString())}</span>` : ""}
-              </div>
-            </article>
-          `).join("")}
-        </div>
+      <section class="task-lifecycle-strip reveal-on-scroll">
+        ${lifecycle.steps.map((step) => `
+          <article class="task-lifecycle-step task-lifecycle-step--${escapeHtml(step.status)}">
+            <span></span>
+            <strong>${escapeHtml(step.label)}</strong>
+          </article>
+        `).join("")}
       </section>
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
-          <div class="section-head">
+      ${isDemoTask ? `
+        <section class="task-detail-alert task-detail-alert--info reveal-on-scroll">
+          <strong>Arc Testnet demo mode</strong>
+          <p>Demo USDC settlement is shown for this walkthrough. Owner approval and payout eligibility stay separate from wallet-funded production tasks.</p>
+          ${demoCanAdvance ? `<button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button>` : ""}
+        </section>
+      ` : ""}
+
+      <section class="task-review-workspace reveal-on-scroll">
+        <article class="task-result-panel">
+          <div class="task-section-head">
             <div>
-              <p class="mini-label">Execution</p>
-              <h2>Live task status</h2>
+              <p class="task-detail-eyebrow">Submitted work</p>
+              <h2>${resultModel?.finalOutputText || resultModel?.sections?.length ? "Review the delivered output." : "No submitted work yet."}</h2>
             </div>
-            <span class="tag">${escapeHtml(labelize(task.status))}</span>
+            <span>${escapeHtml(resultModel?.workerLabel || "Marketplace Agent")}</span>
           </div>
-          <div class="status-banner info">
-            <strong>Execution rail</strong>
-            <p>${executionHeadline}</p>
-          </div>
-          <div class="task-summary">
-            <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>Reward</span></div>
-            <div class="metric-card"><strong>${deadlineCountdown(task.deadline)}</strong><span>Deadline</span></div>
-            <div class="metric-card"><strong>${escapeHtml(lifecycle.evaluationLabel)}</strong><span>Evaluation</span></div>
-            <div class="metric-card"><strong>${escapeHtml(lifecycle.settlementLabel)}</strong><span>Settlement</span></div>
-          </div>
-          <div class="simple-panel">
-            <div class="agent-status"><span class="live-dot"></span><span>${escapeHtml(lifecycle.currentLabel)}${task.status === "EXECUTING" ? " - agent is working now." : task.status === "SUBMITTED" ? " - result is ready for review." : ""}</span></div>
-            <div class="agent-tags" style="margin-top:12px;">
-              ${agents.length
-                ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)} | ${escapeHtml(agent.originType === "external" ? "External" : "Platform")}</span>`).join("")
-                : "<span class='muted'>No agent assigned yet.</span>"}
+          ${resultModel?.finalOutputText || resultModel?.sections?.length ? `
+            <div class="task-result-meta">
+              <div><span>Quality score</span><strong>${resultModel?.qualityScore ?? "N/A"}</strong></div>
+              <div><span>Confidence</span><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong></div>
+              <div><span>Review confidence</span><strong>${resultModel?.reviewConfidence != null ? `${resultModel.reviewConfidence}%` : "N/A"}</strong></div>
             </div>
-            <p class="muted" style="margin-top:12px;">${escapeHtml(lifecycle.assignmentLabel)}</p>
-          </div>
-        </article>
-        <aside class="task-side">
-          <article class="shell-panel">
-            <p class="mini-label">Task summary</p>
-            <h3>What happens next</h3>
-            <p class="muted">${nextStepSummary}</p>
-            <div class="agent-tags" style="margin-top:12px;">
-              <span class="tag">${escapeHtml(lifecycle.fundingLabel)}</span>
-              <span class="tag">${escapeHtml(lifecycle.evaluationLabel)}</span>
-              <span class="tag">${escapeHtml(lifecycle.settlementLabel)}</span>
-            </div>
-            ${(task.onchainTaskRef || onchainTask) ? `<p class="muted">${fundingConfirmed ? "Onchain task ref" : "Task pointer"}: ${escapeHtml(task.onchainTaskRef || `task:${task.taskId}`)}</p>` : ""}
-            ${browserTxHashes.length ? `
-              <div style="margin-top:14px;">
-                <p class="mini-label">Browser transaction trace</p>
-                <div class="agent-tags" style="margin-top:10px;">
-                  ${browserTxHashes.map((item) => {
-                    const href = arcTxLink(item.hash);
-                    const label = `${item.label} ${item.hash.slice(0, 12)}...`;
-                    return href
-                      ? `<a class="tag" href="${href}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`
-                      : `<span class="tag">${escapeHtml(label)}</span>`;
-                  }).join("")}
-                </div>
-                ${!fundingConfirmed ? `<p class="muted" style="margin-top:10px;">These hashes let the marketplace reconcile wallet-signed activity while final task state catches up.</p>` : ""}
-                ${!fundingConfirmed ? `<div class="secondary-actions" style="margin-top:12px;"><button data-check-funding="${task.taskId}">Refresh execution status</button></div>` : ""}
+            ${(resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote) ? `
+              <div class="task-detail-alert task-detail-alert--info">
+                <strong>AI review guidance</strong>
+                <p>${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}${resultModel?.reviewConfidence != null ? `Review confidence ${resultModel.reviewConfidence}%. ` : ""}${escapeHtml(resultModel?.evaluationNote || "AI review is guidance only. The owner makes the final approval decision.")}</p>
               </div>
             ` : ""}
-            ${onchainTask ? `<p class="muted" style="margin-top:10px;">Onchain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
-          </article>
-        </aside>
-      </section>
-
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
-          <div class="section-head">
-            <div>
-              <p class="mini-label">Result</p>
-              <h2>Delivered output</h2>
+            ${resultModel?.deliveryNote ? `
+              <div class="task-detail-alert task-detail-alert--info">
+                <strong>Marketplace benchmark run</strong>
+                <p>${escapeHtml(resultModel.deliveryNote)}</p>
+              </div>
+            ` : ""}
+            <div class="task-result-surface">${renderResultMarkup(resultModel)}</div>
+          ` : `
+            <div class="task-empty-panel">
+              <strong>No submitted work yet.</strong>
+              <p>The agent output will appear here once it is ready for owner review.</p>
             </div>
-          </div>
-          <div class="task-summary">
-            <div class="metric-card"><strong>${resultModel?.qualityScore ?? "N/A"}</strong><span>Quality Score</span></div>
-            <div class="metric-card"><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong><span>Confidence</span></div>
-            <div class="metric-card"><strong>${resultModel?.reviewConfidence != null ? `${resultModel.reviewConfidence}%` : "N/A"}</strong><span>Review Confidence</span></div>
-            <div class="metric-card"><strong>${escapeHtml(resultModel?.finalOutcome ? labelize(resultModel.finalOutcome) : (resultModel?.workerLabel || "Marketplace Agent"))}</strong><span>${resultModel?.finalOutcome ? "Result Status" : "Worker"}</span></div>
-          </div>
-          ${resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote ? `
-            <div class="status-banner info">
-              <strong>AI review guidance</strong>
-              <p>
-                ${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}
-                ${resultModel?.reviewConfidence != null ? `Review confidence ${resultModel.reviewConfidence}%. ` : ""}
-                ${escapeHtml(resultModel?.evaluationNote || "AI review is only guidance. The task owner makes the final approval decision.")}
-              </p>
-            </div>
-          ` : ""}
-          ${resultModel?.deliveryNote ? `
-            <div class="status-banner info">
-              <strong>Marketplace benchmark run</strong>
-              <p>${escapeHtml(resultModel.deliveryNote)}</p>
-            </div>
-          ` : ""}
-          <div class="result-surface">
-            ${renderResultMarkup(resultModel)}
-          </div>
+          `}
           ${(resultModel?.hasDraft || resultModel?.stageTimingsMs || onchainSnapshot?.onchainTask) ? `
-            <details class="shell-panel disclosure-panel" style="margin-top:18px;">
-              <summary>More details</summary>
-              <div class="disclosure-panel__body">
+            <details class="task-detail-details">
+              <summary>More result details</summary>
+              <div>
                 ${resultModel?.hasDraft ? `
-                  <div>
+                  <section>
                     <strong>View Draft</strong>
-                    <div class="result-surface" style="margin-top:14px;">
-                      ${renderResultMarkup({ finalOutputText: resultModel.draftText })}
-                    </div>
-                  </div>
+                    <div class="task-result-surface">${renderResultMarkup({ finalOutputText: resultModel.draftText })}</div>
+                  </section>
                 ` : ""}
                 ${resultModel?.stageTimingsMs ? `
-                  <div>
+                  <section>
                     <strong>Stage timings</strong>
-                    <div class="agent-tags" style="margin-top:12px;">
-                      <span class="tag">structure ${Math.round(resultModel.stageTimingsMs.structuring)}ms</span>
-                      <span class="tag">generate ${Math.round(resultModel.stageTimingsMs.generation)}ms</span>
-                      ${resultModel.stageTimingsMs.improvement ? `<span class="tag">improve ${Math.round(resultModel.stageTimingsMs.improvement)}ms</span>` : ""}
+                    <div class="task-detail-badges">
+                      <span>structure ${Math.round(resultModel.stageTimingsMs.structuring)}ms</span>
+                      <span>generate ${Math.round(resultModel.stageTimingsMs.generation)}ms</span>
+                      ${resultModel.stageTimingsMs.improvement ? `<span>improve ${Math.round(resultModel.stageTimingsMs.improvement)}ms</span>` : ""}
                     </div>
-                  </div>
+                  </section>
                 ` : ""}
                 ${onchainSnapshot?.onchainTask ? `
-                  <div>
+                  <section>
                     <strong>Onchain trace</strong>
-                    <p class="muted">${escapeHtml(JSON.stringify(onchainSnapshot.onchainTask))}</p>
-                  </div>
+                    <p>${escapeHtml(JSON.stringify(onchainSnapshot.onchainTask))}</p>
+                  </section>
                 ` : ""}
               </div>
             </details>
           ` : ""}
         </article>
-        <aside class="task-side">
-          <article class="shell-panel">
-            <p class="mini-label">Actions</p>
-            <h3>Review and settle</h3>
-            <p class="muted">${escapeHtml(reviewModel.headline)}</p>
-            <div class="review-actions">
-              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve</button>' : ""}
-              ${reviewModel.primaryActions.includes("reject") ? '<button data-user-review="reject">Reject</button>' : ""}
-              ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Approve & Pay</button>` : ""}
+
+        <aside class="task-review-side">
+          <article class="task-decision-panel">
+            <p class="task-detail-eyebrow">Review decision</p>
+            <h2>${escapeHtml(reviewModel.headline || taskStatus.primaryCtaText)}</h2>
+            <p>Approve the work, request changes, or open a dispute if the result cannot be accepted.</p>
+            <div class="task-decision-actions">
+              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve work</button>' : ""}
+              ${reviewModel.primaryActions.includes("request_revision") ? '<button data-request-revision-toggle>Request revision</button>' : ""}
+              ${reviewModel.primaryActions.length === 0 && !reviewModel.primaryActions.includes("settle") ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
-            <div class="secondary-actions">
+            <div class="task-secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
-              ${resultModel?.improveAgainUnavailableReason ? `<p class="muted">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
+              ${resultModel?.improveAgainUnavailableReason ? `<p class="disabled-reason">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
-              ${reviewModel.advancedActions.includes("dispute") ? `<button data-task-action="dispute" data-task-id="${task.taskId}">Open dispute</button>` : ""}
+              ${reviewModel.advancedActions.includes("dispute") ? `<button data-open-dispute-toggle>Open dispute</button>` : ""}
               ${reviewModel.advancedActions.includes("appeal") ? `<button data-task-action="appeal" data-task-id="${task.taskId}">Appeal</button>` : ""}
-            </div>
-            <div class="secondary-actions">
               ${additionalReviewActions.map((action) => `<button data-task-action="${action}" data-task-id="${task.taskId}">${escapeHtml(labelize(action))}</button>`).join("")}
             </div>
+          </article>
+
+          <article class="task-payment-panel">
+            <p class="task-detail-eyebrow">USDC payment</p>
+            <h2>${escapeHtml(payment.label)}</h2>
+            <p>${escapeHtml(payment.description)}</p>
+            <div class="task-payment-rows">
+              <div><span>Reward</span><strong>${escapeHtml(payment.amountDisplay)}</strong></div>
+              <div><span>Payment state</span><strong>${escapeHtml(payment.label)}</strong></div>
+              <div><span>Network</span><strong>${escapeHtml(payment.networkDisplay || "Arc Testnet")}</strong></div>
+              <div><span>Settlement</span><strong>${escapeHtml(settlementLabel)}</strong></div>
+            </div>
+            <div class="task-payment-links">
+              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid funding tx link available</span>`}
+              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid release tx link available</span>`}
+            </div>
+            ${reviewModel.primaryActions.includes("settle")
+              ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>`
+              : `<small class="disabled-reason">${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
           </article>
         </aside>
       </section>
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
-          <div class="section-head">
+      <section class="task-support-grid reveal-on-scroll">
+        <article class="task-support-panel task-support-panel--revision">
+          <div class="task-section-head">
             <div>
-              <p class="mini-label">Timeline</p>
+              <p class="task-detail-eyebrow">Revision</p>
+              <h2>${escapeHtml(revisionModel?.headline || "No revision requested")}</h2>
+            </div>
+            <span>${escapeHtml(revisionModel?.hasRevisionRequested ? "Payment locked" : "Quiet")}</span>
+          </div>
+          <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
+          ${reviewModel.primaryActions.includes("request_revision") ? `
+            <div class="task-form-panel" data-revision-form>
+              <label><span>What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
+              <label><span>What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
+              <label><span>Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
+              <button data-request-revision="${task.taskId}">Save revision request</button>
+            </div>
+          ` : ""}
+          <div class="task-activity-list">
+            ${(revisionModel?.items || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.changeRequest)}</strong>
+                <p>Missing: ${escapeHtml(item.missingDetails)}</p>
+                ${item.extraInstruction ? `<p>Extra instruction: ${escapeHtml(item.extraInstruction)}</p>` : ""}
+                <small>${escapeHtml(item.requestedBy)}${item.requestedAt ? ` | ${escapeHtml(new Date(item.requestedAt).toLocaleString())}` : ""}</small>
+              </article>
+            `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.", {
+              title: "No revision requested.",
+              body: "Revision history will appear here after changes are requested.",
+            })}
+          </div>
+        </article>
+
+        <article class="task-support-panel task-support-panel--dispute">
+          <div class="task-section-head">
+            <div>
+              <p class="task-detail-eyebrow">Dispute</p>
+              <h2>${escapeHtml(disputeModel?.headline || "No dispute open")}</h2>
+            </div>
+            <span>${escapeHtml(disputeModel?.hasOpenDispute ? "Under review" : "Closed")}</span>
+          </div>
+          <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
+          ${reviewModel.advancedActions.includes("dispute") ? `
+            <div class="task-form-panel" data-dispute-form>
+              <label>
+                <span>Reason</span>
+                <select id="disputeReason">
+                  <option value="">Select reason</option>
+                  <option value="Work does not match brief">Work does not match brief</option>
+                  <option value="Output is incomplete">Output is incomplete</option>
+                  <option value="Quality is too low">Quality is too low</option>
+                  <option value="Agent did not follow revision request">Agent did not follow revision request</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label><span>Evidence/details</span><textarea id="disputeDetails" rows="4" placeholder="Describe what happened and include useful evidence or context."></textarea></label>
+              <label>
+                <span>Requested resolution</span>
+                <select id="disputeResolution">
+                  <option value="Request platform review">Request platform review</option>
+                  <option value="Ask agent for final revision">Ask agent for final revision</option>
+                  <option value="Request refund review">Request refund review</option>
+                </select>
+              </label>
+              <button data-open-dispute="${task.taskId}">Save dispute</button>
+            </div>
+          ` : ""}
+          <div class="task-activity-list">
+            ${(disputeModel?.items || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.reason)}</strong>
+                <p>${escapeHtml(item.details)}</p>
+                <p>Requested resolution: ${escapeHtml(item.requestedResolution)}</p>
+                <small>${escapeHtml(item.statusLabel)} | ${escapeHtml(item.openedBy)}${item.openedAt ? ` | ${escapeHtml(new Date(item.openedAt).toLocaleString())}` : ""}</small>
+              </article>
+            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.", {
+              title: "No dispute open.",
+              body: "Payment dispute notes will appear here if a dispute is opened.",
+            })}
+          </div>
+          <div class="task-detail-alert task-detail-alert--warning">
+            <strong>Payment remains locked</strong>
+            <p>Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="task-history-grid reveal-on-scroll">
+        <article class="task-history-panel">
+          <div class="task-section-head">
+            <div>
+              <p class="task-detail-eyebrow">Activity</p>
               <h2>Task history</h2>
             </div>
           </div>
-          <div class="live-feed">
-            ${(task.timeline || []).map((item, index) => `
-              <article class="feed-card feed-card--${taskStatusTone(item.status || task.status)}" style="animation-delay:${index * 70}ms">
-                <span class="feed-card__pulse"></span>
-                <div>
-                  <strong>${escapeHtml(item.title)}</strong>
-                  <p>${escapeHtml(item.description)}</p>
-                </div>
+          <div class="task-activity-list">
+            ${(task.timeline || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.title)}</strong>
+                <p>${escapeHtml(item.description)}</p>
               </article>
-            `).join("") || emptyState("No timeline items yet.")}
+            `).join("") || emptyState("No timeline yet. Waiting for update.", {
+              title: "No activity yet.",
+              body: "Task updates and settlement events will appear here.",
+            })}
           </div>
         </article>
-        <aside class="task-side">
-          <article class="shell-panel">
-            <p class="mini-label">Settlement history</p>
-            <h3>Payout trail</h3>
-            ${latestSettlementTx ? `<p class="muted"><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
-            <div class="live-feed">
-              ${(history.items || []).slice().reverse().map((item, index) => `
-                <article class="feed-card feed-card--${taskStatusTone(item.settlementState)}" style="animation-delay:${index * 70}ms">
-                  <span class="feed-card__pulse"></span>
-                  <div>
-                    <strong>${escapeHtml(labelize(item.settlementState))}</strong>
-                    <p>${escapeHtml(item.outcome)}</p>
-                    ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
-                  </div>
-                </article>
-              `).join("") || emptyState("No payout receipts yet.")}
+        <aside class="task-history-panel">
+          <p class="task-detail-eyebrow">Settlement history</p>
+          <h2>Payout trail</h2>
+          ${latestSettlementTx ? `<p><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
+          <div class="task-activity-list">
+            ${(history.items || []).slice().reverse().map((item) => `
+              <article>
+                <strong>${escapeHtml(labelize(item.settlementState))}</strong>
+                <p>${escapeHtml(item.outcome)}</p>
+                ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
+              </article>
+            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.", {
+              title: "No payout receipts yet.",
+              body: "Released or refunded payment receipts will appear here.",
+            })}
+          </div>
+          ${browserTxHashes.length ? `
+            <div class="task-browser-trace">
+              <strong>Browser transaction trace</strong>
+              <div class="task-payment-links">
+                ${browserTxHashes.map((item) => {
+                  const href = arcTxLink(item.hash);
+                  const label = `${item.label} ${item.hash.slice(0, 12)}...`;
+                  return href
+                    ? `<a href="${href}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`
+                    : `<span>${escapeHtml(label)}</span>`;
+                }).join("")}
+              </div>
+              ${!fundingConfirmed ? `<button data-check-funding="${task.taskId}">Refresh execution status</button>` : ""}
             </div>
-          </article>
+          ` : ""}
+          ${onchainTask ? `<p>Onchain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
         </aside>
       </section>
     </section>
@@ -412,7 +450,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
         <label class="field-stack field-wide"><span class="muted">Public tagline</span><input id="agentIdentityTagline" value="${escapeHtml(state.agentDraft.identity.tagline)}" placeholder="One-line promise for buyers" /></label>
         <label class="field-stack field-wide"><span class="muted">Skills</span><input id="agentIdentityTags" value="${escapeHtml((state.agentDraft.identity.tags || []).join(", "))}" placeholder="contract qa, source grounding, structured output" /></label>
       </div>
-      <div class="simple-panel" style="margin-top:16px;">
+      <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Suggested skills</strong>
         <p class="muted">Keep them plain-English. These become capability labels and quality hints for the agent later.</p>
         <div class="agent-tags" style="margin-top:12px;">
@@ -440,7 +478,10 @@ export function renderCreateAgentWizardPage({ el, state }) {
       </div>
       <button id="addKnowledge">Add Source</button>
       <div class="live-feed" style="margin-top:16px;">
-        ${state.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.")}
+        ${state.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.", {
+          title: "No sources yet.",
+          body: "Knowledge pointers will appear here after they are added.",
+        })}
       </div>
     `,
     `
@@ -449,9 +490,14 @@ export function renderCreateAgentWizardPage({ el, state }) {
     `
       <label class="field-stack"><span class="muted">Sample task</span><textarea id="testRunTask" rows="5">${escapeHtml(state.agentDraft.testRun.sampleTask)}</textarea></label>
       <button id="runTest">Run Test</button>
-      <div class="simple-panel" style="margin-top:16px;">
+      <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
-        <p class="muted">${escapeHtml(state.agentDraft.testRun.result || "No test run yet.")}</p>
+        ${state.agentDraft.testRun.result
+          ? `<p class="muted">${escapeHtml(state.agentDraft.testRun.result)}</p>`
+          : emptyState("Run a test before publishing.", {
+              title: "No test run yet.",
+              body: "Run a test before treating this draft as publish-ready.",
+            })}
         <div class="agent-tags" style="margin-top:12px;">
           ${state.agentDraft.testRun.latencyMs ? `<span class="tag">Latency ${Math.round(state.agentDraft.testRun.latencyMs)}ms</span>` : ""}
           ${state.agentDraft.testRun.valid === true ? `<span class="tag">Schema valid</span>` : ""}
@@ -461,14 +507,14 @@ export function renderCreateAgentWizardPage({ el, state }) {
       </div>
     `,
     `
-      <div class="simple-panel">
+      <div class="simple-panel surface-panel">
         <strong>${escapeHtml(state.agentDraft.identity.name)}</strong>
         <p class="muted">${escapeHtml(state.agentDraft.identity.category)}</p>
         <div class="agent-tags" style="margin-top:12px;">
           ${(state.agentDraft.identity.tags || []).slice(0, 4).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || `<span class="muted">No skills added yet.</span>`}
         </div>
       </div>
-      <div class="status-banner ${draftStatusTone}" style="margin-top:16px;">
+      <div class="status-banner surface-alert ${draftStatusTone}" style="margin-top:16px;">
         <strong>Backend draft status</strong>
         <p>${escapeHtml(state.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
         ${state.agentDraftMeta?.draftId ? `<small>Draft ID: ${escapeHtml(state.agentDraftMeta.draftId)}</small>` : ""}
@@ -477,36 +523,36 @@ export function renderCreateAgentWizardPage({ el, state }) {
   ];
 
   el.appRoot.innerHTML = `
-    <section data-structure="create-agent">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Create agent</p>
-        <h1>Design an agent draft for the marketplace.</h1>
-        <p class="muted">Configure identity, behavior, skills, tools, knowledge, schema, and a real backend test preview. Final publish still needs the owner proof flow.</p>
+    <section data-structure="create-agent" class="builder-onboarding-page builder-onboarding-page--create">
+      <header class="builder-onboarding-header reveal-on-scroll is-visible">
+        <p class="builder-onboarding-eyebrow">Create agent</p>
+        <h1>Create an agent for funded work.</h1>
+        <p>Define the agent, test its behavior, and prepare it for Dispatch tasks.</p>
       </header>
 
       <section class="wizard-shell reveal-on-scroll">
-        <div class="wizard-progress shell-section">
+        <div class="wizard-progress builder-progress-panel">
           <div class="wizard-progress__bar"><span style="width:${(state.wizardStep / 7) * 100}%"></span></div>
           <div class="wizard-steps">
-            ${wizardSteps.map((step, index) => `<button data-step="${index + 1}" class="${state.wizardStep === index + 1 ? "active" : index + 1 < state.wizardStep ? "done" : ""}">${index + 1}. ${step}</button>`).join("")}
+            ${wizardSteps.map((step, index) => `<button data-step="${index + 1}" class="${state.wizardStep === index + 1 ? "active" : index + 1 < state.wizardStep ? "done" : ""}"><span>${index + 1}</span>${step}</button>`).join("")}
           </div>
         </div>
         <div class="wizard-layout">
           <div class="wizard-main">
-            <article class="shell-section wizard-stage-card">
-              <div class="section-head">
+            <article class="wizard-stage-card builder-form-panel">
+              <div class="builder-form-head">
                 <div>
-                  <p class="mini-label">${escapeHtml(currentStep.eyebrow)}</p>
+                  <p class="builder-onboarding-eyebrow">${escapeHtml(currentStep.eyebrow)}</p>
                   <h2>${escapeHtml(currentStep.title)}</h2>
                 </div>
-                <span class="meta-pill">Step ${state.wizardStep} / 7</span>
+                <span>Step ${state.wizardStep} / 7</span>
               </div>
-              <p class="muted">${escapeHtml(currentStep.body)}</p>
+              <p>${escapeHtml(currentStep.body)}</p>
               <div class="wizard-stage-body">
                 ${stepBodies[state.wizardStep - 1]}
               </div>
             </article>
-            <article class="shell-section">
+            <article class="builder-action-panel">
               <div class="review-actions">
                 <button id="wizardPrev" ${state.wizardStep === 1 ? "disabled" : ""}>Back</button>
                 <button class="hero-primary" id="wizardNext">${state.wizardStep === 7 ? "Save Draft" : "Next"}</button>
@@ -514,23 +560,24 @@ export function renderCreateAgentWizardPage({ el, state }) {
             </article>
           </div>
           <aside class="wizard-side">
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Launch readiness</p>
-              <h3>${readinessScore}% ready</h3>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Setup readiness</p>
+              <h3>${readinessChecks.filter((item) => item.ready).length} / ${readinessChecks.length} complete</h3>
               <div class="wizard-progress__bar"><span style="width:${readinessScore}%"></span></div>
               <div class="launch-checklist">
-                ${readinessChecks.map((item) => `<div class="checklist-row ${item.ready ? "is-ready" : ""}"><span>${item.ready ? "Done" : "Open"}</span><strong>${escapeHtml(item.label)}</strong></div>`).join("")}
+                ${readinessChecks.map((item) => `<div class="checklist-row ${item.ready ? "is-ready" : ""}"><span>${item.ready ? "Complete" : "Missing"}</span><strong>${escapeHtml(item.label)}</strong></div>`).join("")}
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Backend draft</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Backend draft</p>
               <h3>${escapeHtml(labelize(state.agentDraftMeta?.syncState || "idle"))}</h3>
-              <p class="muted">${escapeHtml(state.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
+              <p>${escapeHtml(state.agentDraftMeta?.syncMessage || "Draft not saved yet.")}</p>
               ${state.agentDraftMeta?.lastSyncedAt ? `<small>Last synced ${escapeHtml(new Date(state.agentDraftMeta.lastSyncedAt).toLocaleTimeString())}</small>` : ""}
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Market preview</p>
-              <div class="agent-card wizard-preview-card">
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Marketplace preview</p>
+              <p>This preview shows how the agent profile may appear after setup. It does not create ratings, earnings, or verification.</p>
+              <div class="agent-card surface-card wizard-preview-card">
                 <div class="agent-card__top">
                   <div class="agent-card__identity">
                     <div class="avatar">${escapeHtml(state.agentDraft.identity.avatar || state.agentDraft.identity.name.slice(0, 2).toUpperCase())}</div>
@@ -543,16 +590,16 @@ export function renderCreateAgentWizardPage({ el, state }) {
                 <div class="agent-tags">
                   ${(state.agentDraft.identity.tags || []).slice(0, 3).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || `<span class="muted">Add skills to help buyers understand the agent quickly.</span>`}
                 </div>
-                <div class="agent-metrics">
-                  <div><strong class="metric-success">92%</strong><span>Projected trust</span></div>
-                  <div><strong>${state.agentDraft.testRun.latencyMs ? `${Math.round(state.agentDraft.testRun.latencyMs)}ms` : "Pending"}</strong><span>Latency</span></div>
-                  <div class="metric-earnings"><strong>${state.agentDraftMeta?.draftId ? "Live draft" : "Draft only"}</strong><span>Status</span></div>
+                <div class="builder-preview-facts">
+                  <div><span>Test run</span><strong>${state.agentDraft.testRun.result ? "Available" : "Not tested"}</strong></div>
+                  <div><span>Latency</span><strong>${state.agentDraft.testRun.latencyMs ? `${Math.round(state.agentDraft.testRun.latencyMs)}ms` : "Not checked"}</strong></div>
+                  <div><span>Status</span><strong>${state.agentDraftMeta?.draftId ? "Backend draft" : "Local draft"}</strong></div>
                 </div>
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Draft notes</p>
-              <p class="muted">${state.wizardStep < 6 ? "Keep the setup tight. The market rewards fast, legible agents with clear skills and a strong output shape." : state.agentDraft.testRun.result ? "This draft now has a real backend preview. Final publish still needs the owner proof and registry flow." : "Run one believable backend test before treating this draft as publish-ready."}</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Draft notes</p>
+              <p>${state.wizardStep < 6 ? "Keep the setup tight: clear skills, clear behavior, and a predictable output shape." : state.agentDraft.testRun.result ? "This draft has a backend preview. Final publish still needs owner proof and registry flow." : "Run a backend test before treating this draft as publish-ready."}</p>
             </article>
           </aside>
         </div>
@@ -569,23 +616,38 @@ export function renderConnectExternalAgentPage({ el, state }) {
   const compatibilityNotes = state.externalAgentMeta.compatibilityNotes || [];
 
   el.appRoot.innerHTML = `
-    <section data-structure="connect-agent">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Connect external agent</p>
-        <h1>Register an external agent for funded AI work.</h1>
-        <p class="muted">Connect an external AI agent to receive structured funded tasks through Dispatch's adapter flow, submit outputs for owner review, and earn testnet USDC after approved Arc Testnet settlement.</p>
+    <section data-structure="connect-agent" class="builder-onboarding-page builder-onboarding-page--connect">
+      <header class="builder-onboarding-header reveal-on-scroll is-visible">
+        <p class="builder-onboarding-eyebrow">Connect agent</p>
+        <h1>Connect an external agent.</h1>
+        <p>Register an existing agent endpoint and make it available for funded tasks.</p>
       </header>
+
+      <section class="builder-flow-strip reveal-on-scroll">
+        ${[
+          ["01", "Identity", "Name the agent"],
+          ["02", "Endpoint", "Add execution URL"],
+          ["03", "Verify", "Check owner and health"],
+          ["04", "Publish", "Make it available"],
+        ].map(([number, title, helper]) => `
+          <article>
+            <strong>${number}</strong>
+            <h3>${title}</h3>
+            <p>${helper}</p>
+          </article>
+        `).join("")}
+      </section>
 
       <section class="wizard-shell reveal-on-scroll">
         <div class="wizard-layout">
           <div class="wizard-main">
-            <article class="shell-section wizard-stage-card">
-              <div class="section-head">
+            <article class="wizard-stage-card builder-form-panel">
+              <div class="builder-form-head">
                 <div>
-                  <p class="mini-label">Agent identity</p>
+                  <p class="builder-onboarding-eyebrow">Agent identity</p>
                   <h2>Public profile and endpoint</h2>
                 </div>
-                <span class="meta-pill">External</span>
+                <span>External</span>
               </div>
               <div class="form-grid">
                 <label class="field-stack field-wide"><span class="muted">Public name</span><input id="externalAgentName" value="${escapeHtml(state.externalAgentForm.publicName)}" /></label>
@@ -597,18 +659,19 @@ export function renderConnectExternalAgentPage({ el, state }) {
                 <label class="field-stack field-wide"><span class="muted">Description</span><textarea id="externalAgentDescription" rows="4">${escapeHtml(state.externalAgentForm.description)}</textarea></label>
                 <label class="field-stack field-wide"><span class="muted">Skills</span><input id="externalAgentSkills" value="${escapeHtml(state.externalAgentForm.skills.join(", "))}" placeholder="research synthesis, source grounding, structured output" /></label>
               </div>
-              <div class="simple-panel">
+              <div class="builder-helper-panel">
                 <strong>Suggested skills</strong>
+                <p>Use plain capability labels. These help buyers understand the agent without inventing performance history.</p>
                 <div class="agent-tags" style="margin-top:12px;">
                   ${suggestedSkills.map((skill) => `<button type="button" class="tag-button" data-external-skill="${escapeHtml(skill)}">${escapeHtml(skill)}</button>`).join("") || `<span class="muted">No suggestions for this category yet.</span>`}
                 </div>
               </div>
             </article>
 
-            <article class="shell-section wizard-stage-card">
-              <div class="section-head">
+            <article class="wizard-stage-card builder-form-panel">
+              <div class="builder-form-head">
                 <div>
-                  <p class="mini-label">Marketplace checks</p>
+                  <p class="builder-onboarding-eyebrow">Marketplace checks</p>
                   <h2>Latency and compatibility hints</h2>
                 </div>
               </div>
@@ -625,48 +688,25 @@ export function renderConnectExternalAgentPage({ el, state }) {
                 <label class="field-stack field-wide"><span class="muted">Payout wallet</span><input id="externalAgentPayoutWallet" value="${escapeHtml(state.externalAgentForm.payoutWallet || "")}" placeholder="Defaults to connected owner wallet" /></label>
                 <label class="field-stack field-wide"><span class="muted">Output schema</span><textarea id="externalAgentOutputSchema" rows="3">${escapeHtml(state.externalAgentForm.outputSchema || "")}</textarea></label>
               </div>
-              <div class="status-banner info">
+              <div class="builder-helper-panel builder-helper-panel--endpoint">
                 <strong>Expected endpoint shape</strong>
-                <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code>. Dispatch sends a funded job envelope with task scope, USDC reward, Arc Testnet lifecycle status, and adapter metadata.</p>
+                <p>Your agent should expose compatible execute, status, and result endpoints for Dispatch task routing.</p>
+                <div class="builder-endpoint-list">
+                  <div><code>POST /execute</code><span>Accept funded task input</span></div>
+                  <div><code>GET /status/:runId</code><span>Return queued, running, completed, failed, or cancelled</span></div>
+                  <div><code>GET /result/:runId</code><span>Return final task output for owner review</span></div>
+                </div>
               </div>
-              <details class="shell-panel disclosure-panel">
-                <summary>Builder checklist</summary>
-                <div class="disclosure-panel__body">
-                  <div class="live-feed">
-                    <article class="feed-card">
-                      <span class="feed-card__pulse"></span>
-                      <div>
-                        <strong><code>GET /health</code></strong>
-                        <p>Return <code>ok</code>, <code>version</code>, <code>supportedTaskTypes</code>, <code>maxInputBytes</code>, <code>averageLatencyHintMs</code>, and <code>schemaVersion</code>.</p>
-                      </div>
-                    </article>
-                    <article class="feed-card">
-                      <span class="feed-card__pulse"></span>
-                      <div>
-                        <strong><code>POST /execute</code></strong>
-                        <p>Accept marketplace task input and return an accepted run id or an immediate result if your runtime is synchronous.</p>
-                      </div>
-                    </article>
-                    <article class="feed-card">
-                      <span class="feed-card__pulse"></span>
-                      <div>
-                        <strong><code>GET /status/:runId</code></strong>
-                        <p>Return queued, running, completed, failed, or cancelled so the marketplace can track live execution safely.</p>
-                      </div>
-                    </article>
-                    <article class="feed-card">
-                      <span class="feed-card__pulse"></span>
-                      <div>
-                        <strong><code>GET /result/:runId</code></strong>
-                        <p>Return the final task output and any machine-readable payload your agent produces for review and settlement.</p>
-                      </div>
-                    </article>
-                  </div>
+              <details class="builder-details-panel">
+                <summary>Additional health endpoint detail</summary>
+                <div>
+                  <strong><code>GET /health</code></strong>
+                  <p>Return availability, version, supported task types, max input bytes, latency hint, and schema version if your runtime supports it.</p>
                 </div>
               </details>
             </article>
 
-            <article class="shell-section">
+            <article class="builder-action-panel">
               <div class="review-actions">
                 <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify Wallet Ownership"}</button>
                 <button class="hero-primary" id="connectExternalAgent">${verified ? "Connect Agent" : "Verify First"}</button>
@@ -675,22 +715,31 @@ export function renderConnectExternalAgentPage({ el, state }) {
           </div>
 
           <aside class="wizard-side">
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Owner proof</p>
-              <h3>${escapeHtml(verified ? "Verified" : "Pending")}</h3>
-              <p class="muted">${escapeHtml(state.externalAgentMeta.verificationMessage)}</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Connection checks</p>
+              <h3>${escapeHtml(verified ? "Owner proof verified" : "Owner proof pending")}</h3>
+              <div class="builder-check-list">
+                <div class="${verified ? "is-ready" : ""}"><span>${verified ? "Verified" : "Pending"}</span><strong>Owner proof</strong></div>
+                <div class="${state.externalAgentForm.endpointUrl ? "is-ready" : ""}"><span>${state.externalAgentForm.endpointUrl ? "Provided" : "Missing"}</span><strong>Endpoint URL</strong></div>
+                <div class="${compatibilityNotes.length ? "is-ready" : ""}"><span>${compatibilityNotes.length ? "Available" : "Not checked"}</span><strong>Compatibility</strong></div>
+                <div class="${state.externalAgentForm.payoutWallet || state.wallet ? "is-ready" : ""}"><span>${state.externalAgentForm.payoutWallet || state.wallet ? "Available" : "Missing"}</span><strong>Payout wallet</strong></div>
+              </div>
+              <p>${escapeHtml(state.externalAgentMeta.verificationMessage || "Waiting for wallet ownership verification.")}</p>
               ${state.externalAgentMeta.verificationMode ? `<small>Mode: ${escapeHtml(labelize(state.externalAgentMeta.verificationMode))}</small>` : ""}
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Compatibility</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Compatibility</p>
               <h3>${escapeHtml(state.externalAgentMeta.compatibilityHeadline)}</h3>
-              <div class="live-feed">
-                ${compatibilityNotes.map((note) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><p>${escapeHtml(note)}</p></div></article>`).join("") || emptyState("No compatibility notes yet.")}
+              <div class="builder-note-list">
+                ${compatibilityNotes.map((note) => `<article><p>${escapeHtml(note)}</p></article>`).join("") || emptyState("No compatibility checks yet.", {
+                  title: "Endpoint not checked yet.",
+                  body: "Compatibility notes will appear after ownership and endpoint checks run.",
+                })}
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">What this does</p>
-              <p class="muted">This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. External agents can compete for funded work, submit structured outputs, earn testnet USDC after owner-approved settlement, and build reputation.</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">What this does</p>
+              <p>This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. Earnings and reputation appear only after real approved funded work.</p>
               <div class="agent-tags" style="margin-top:12px;">
                 <span class="tag">OpenClaw</span>
                 <span class="tag">LangGraph</span>

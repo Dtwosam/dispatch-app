@@ -45715,6 +45715,7 @@ function custom(provider, config = {}) {
 
 // node_modules/viem/_esm/index.js
 init_abis();
+init_formatUnits();
 
 // apps/web/src/browser-wallet.js
 function listInjectedProviders() {
@@ -45760,7 +45761,15 @@ async function connectInjectedWallet() {
   if (!provider?.request) {
     throw new Error("Rabby or another injected wallet was not detected in this browser.");
   }
-  const accounts = await provider.request({ method: "eth_requestAccounts" });
+  let accounts;
+  try {
+    accounts = await provider.request({ method: "eth_requestAccounts" });
+  } catch (error) {
+    if (error?.code === 4001) {
+      throw new Error("Wallet connection was rejected. Approve the connection request to fund tasks with testnet USDC.");
+    }
+    throw error;
+  }
   if (!Array.isArray(accounts) || !accounts[0]) {
     throw new Error("No browser wallet account was returned.");
   }
@@ -45861,6 +45870,9 @@ function validateAgentView(agent, label = "agent") {
   if (profile.skillCategories !== void 0) assertArray(profile.skillCategories, `${label}.profile.skillCategories`);
   assertObject(profile.expectedLatencyMsRange, `${label}.profile.expectedLatencyMsRange`);
   assertNumber(performanceSummary.tasksCompleted, `${label}.performanceSummary.tasksCompleted`);
+  assertNumber(performanceSummary.successRate, `${label}.performanceSummary.successRate`);
+  assertNumber(performanceSummary.averageResponseTimeMs, `${label}.performanceSummary.averageResponseTimeMs`);
+  assertNumber(performanceSummary.totalEarnings, `${label}.performanceSummary.totalEarnings`);
   return row;
 }
 function validateTaskSummary(task, label = "task") {
@@ -45990,6 +46002,9 @@ var marketplaceAbi = parseAbi([
   "function assign_task(string taskId, string agentId)"
 ]);
 var MAX_UINT256 = (1n << 256n) - 1n;
+var ARC_TESTNET_CHAIN_ID = 5042002;
+var ARC_TESTNET_USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
+var ARC_TESTNET_USDC_DECIMALS = 6;
 function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
   let browserContextPromise = null;
   async function getConfig() {
@@ -46001,7 +46016,7 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
   async function connectWallet() {
     const walletAddress = getWalletAddress()?.trim();
     if (!walletAddress) {
-      throw new Error("Connect a browser wallet before sending an Arc transaction.");
+      throw new Error("Connect a browser wallet before sending an Arc Testnet transaction.");
     }
     return { walletAddress };
   }
@@ -46021,8 +46036,9 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
       throw new Error("Arc writes are disabled in this environment.");
     }
     if (config.chainMode !== "browser_wallet") {
-      throw new Error("Task posting on Arc must be signed from the connected browser wallet.");
+      throw new Error(`Task posting on ${chainDisplayName(config)} must be signed from the connected browser wallet.`);
     }
+    assertBrowserFundingConfig(config);
     return createBrowserTaskLifecycle({
       config,
       taskId,
@@ -46046,10 +46062,11 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
     selectedAgentId,
     selectedAgentOnchainId
   }) {
+    assertBrowserFundingConfig(config);
     const walletAddress = getWalletAddress()?.trim();
     const providerLabel = getInjectedWalletProviderLabel();
     if (!walletAddress) {
-      throw new Error(`Connect ${providerLabel} before sending an Arc transaction.`);
+      throw new Error(`Connect ${providerLabel} before sending a ${chainDisplayName(config)} transaction.`);
     }
     const { publicClient, walletClient } = await getBrowserWriteContext(config);
     const rewardBaseUnits = toTokenBaseUnits(String(rewardAmount ?? ""), Number(config.paymentTokenDecimals ?? 6));
@@ -46176,7 +46193,7 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
       latestReceipt,
       onchainTaskRef: `${config.taskEscrowAddress}:${taskId}`,
       notes: [
-        `${providerLabel} browser signing is active on Arc.`,
+        `${providerLabel} browser signing is active on Arc Testnet.`,
         `${config.paymentTokenSymbol || "USDC"} approval may be required before escrow funding.`,
         `create_task status: ${createReceipt?.status || "PENDING"}`,
         `fund_task status: ${fundReceipt?.status || "PENDING"}`,
@@ -46254,12 +46271,88 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
     if (config.chainMode !== "browser_wallet") return null;
     return getBrowserWriteContext(config);
   }
+  async function getWalletNetworkSnapshot() {
+    const walletAddress = getWalletAddress()?.trim();
+    const config = await getConfig();
+    const provider = getInjectedWalletProvider();
+    if (!provider?.request) {
+      return {
+        walletAddress,
+        chainId: null,
+        expectedChainId: Number(config.chainId || ARC_TESTNET_CHAIN_ID),
+        isArcTestnet: false,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        tokenDecimals: Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS),
+        message: "No EVM browser wallet was detected."
+      };
+    }
+    const rawChainId = await provider.request({ method: "eth_chainId" }).catch(() => null);
+    const chainId = parseChainId(rawChainId);
+    const expectedChainId = Number(config.chainId || ARC_TESTNET_CHAIN_ID);
+    const isArcTestnet = chainId === expectedChainId;
+    if (!walletAddress || !isArcTestnet) {
+      return {
+        walletAddress,
+        chainId,
+        expectedChainId,
+        isArcTestnet,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        tokenDecimals: Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS),
+        message: !walletAddress ? "Connect a wallet to read Arc Testnet balances." : `Switch to Arc Testnet to fund tasks with testnet USDC.`
+      };
+    }
+    const chain = resolveArcChain(config);
+    const publicClient = createPublicClient({ chain, transport: custom(provider) });
+    const tokenAddress = config.paymentTokenAddress || ARC_TESTNET_USDC_ADDRESS;
+    const tokenDecimals = await publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: "decimals"
+    }).then((value) => Number(value)).catch(() => Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS));
+    const [tokenBalance, nativeGasBalance] = await Promise.all([
+      publicClient.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [walletAddress]
+      }).catch(() => null),
+      publicClient.getBalance({ address: walletAddress }).catch(() => null)
+    ]);
+    return {
+      walletAddress,
+      chainId,
+      expectedChainId,
+      isArcTestnet,
+      usdcBalance: tokenBalance == null ? null : formatUnits(BigInt(tokenBalance), tokenDecimals),
+      nativeGasBalance: nativeGasBalance == null ? null : formatUnits(BigInt(nativeGasBalance), Number(config.gasTokenDecimals ?? 18)),
+      tokenDecimals,
+      message: "Arc Testnet wallet is ready for testnet USDC funding."
+    };
+  }
+  async function switchWalletToArcTestnet() {
+    const config = await getConfig();
+    const provider = getInjectedWalletProvider();
+    if (!provider?.request) {
+      throw new Error("No EVM browser wallet was detected.");
+    }
+    await ensureProviderChain(provider, resolveArcChain(config));
+    browserContextPromise = null;
+    return getWalletNetworkSnapshot();
+  }
+  function resetBrowserContext() {
+    browserContextPromise = null;
+  }
   return {
     getConfig,
     getStatus,
     connectWallet,
     createTaskLifecycle,
     primeBrowserLifecycle,
+    getWalletNetworkSnapshot,
+    switchWalletToArcTestnet,
+    resetBrowserContext,
     pollReceipt,
     readContractState,
     readOnchainTask,
@@ -46285,7 +46378,10 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
           transport: custom(provider)
         });
         return { publicClient, walletClient };
-      })();
+      })().catch((error) => {
+        browserContextPromise = null;
+        throw error;
+      });
     }
     return browserContextPromise;
   }
@@ -46312,11 +46408,27 @@ function createMarketplaceChainClient({ apiBase, getWalletAddress, onStatus }) {
     }
   }
 }
+function assertBrowserFundingConfig(config) {
+  if (!config?.taskEscrowAddress) {
+    throw new Error("Arc marketplace contract address is not configured. Set ARC_TASK_MARKETPLACE_ADDRESS before wallet-funded task posting.");
+  }
+  if (!config?.paymentTokenAddress) {
+    throw new Error("Arc USDC token address is not configured. Set ARC_PAYMENT_TOKEN_ADDRESS to 0x3600000000000000000000000000000000000000.");
+  }
+}
 async function runWriteStep({ walletClient, publicClient, label, stepIndex, totalSteps, onStatus, request }) {
   const stepPrefix = totalSteps > 1 ? `Step ${stepIndex}/${totalSteps}: ` : "";
   onStatus?.("pending_wallet", `${stepPrefix}Confirm ${label} in your wallet.`);
-  const hash3 = await walletClient.writeContract(request);
-  onStatus?.("pending_chain", `${stepPrefix}${label} submitted. Waiting for Arc confirmation.`);
+  let hash3;
+  try {
+    hash3 = await walletClient.writeContract(request);
+  } catch (error) {
+    if (error?.code === 4001 || /user rejected|rejected/i.test(String(error?.message || ""))) {
+      throw new Error(`Transaction rejected. Confirm ${label} in your wallet to continue funding on Arc Testnet.`);
+    }
+    throw error;
+  }
+  onStatus?.("pending_chain", `${stepPrefix}${label} submitted. Waiting for Arc Testnet confirmation.`);
   const receipt = await publicClient.waitForTransactionReceipt({ hash: hash3 });
   if (String(receipt.status).toLowerCase() !== "success") {
     throw new Error(`${label} failed onchain.`);
@@ -46358,7 +46470,7 @@ async function assertSufficientBalances({
   }
   if (BigInt(gasBalance || 0n) === 0n) {
     throw new Error(
-      `${providerLabel} wallet has no ${gasTokenSymbol} available for Arc gas. Add a small gas balance before posting a task.`
+      `${providerLabel} wallet has no native ${gasTokenSymbol} available for Arc gas. Add a small gas balance before posting a task.`
     );
   }
   return {
@@ -46371,7 +46483,7 @@ async function assertSufficientBalances({
 }
 function resolveArcChain(config) {
   return {
-    id: Number(config.chainId || 5042002),
+    id: Number(config.chainId || ARC_TESTNET_CHAIN_ID),
     name: config.networkName || "Arc Testnet",
     nativeCurrency: {
       name: config.gasTokenSymbol || "USDC",
@@ -46385,7 +46497,7 @@ function resolveArcChain(config) {
     },
     blockExplorers: config.explorerBaseUrl ? {
       default: {
-        name: "Arcscan",
+        name: "Explorer",
         url: config.explorerBaseUrl
       }
     } : void 0
@@ -46437,6 +46549,19 @@ function toTokenBaseUnits(amount, decimals = 6) {
   }
   return parseUnits(source, decimals);
 }
+function chainDisplayName(config = {}) {
+  const raw = `${config.chainKey || ""} ${config.networkName || ""}`.toLowerCase();
+  return raw.includes("arc") ? "Arc Testnet" : "Connected EVM network";
+}
+function parseChainId(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
+  const text = String(value || "").trim();
+  if (!text) return null;
+  if (text.startsWith("0x")) return Number.parseInt(text, 16);
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 function formatBaseUnits(value, decimals = 6) {
   const negative = value < 0n;
   const absolute = negative ? -value : value;
@@ -46456,7 +46581,7 @@ function delay(ms) {
 
 // apps/web/src/app-config.js
 function readConfiguredApiBase() {
-  const hostedDefaultApiBase = "https://dispatch-router-production.up.railway.app";
+  const hostedDefaultApiBase = "";
   if (typeof window === "undefined") return "http://localhost:4020";
   const { hostname, origin } = window.location;
   const isLocalHost = ["localhost", "127.0.0.1"].includes(hostname);
@@ -46478,14 +46603,25 @@ function readConfiguredApiBase() {
   if (globalApiBase) return globalApiBase;
   return isLocalHost ? "http://localhost:4020" : hostedDefaultApiBase || origin;
 }
+function readJsonStorage(key, fallback) {
+  if (typeof localStorage === "undefined") return fallback;
+  try {
+    const value = localStorage.getItem(key);
+    if (!value) return fallback;
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
 var API_BASE = readConfiguredApiBase();
 var routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
   ["/post-task", "Post Task"],
-  ["/create-agent", "Create Agent"],
+  ["/dashboard", "Builder Dashboard"],
   ["/connect-agent", "Connect Agent"],
-  ["/dashboard", "Dashboard"]
+  ["/create-agent", "Create Agent"]
 ];
 var categories = [
   "research",
@@ -46536,12 +46672,34 @@ function createInitialState() {
       state: "idle",
       message: "No transaction in progress."
     },
+    arcDemo: {
+      step: 0,
+      taskId: "dispatch_demo_research_001",
+      agentId: "platform-agent",
+      reward: 10,
+      consensusScore: 86,
+      validatorAgreement: 78,
+      consensusConfidence: 82
+    },
+    walletNetwork: {
+      loading: false,
+      error: "",
+      chainId: null,
+      expectedChainId: 5042002,
+      isArcTestnet: false,
+      usdcBalance: null,
+      nativeGasBalance: null,
+      tokenDecimals: 6,
+      message: ""
+    },
     task: null,
     history: { items: [] },
+    revisionRequests: readJsonStorage("dispatchRevisionRequests", {}),
+    disputeRecords: readJsonStorage("dispatchDisputeRecords", {}),
     mobileNavOpen: false,
     search: "",
-    filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "trending" },
-    dashboardTab: "my_tasks",
+    filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
+    dashboardTab: "agents",
     wizardStep: 1,
     agentDraftMeta: {
       draftId: null,
@@ -46556,6 +46714,11 @@ function createInitialState() {
       category: "research",
       description: "External endpoint-backed agent for research, synthesis, and evidence-based task execution.",
       endpointUrl: "",
+      webhookUrl: "",
+      developerName: "",
+      adapterType: "erc8183_adapter",
+      outputSchema: "Structured JSON or markdown result suitable for evaluator review.",
+      payoutWallet: "",
       skills: ["research synthesis", "evidence gathering", "structured output"],
       pricingHint: "Bring your own endpoint",
       minLatencyMs: 1500,
@@ -46575,6 +46738,10 @@ function createInitialState() {
     taskForm: {
       title: "",
       description: "",
+      templateId: "custom_task",
+      templateFields: {},
+      templateMessage: "",
+      selectedServicePackage: null,
       category: "research",
       rewardAmount: "",
       deadline: "",
@@ -46689,6 +46856,7 @@ function getAppElements() {
     routeList: document.getElementById("routeList"),
     statusToast: document.getElementById("statusToast"),
     appRoot: document.getElementById("appRoot"),
+    appFooter: document.getElementById("appFooter"),
     topbarActions: document.getElementById("topbarActions"),
     walletSheet: document.getElementById("walletSheet"),
     burstLayer: document.getElementById("burstLayer")
@@ -46712,16 +46880,6 @@ function formatCurrency(value) {
     minimumFractionDigits: hasFraction ? 2 : 0,
     maximumFractionDigits: hasFraction ? 6 : 0
   })} USDC`;
-}
-function formatPercent(value) {
-  const numeric = Number(value || 0);
-  return `${Math.round(numeric)}%`;
-}
-function formatLatency(value) {
-  const numeric = Number(value || 0);
-  if (!numeric) return "0ms";
-  if (numeric < 1e3) return `${Math.round(numeric)}ms`;
-  return `${(numeric / 1e3).toFixed(1).replace(/\.0$/, "")}s`;
 }
 function icon(name, size5 = 16) {
   const icons = {
@@ -46767,13 +46925,20 @@ function setChrome(el2, eyebrow, title, sidebarTitle, sidebarLead, progress) {
     <div class="brand-mark">D</div>
     <div class="brand-copy">
       <strong>Dispatch</strong>
-      <p>Hire AI agents that actually deliver.</p>
+      <p>USDC-funded AI work on Arc Testnet.</p>
     </div>
   `;
 }
 function renderNav(el2, routes2, isActive2, state2) {
-  const primaryRoutes = routes2.filter(([path]) => ["/", "/agents", "/dashboard"].includes(path));
-  const secondaryRoutes = routes2.filter(([path]) => !primaryRoutes.some(([primaryPath]) => primaryPath === path));
+  const primaryOrder = ["/", "/agents", "/post-task", "/dashboard"];
+  const secondaryOrder = ["/connect-agent", "/create-agent"];
+  const byPath = new Map(routes2);
+  const primaryRoutes = primaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
+  const secondaryRoutes = [
+    ...secondaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]),
+    ...routes2.filter(([path]) => !primaryOrder.includes(path) && !secondaryOrder.includes(path))
+  ];
+  const walletLabel = state2.wallet?.trim() ? "Wallet Connected" : "Connect Wallet";
   el2.routeList.innerHTML = `
     <div class="nav-shell">
       <nav class="desktop-nav" aria-label="Primary">
@@ -46799,10 +46964,34 @@ function renderNav(el2, routes2, isActive2, state2) {
           </div>
           <button type="button" data-menu="close" aria-label="Close navigation">${icon("plus", 14)}</button>
         </div>
+        <div class="mobile-drawer__status">
+          <span class="network-pill"><span></span>Arc Testnet</span>
+          <button class="wallet-action wallet-action--drawer" type="button" data-wallet="open">
+            <span class="wallet-action__copy"><strong>${escapeHtml(walletLabel)}</strong></span>
+          </button>
+        </div>
         <nav class="mobile-drawer__nav" aria-label="Mobile">
-          ${routes2.map(([path, label]) => `<a href="${path}" data-route="${path}" ${isActive2(path) ? 'aria-current="page"' : ""}>${label}</a>`).join("")}
+          ${[...primaryRoutes, ...secondaryRoutes].map(([path, label]) => `<a href="${path}" data-route="${path}" ${isActive2(path) ? 'aria-current="page"' : ""}>${label}</a>`).join("")}
         </nav>
       </aside>
+    </div>
+  `;
+}
+function renderAppFooter(el2, routes2) {
+  if (!el2.appFooter) return;
+  const footerPaths = ["/", "/agents", "/post-task", "/dashboard", "/connect-agent", "/create-agent"];
+  const byPath = new Map(routes2);
+  const footerRoutes = footerPaths.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
+  el2.appFooter.innerHTML = `
+    <div class="app-footer__inner">
+      <div class="app-footer__brand">
+        <strong>Dispatch</strong>
+        <p>AI work marketplace on Arc Testnet.</p>
+      </div>
+      <nav class="app-footer__links" aria-label="Footer">
+        ${footerRoutes.map(([path, label]) => `<button type="button" data-route="${path}">${escapeHtml(label)}</button>`).join("")}
+      </nav>
+      <span class="app-footer__pill"><span></span>Arc Testnet</span>
     </div>
   `;
 }
@@ -46811,6 +47000,7 @@ function renderTopbar(el2, state2, shortWallet2) {
   const walletLabel = state2.wallet.trim() ? state2.walletConnectionType === "injected" ? `${providerLabel} ${shortWallet2(state2.wallet)}` : shortWallet2(state2.wallet) : "Connect Wallet";
   const chainMode = state2.chainStatusError ? "Chain Offline" : !state2.chainConfig ? "Checking Chain" : state2.chainConfig.chainMode === "browser_wallet" ? "Browser Sign" : state2.chainConfig.chainMode === "server_signer_proxy" ? "Server Signer" : "Read Only";
   el2.topbarActions.innerHTML = `
+    <span class="network-pill"><span></span>Arc Testnet</span>
     <button class="wallet-action" data-wallet="open">
       <span class="wallet-action__icon">${icon("wallet", 16)}</span>
       <span class="wallet-action__copy">
@@ -46828,63 +47018,71 @@ function renderWalletSheet({
   walletProviderLabel,
   onClose,
   onConnectInjected,
-  onDisconnect
+  onDisconnect,
+  onSwitchNetwork
 }) {
   const providerLabel = walletProviderLabel || "Rabby";
+  const walletNetwork = state2.walletNetwork || {};
   const chainMode = state2.chainStatusError ? "Chain status unavailable" : !state2.chainConfig ? "Checking chain access" : state2.chainConfig.chainMode === "browser_wallet" ? "Browser signing" : state2.chainConfig.chainMode === "server_signer_proxy" ? "Server signer" : "Read only";
   el2.walletSheet.classList.toggle("open", true);
+  const networkLabel = walletNetwork.chainId ? walletNetwork.isArcTestnet ? "Arc Testnet" : `Wrong network (${walletNetwork.chainId})` : "Network not checked";
+  const balanceLabel = walletNetwork.usdcBalance == null ? "Balance unavailable" : `${Number(walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} testnet USDC`;
+  const connected = Boolean(state2.wallet.trim());
+  const onArc = Boolean(walletNetwork.isArcTestnet);
+  const primaryAction = !connected ? `<button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>${walletAvailable ? `Connect ${escapeHtml(providerLabel)}` : "No injected wallet detected"}</button>` : !onArc ? `<button class="hero-primary" type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : `<button class="hero-primary" type="button" disabled>Ready to fund tasks</button>`;
+  const readinessLabel = !connected ? "Connect wallet to continue." : !onArc ? "Switch to Arc Testnet." : walletNetwork.usdcBalance == null ? "Balance unavailable." : "Wallet ready for Dispatch task funding.";
   el2.walletSheet.innerHTML = `
     <div class="wallet-sheet-backdrop" data-wallet="close"></div>
     <div class="wallet-sheet-panel">
       <div class="wallet-sheet-handle"></div>
-      <div class="wallet-sheet-hero">
+      <div class="wallet-sheet-header">
         <div>
           <p class="mini-label">Wallet</p>
-          <h3>Connect and fund work in Dispatch</h3>
-          <p class="muted">Move from browsing to funded execution with a clear signing path, network confirmation, and wallet-owned final approval.</p>
+          <h3>${connected ? "Wallet connected" : "Connect wallet"}</h3>
+          <p class="muted">Use Arc Testnet to fund tasks and release USDC after approval.</p>
         </div>
-        <div class="wallet-sheet-badges">
-          <span class="meta-pill">${escapeHtml(providerLabel)}</span>
-          <span class="meta-pill">${escapeHtml(chainMode)}</span>
-        </div>
+        <button class="wallet-sheet-close" type="button" data-wallet="close" aria-label="Close wallet panel">${icon("plus", 14)}</button>
       </div>
-      <div class="wallet-flow-grid">
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">1</span>
-          <strong>Connect</strong>
-          <p>Attach ${escapeHtml(providerLabel)} to this session and restore the active address.</p>
+
+      <div class="wallet-readiness-grid">
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${connected ? "is-ready" : "is-pending"}"></span>
+            <span>Wallet</span>
+          </div>
+          <strong>${connected ? "Connected" : "Not connected"}</strong>
+          <p>${connected ? `${escapeHtml(shortWallet2(state2.wallet))} via ${escapeHtml(providerLabel)}` : `Connect ${escapeHtml(providerLabel)} to start funded work.`}</p>
         </article>
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">2</span>
-          <strong>Switch network</strong>
-          <p>Confirm Arc Testnet so funding, escrow, and receipt tracking stay aligned.</p>
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${onArc ? "is-ready" : "is-warning"}"></span>
+            <span>Network</span>
+          </div>
+          <strong>${escapeHtml(networkLabel)}</strong>
+          <p>${connected && !onArc ? "Switch to Arc Testnet to continue." : escapeHtml(chainMode)}</p>
         </article>
-        <article class="wallet-flow-card">
-          <span class="wallet-flow-step">3</span>
-          <strong>Sign task execution</strong>
-          <p>Approve only the exact action you want to fund or settle. The wallet stays in control.</p>
+        <article class="wallet-readiness-card">
+          <div class="wallet-readiness-card__head">
+            <span class="wallet-status-dot ${connected && walletNetwork.usdcBalance != null ? "is-ready" : "is-pending"}"></span>
+            <span>Funding</span>
+          </div>
+          <strong>${escapeHtml(balanceLabel)}</strong>
+          <p>${walletNetwork.nativeGasBalance == null ? "Arc Testnet balance appears here when available." : `Gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(void 0, { maximumFractionDigits: 6 }))}`}</p>
         </article>
       </div>
-      <article class="wallet-session-card">
-        <div>
-          <p class="mini-label">Current session</p>
-          <h3>${state2.wallet.trim() ? escapeHtml(shortWallet2(state2.wallet)) : "No wallet connected"}</h3>
-          <p class="muted">${state2.wallet.trim() ? `Connected from ${escapeHtml(providerLabel)} and ready for marketplace signing.` : "Connect once and keep the session ready for task funding, review, and settlement."}</p>
-        </div>
+
+      <article class="wallet-session-card wallet-action-card">
         <div class="wallet-session-actions">
-          <button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>
-            ${walletAvailable ? `${state2.wallet.trim() ? "Reconnect" : "Connect"} ${escapeHtml(providerLabel)}` : "No injected wallet detected"}
-          </button>
-          ${state2.wallet.trim() ? `<button type="button" id="disconnectWallet">Disconnect</button>` : ""}
+          ${primaryAction}
+          ${connected ? `<button type="button" id="connectInjectedWallet">${`Reconnect ${escapeHtml(providerLabel)}`}</button>` : ""}
+          ${connected ? `<button type="button" id="disconnectWallet">Disconnect</button>` : ""}
           <button type="button" data-wallet="close">Close</button>
         </div>
+        <p class="disabled-reason">${escapeHtml(readinessLabel)}</p>
       </article>
       <div class="wallet-sheet-note">
         <span class="live-dot"></span>
-        <p>${state2.walletConnectionType === "injected" && state2.wallet.trim() ? `Connected from browser wallet: ${escapeHtml(shortWallet2(state2.wallet))}.` : "Connect once and the marketplace will keep this workspace ready for live task execution."}</p>
-      </div>
-      <div class="wallet-sheet-footer">
-        <small>Dispatch handles execution flow, but the final signature and payment decision stay in your wallet.</small>
+        <p>Arc Testnet is used for Dispatch task funding and payment review flows. Testnet USDC has no financial value.</p>
       </div>
     </div>
   `;
@@ -46893,6 +47091,9 @@ function renderWalletSheet({
   });
   document.getElementById("disconnectWallet")?.addEventListener("click", () => {
     onDisconnect?.();
+  });
+  document.getElementById("switchArcNetwork")?.addEventListener("click", () => {
+    onSwitchNetwork?.();
   });
   document.querySelectorAll("[data-wallet='close']").forEach((node) => {
     node.addEventListener("click", onClose);
@@ -46917,56 +47118,22 @@ function setButtonLoading(button, loading, text = "") {
     button.innerHTML = button.dataset.originalLabel;
   }
 }
-function speedLabel(agent) {
-  const latency = agent.performanceSummary?.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
-  if (latency <= 12e3) return "Fast";
-  if (latency <= 28e3) return "Balanced";
-  return "Deep";
-}
 function trustScore(agent) {
-  return Math.round(agent.performanceSummary?.reliabilityScore || 0);
-}
-function trendWeight(agent) {
-  return agent.performanceSummary?.trend === "up" ? 2 : agent.performanceSummary?.trend === "flat" ? 1 : 0;
+  return Math.round(agent.performanceSummary?.rankScore || agent.performanceSummary?.reliabilityScore || 0);
 }
 function sortAgents(items, state2) {
   return [...items].sort((left, right) => {
-    if (state2.filters.sort === "highest_earning") {
+    if (state2.filters.sort === "top_earning") {
       return (right.performanceSummary.totalEarnings || 0) - (left.performanceSummary.totalEarnings || 0);
     }
-    if (state2.filters.sort === "best_rated") {
-      return (right.performanceSummary.averageScore || 0) - (left.performanceSummary.averageScore || 0);
+    if (state2.filters.sort === "highest_success") {
+      return (right.performanceSummary.successRate || 0) - (left.performanceSummary.successRate || 0) || (right.performanceSummary.approvalRate || 0) - (left.performanceSummary.approvalRate || 0) || (right.performanceSummary.tasksCompleted || 0) - (left.performanceSummary.tasksCompleted || 0);
     }
     if (state2.filters.sort === "fastest") {
-      return (left.performanceSummary.averageLatencyMs || left.profile.expectedLatencyMsRange.maxMs) - (right.performanceSummary.averageLatencyMs || right.profile.expectedLatencyMsRange.maxMs);
+      return (left.performanceSummary.averageResponseTimeMs || left.performanceSummary.averageLatencyMs || left.profile.expectedLatencyMsRange.maxMs) - (right.performanceSummary.averageResponseTimeMs || right.performanceSummary.averageLatencyMs || right.profile.expectedLatencyMsRange.maxMs);
     }
-    return trendWeight(right) - trendWeight(left) || trustScore(right) - trustScore(left);
+    return (right.performanceSummary.rankScore || 0) - (left.performanceSummary.rankScore || 0) || (right.performanceSummary.successRate || 0) - (left.performanceSummary.successRate || 0) || (right.performanceSummary.approvalRate || 0) - (left.performanceSummary.approvalRate || 0) || (right.performanceSummary.tasksCompleted || 0) - (left.performanceSummary.tasksCompleted || 0);
   });
-}
-function liveActivityEntries(state2) {
-  const leaders = (state2.leaderboards?.buckets || []).flatMap((bucket) => bucket.items.slice(0, 2));
-  const tasks = [...state2.tasks?.activeTasks || [], ...state2.tasks?.completedTasks || []].slice(0, 5);
-  return [
-    ...leaders.map((item, index2) => ({
-      id: `leader-${item.agentId || item.displayName}-${index2}`,
-      tone: item.trend === "up" ? "success" : item.trend === "down" ? "trending" : "neutral",
-      headline: `${item.displayName} moved on the leaderboard`,
-      detail: `${formatCurrency(item.totalEarnings || 0)} total earnings`,
-      meta: item.trend === "up" ? "Ranking up" : item.trend === "down" ? "Cooling off" : "Holding"
-    })),
-    ...tasks.map((task, index2) => ({
-      id: `task-${task.taskId || index2}`,
-      tone: taskStatusTone(task.status),
-      headline: task.title,
-      detail: `${labelize(task.status)} -> ${formatCurrency(task.rewardAmount)}`,
-      meta: task.status === "EXECUTING" ? "Working now" : task.status === "OPEN" ? "Fresh task" : "Recently updated"
-    }))
-  ].slice(0, 7);
-}
-function rankingDeltaLabel(trend, rank) {
-  if (trend === "up") return `+${Math.max(1, 4 - Number(rank || 1))}`;
-  if (trend === "down") return `-${Math.max(1, Number(rank || 1) - 1)}`;
-  return "0";
 }
 function taskStatusTone(status) {
   const normalized = String(status || "").toUpperCase();
@@ -46974,12 +47141,43 @@ function taskStatusTone(status) {
   if (["DISPUTED", "REJECTED", "FAILED", "REFUNDED"].includes(normalized)) return "trending";
   return "neutral";
 }
-function emptyState(message) {
-  return `<div class="empty-inline">${escapeHtml(message)}</div>`;
+function stateTitleFromMessage(message, fallback = "Nothing here yet.") {
+  const source = String(message || "").trim();
+  if (!source) return fallback;
+  const firstSentence = source.split(". ")[0]?.trim();
+  if (!firstSentence) return fallback;
+  return firstSentence.length > 48 ? fallback : firstSentence.replace(/\.$/, ".");
 }
-function countMarkup(value, label, className = "") {
-  const numeric = Number(value) || 0;
-  return `<div class="${className || "metric-card"}"><strong data-count="${numeric}" data-format="${Math.abs(numeric) >= 1e3 ? "compact" : "integer"}">${compactNumber(numeric)}</strong><span>${escapeHtml(label)}</span></div>`;
+function emptyState(message, options = {}) {
+  const title = options.title || stateTitleFromMessage(message);
+  const body = options.body || (title === message ? "Updates will appear here when data is available." : message) || "Waiting for update.";
+  const variant = options.variant || "empty";
+  const inline = options.inline !== false;
+  const markClass = inline ? "empty-inline__mark" : "empty-state__mark";
+  const className = inline ? `empty-inline state-inline state-inline--${escapeHtml(variant)}` : `empty-state state-card state-card--${escapeHtml(variant)}`;
+  const actionMarkup = options.action ? `<div class="empty-state-actions"><button class="${escapeHtml(options.action.className || "hero-secondary")}" ${options.action.route ? `data-route="${escapeHtml(options.action.route)}"` : ""} ${options.action.id ? `id="${escapeHtml(options.action.id)}"` : ""}>${escapeHtml(options.action.label || "Continue")}</button></div>` : "";
+  return `
+    <div class="${className}" role="status">
+      <span class="${markClass}">${icon("spark", inline ? 14 : 16)}</span>
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        ${body ? `<p>${escapeHtml(body)}</p>` : ""}
+        ${actionMarkup}
+      </div>
+    </div>
+  `;
+}
+function richEmptyState(title, body, actions = [], variant = "empty") {
+  return `
+    <div class="empty-state state-card state-card--${escapeHtml(variant)}" role="status">
+      <span class="empty-state__mark">${icon("spark", 16)}</span>
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        <p>${escapeHtml(body)}</p>
+        ${actions.length ? `<div class="empty-state-actions">${actions.join("")}</div>` : ""}
+      </div>
+    </div>
+  `;
 }
 function animateCounters(scope = document) {
   scope.querySelectorAll("[data-count]").forEach((node) => {
@@ -47042,20 +47240,390 @@ function deadlineCountdown(isoTimestamp) {
 }
 
 // apps/web/src/ui-models.js
+function buildArcTransactionLink(hash3) {
+  const value = String(hash3 || "").trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(value)) return null;
+  return `https://testnet.arcscan.app/tx/${value}`;
+}
 function shortWallet(wallet) {
   const value = String(wallet || "").trim();
   if (value.length <= 10) return value || "No wallet";
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
+function buildTaskLifecycleModel(task, options = {}) {
+  const onchainTask = options.onchainSnapshot?.onchainTask || null;
+  const onchainState = String(onchainTask?.state || "").toUpperCase();
+  const escrowLocked = readBigIntLike(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
+  const timelineByKind = new Map((task?.timeline || []).map((item) => [item.kind, item.createdAt]));
+  const settlementSummary = task?.settlementSummary || null;
+  const status = String(task?.status || "").toUpperCase();
+  const resultStatus = String(task?.resultStatus || "").toLowerCase();
+  const transactionState = String(task?.transactionState || "").toLowerCase();
+  const settlementState = String(task?.settlementState || "").toLowerCase();
+  const finalOutcome = String(task?.latestEvaluation?.finalOutcome || "").toLowerCase();
+  const revisionRequests = [
+    ...Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
+    ...Array.isArray(options.revisionRequests) ? options.revisionRequests : []
+  ];
+  const disputeRecords = [
+    ...Array.isArray(task?.disputeRecords) ? task.disputeRecords : [],
+    ...Array.isArray(options.disputeRecords) ? options.disputeRecords : []
+  ];
+  const assignedAgents = task?.selectedAgents || [];
+  const assignedAgent = assignedAgents[0] || null;
+  const participatingAgentIds = task?.participatingAgentIds || [];
+  const hasAnyRawStatus = Boolean(status || resultStatus || transactionState || settlementState || task?.onchainTaskRef || task?.latestSettlement);
+  const fundingConfirmed = Boolean(settlementSummary?.isFunded) || transactionState === "accepted" || Boolean(task?.onchainTaskRef) || escrowLocked > 0n || ["ESCROW_FUNDED", "OPEN", "ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status) || ["OPEN", "ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(onchainState);
+  const fundingPending = !fundingConfirmed && ["pending_wallet", "pending_chain"].includes(transactionState);
+  const fundingFailed = transactionState === "failed";
+  const assigned = Boolean(assignedAgent || task?.selectedAgentId || participatingAgentIds.length || ["ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status));
+  const executing = status === "EXECUTING" || resultStatus === "in_progress";
+  const submitted = ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status) || ["submitted", "approved", "rejected", "disputed", "appealed", "unresolved", "settled"].includes(resultStatus) || Boolean(task?.latestSubmissionId);
+  const underReview = status === "UNDER_REVIEW" || submitted && !["APPROVED", "REJECTED", "DISPUTED", "UNRESOLVED", "SETTLED", "REFUNDED"].includes(status) && Boolean(task?.latestEvaluation);
+  const rejected = status === "REJECTED" || resultStatus === "rejected" || finalOutcome === "rejected";
+  const approved = status === "APPROVED" || resultStatus === "approved" || finalOutcome === "accepted" || settlementState === "pending_settlement" && !rejected;
+  const disputed = status === "DISPUTED" || settlementState === "disputed" || finalOutcome === "disputed" || task?.disputeRecord?.status === "open" || disputeRecords.some((record) => String(record?.status || "under_review").toLowerCase() !== "resolved");
+  const unresolved = status === "UNRESOLVED" || settlementState === "unresolved" || finalOutcome === "unresolved";
+  const cancelled = ["CANCELLED", "CANCELED", "CANCELLED_BY_OWNER", "CANCELED_BY_OWNER"].includes(status) || ["cancelled", "canceled"].includes(resultStatus) || ["cancelled", "canceled"].includes(settlementState);
+  const refunded = status === "REFUNDED" || settlementState === "refunded" || task?.latestSettlement?.outcome === "refunded";
+  const settled = status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
+  const completed = status === "COMPLETED" || resultStatus === "completed";
+  const settlementReady = Boolean(settlementSummary?.canReleasePayment) || !settled && !refunded && !disputed && approved && (settlementState === "pending_settlement" || (task?.reviewActions || []).includes("settle") || settlementState === "reward_funded");
+  const refundReady = Boolean(settlementSummary?.canRefund);
+  const revisionRequested = Boolean(revisionRequests.length) || resultStatus === "needs_revision" || task?.userReview?.decision === "needs_human_review" || rejected && !refunded && !disputed && !unresolved;
+  const needsRevision = revisionRequested && !refunded;
+  const noSubmission = !submitted;
+  const fundingLabel = fundingConfirmed ? "Funded" : fundingPending ? "Funding pending" : fundingFailed ? "Funding failed" : "Awaiting funding";
+  const evaluationLabel = settled ? "Approved" : refunded ? "Closed" : disputed ? "Disputed" : unresolved ? "Unresolved" : revisionRequested ? "Revision requested" : rejected ? "Rejected" : approved ? "Approved" : underReview ? "Under review" : submitted ? "Submitted" : executing ? "In progress" : "Awaiting output";
+  const settlementLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Settlement paused" : unresolved ? "Review unresolved" : settlementReady ? "Ready for settlement" : refundReady ? "Refund available" : fundingConfirmed ? "Settlement pending" : "Funding required";
+  const currentLabel = settled ? "Payment Released" : completed ? "Completed" : refunded || cancelled ? "Cancelled" : disputed || unresolved ? "Disputed" : settlementReady ? "Approved" : approved ? "Approved" : revisionRequested ? "Revision Requested" : rejected ? "Revision Requested" : underReview ? "In Review" : submitted ? "Submitted" : executing ? "In Progress" : assigned ? "Agent Assigned" : fundingPending ? "Waiting for Funding" : fundingConfirmed ? "Funded" : hasAnyRawStatus ? "Draft" : "Unknown";
+  const settlementMessage = settled ? "Payment released." : refunded ? "Reward refunded." : settlementSummary?.settlementReadinessLabel ? settlementSummary.settlementReadinessLabel : settlementReady ? "Approved. USDC release is ready." : needsRevision ? "Revision requested before payout." : rejected ? "Rejected. Payout not recommended." : disputed ? "Disputed. Payout stays paused." : unresolved ? "Review unresolved. Payout stays paused." : underReview ? "Under evaluator review." : submitted ? "Output submitted and waiting for review." : executing ? "Agent is executing now." : fundingPending ? "Funding is still being confirmed." : fundingConfirmed ? "Task is funded and waiting for the next step." : "Awaiting onchain funding.";
+  const amountDisplay = Number.isFinite(Number(task?.rewardAmount)) ? `${Number(task.rewardAmount).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Not available yet";
+  const fundingTxLink = buildArcTransactionLink(task?.latestFundTxHash);
+  const settlementTxLink = buildArcTransactionLink(task?.latestSettlement?.txReference);
+  const releasePending = Boolean(settlementTxLink) && !settled && !refunded;
+  const paymentStateLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Payment locked" : settlementReady ? "Payment ready" : refundReady ? "Refund ready" : fundingConfirmed ? "USDC funded" : fundingPending ? "Funding syncing" : "Funding required";
+  const reviewStateLabel = approved ? "Owner approved" : revisionRequested ? "Revision requested" : rejected ? "Owner rejected" : disputed ? "Disputed" : underReview ? "AI guidance attached" : submitted ? "Needs owner review" : noSubmission ? "No submission yet" : "Waiting for update";
+  const primaryAction = settled || completed ? { label: "View Completed Work", kind: "view_result", disabled: false } : refunded || cancelled ? { label: "View Task", kind: "view_result", disabled: false } : disputed || unresolved ? { label: "View Dispute", kind: "dispute", disabled: false } : settlementReady ? { label: "Release Payment", kind: "settle", disabled: false } : revisionRequested ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : rejected ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : submitted || underReview ? { label: "Review Submission", kind: "review", disabled: false } : executing ? { label: "Waiting for Agent", kind: "wait", disabled: true } : assigned ? { label: "Waiting for Agent", kind: "wait", disabled: true } : fundingConfirmed ? { label: "Assign Agent", kind: "assign", disabled: false } : fundingPending ? { label: "Waiting for Funding", kind: "funding", disabled: true } : { label: "Fund Task", kind: "fund", disabled: false };
+  const statusDisplay = {
+    label: settled ? "Payment Released" : completed ? "Completed" : refunded || cancelled ? "Cancelled" : disputed || unresolved ? "Disputed" : settlementReady || approved ? "Approved" : revisionRequested || rejected ? "Revision Requested" : underReview ? "In Review" : submitted ? "Submitted" : executing ? "In Progress" : assigned ? "Agent Assigned" : fundingPending ? "Waiting for Funding" : fundingConfirmed ? "Funded" : hasAnyRawStatus ? "Draft" : "Unknown",
+    description: settled ? "Owner-approved work has been paid out and the task is effectively complete." : completed ? "The task is complete and ready to view as finished work." : refunded || cancelled ? "The task is closed and no normal payment release is available." : disputed || unresolved ? "The task needs dispute or appeal handling before payment can move." : settlementReady || approved ? "The owner approval step is complete and payment release is the next major action." : revisionRequested || rejected ? "The owner requested changes. Payment remains funded and locked until approved." : underReview ? "A submitted result is being reviewed. AI guidance is advisory; the owner decides." : submitted ? "The agent submitted output and the owner needs to review it." : executing ? "The assigned agent is actively working on the funded task." : assigned ? "An agent is assigned and execution is the next step." : fundingPending ? "Funding was started and Dispatch is waiting for Arc Testnet confirmation." : fundingConfirmed ? "The task is funded and ready for assignment or execution." : hasAnyRawStatus ? "The task exists but needs funding before marketplace execution." : "Dispatch cannot determine the current task state yet.",
+    nextActionText: primaryAction.label,
+    whoActsNext: settled || completed || refunded || cancelled ? "No action needed" : revisionRequested || rejected ? "Assigned agent" : settlementReady || approved || submitted || underReview || disputed || unresolved || fundingPending || !fundingConfirmed ? "Task owner" : executing || assigned ? "Assigned agent" : "Marketplace",
+    primaryCtaText: primaryAction.label,
+    variant: settled || completed ? "success" : refunded || cancelled || disputed || unresolved || revisionRequested || rejected || fundingFailed ? "warning" : fundingPending || fundingConfirmed || assigned || executing || submitted || underReview || approved || settlementReady ? "info" : "neutral",
+    lifecycleStepAlignment: settled ? "payment" : completed ? "completed" : refunded || cancelled ? "completed" : disputed || unresolved || revisionRequested || rejected || underReview ? "review" : settlementReady || approved ? "approved" : submitted ? "submitted" : executing ? "in_progress" : assigned ? "assigned" : fundingPending || fundingConfirmed ? "funding" : "posted",
+    actionableBy: settled || completed || refunded || cancelled ? "none" : executing || assigned ? "agent" : fundingConfirmed && !assigned ? "system" : "owner",
+    raw: {
+      status,
+      resultStatus,
+      transactionState,
+      settlementState
+    }
+  };
+  const paymentDisplay = {
+    label: settled ? "Released" : refunded ? "Refunded" : disputed || unresolved ? "Disputed" : releasePending ? "Release Pending" : settlementReady ? "Ready to Release" : submitted || underReview || approved || revisionRequested || rejected ? "Locked Until Approval" : fundingConfirmed ? "Funded" : fundingPending ? "Funding Pending" : fundingFailed ? "Unknown" : task ? "Not Funded" : "Unknown",
+    description: settled ? "Payment has been released to the agent after owner approval." : refunded ? "The task reward has been refunded instead of released." : disputed ? "Payment remains funded and locked while the dispute is under review." : unresolved ? "Payment is paused while the task is unresolved." : releasePending ? "Transaction submitted. Waiting for confirmation." : settlementReady ? "Work has been approved. Payment is ready to release." : revisionRequested || rejected ? "Payment is funded and locked while the requested changes are pending. Approval is still required before release." : submitted || underReview ? "Payment is funded but locked. The owner must review the submitted work before release." : approved ? "Owner approval is recorded. Payment can move to release." : fundingConfirmed ? "Payment is funded but not released yet." : fundingPending ? "Funding transaction is being confirmed on Arc Testnet." : fundingFailed ? "Funding status is unclear after a failed wallet or chain update." : task ? "This task has not been funded yet." : "Payment state is not available yet.",
+    nextPaymentAction: settled ? "No payment action needed." : refunded ? "No release action is available after refund." : disputed ? "Wait for dispute review before payment can move." : unresolved ? "Resolve the review state before payment can move." : releasePending ? "Wait for Arc Testnet confirmation." : settlementReady ? "Release payment." : revisionRequested || rejected ? "Wait for revised output before approval." : submitted || underReview ? "Review the submitted work." : approved ? "Prepare payment release." : fundingConfirmed ? "Wait for output and owner approval." : fundingPending ? "Wait for funding confirmation." : "Fund the task with testnet USDC.",
+    variant: settled ? "success" : refunded || disputed || unresolved || fundingFailed ? "warning" : settlementReady || releasePending || fundingConfirmed || fundingPending || revisionRequested ? "info" : "neutral",
+    amountDisplay,
+    networkDisplay: "Arc Testnet",
+    fundingTxHash: task?.latestFundTxHash || null,
+    fundingTxLink,
+    settlementTxHash: task?.latestSettlement?.txReference || null,
+    settlementTxLink,
+    transactionLinks: [
+      fundingTxLink ? { label: "Funding transaction", href: fundingTxLink, hash: task.latestFundTxHash } : null,
+      settlementTxLink ? { label: "Release transaction", href: settlementTxLink, hash: task.latestSettlement.txReference } : null
+    ].filter(Boolean)
+  };
+  const nextActor = statusDisplay.whoActsNext;
+  const nextActionHelper = settled ? "The task is complete. Review the delivered work and payout trail." : completed ? "The task is complete. View the delivered work and final status." : refunded ? "The task is closed and the reward has been refunded." : cancelled ? "The task is closed and no normal marketplace action is available." : disputed || unresolved ? "Open the dispute or appeal view before payment can move." : settlementReady ? "Release USDC payment now that the output is approved." : revisionRequested || rejected ? "Waiting for revised output. Payment remains funded and locked until owner approval." : submitted || underReview ? "Review the submitted output. AI review is guidance; owner approval controls payout." : executing ? "The agent is working. Wait for the submitted output before reviewing." : assigned ? "An agent is assigned. Execution will produce a submitted output next." : fundingConfirmed ? "The task is funded. Dispatch can route it to an agent for execution." : fundingPending ? "Wallet activity was captured. Wait for Arc Testnet confirmation." : "Fund the task with testnet USDC before assignment or execution can begin.";
+  const reputationLabel = settled ? "Reputation updated" : refunded ? "Refund closed" : "Reputation pending";
+  const assignmentLabel = assignedAgent ? `${assignedAgent.displayName} (${assignedAgent.originType === "external" ? "External agent" : "Platform agent"})` : task?.selectedAgentId ? "Assigned agent selected" : participatingAgentIds.length ? `${participatingAgentIds.length} participating agent${participatingAgentIds.length === 1 ? "" : "s"}` : "No agent assigned yet";
+  const steps = [
+    {
+      key: "posted",
+      label: "Task Created",
+      status: "complete",
+      helper: "Dispatch recorded the task request and reward terms.",
+      timestamp: task?.createdAt || timelineByKind.get("task_created") || null
+    },
+    {
+      key: "funding",
+      label: "Funded",
+      status: fundingConfirmed ? "complete" : fundingFailed ? "failed" : fundingPending ? "current" : "pending",
+      helper: fundingConfirmed ? "Funding is confirmed and the task can move through the marketplace." : fundingFailed ? "The latest wallet or chain funding action failed." : fundingPending ? "Wallet signatures were captured and Arc Testnet funding confirmation is still syncing." : "The task needs onchain funding before assignment and execution.",
+      timestamp: timelineByKind.get("escrow_funded") || null
+    },
+    {
+      key: "assigned",
+      label: "Agent Assigned",
+      status: assigned ? "complete" : fundingConfirmed ? "current" : "pending",
+      helper: assigned ? assignmentLabel : "An AI agent will be assigned once the USDC-funded task is ready to route.",
+      timestamp: timelineByKind.get("agent_accepted") || timelineByKind.get("agent_invited") || null
+    },
+    {
+      key: "in_progress",
+      label: "In Progress",
+      status: submitted || approved || settled || refunded || revisionRequested || rejected || disputed || unresolved ? "complete" : executing ? "current" : assigned ? "pending" : "pending",
+      helper: executing ? "The assigned worker is actively completing the task." : submitted ? "Execution finished and a result was submitted." : assigned ? "Execution starts after the agent begins work." : "Waiting for an assigned agent before work can start.",
+      timestamp: timelineByKind.get("execution_started") || null
+    },
+    {
+      key: "submitted",
+      label: "Submitted",
+      status: submitted ? "complete" : executing ? "pending" : "pending",
+      helper: submitted ? "A result is on the task and ready for owner review." : "No submission yet.",
+      timestamp: timelineByKind.get("submission_received") || null
+    },
+    {
+      key: "review",
+      label: "Review",
+      status: approved ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : underReview || submitted ? "current" : "pending",
+      helper: approved ? "The task owner approved the output for settlement." : revisionRequested || rejected ? "The owner requested changes. Payment stays locked until approval." : disputed ? "A dispute paused payout." : unresolved ? "Manual escalation is needed before payout can move." : underReview ? "AI review is guidance. The task owner makes the final approval decision." : submitted ? "The output is waiting for owner review." : "Review starts after submission.",
+      timestamp: timelineByKind.get("review_started") || timelineByKind.get("result_verified") || null
+    },
+    {
+      key: "approved",
+      label: "Approved",
+      status: approved || settled ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : submitted || underReview ? "pending" : "pending",
+      helper: approved || settled ? "Owner approval is recorded and payment can move." : revisionRequested || rejected ? "Approval is still required before payment can be released." : "Owner approval happens after reviewing a submitted output.",
+      timestamp: timelineByKind.get("approved") || timelineByKind.get("result_verified") || null
+    },
+    {
+      key: "payment",
+      label: "Payment Released",
+      status: settled || refunded ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : settlementReady ? "current" : "pending",
+      helper: settlementMessage,
+      timestamp: task?.latestSettlement?.settlementTimestamp || timelineByKind.get("settled") || timelineByKind.get("refund_completed") || null
+    },
+    {
+      key: "reputation",
+      label: "Completed",
+      status: settled || refunded ? "complete" : "pending",
+      helper: settled ? "Agent reputation can now reflect a paid, owner-approved funded outcome." : refunded ? "The task is closed and payout reputation stays unchanged or neutral." : "Reputation updates after owner approval and a terminal payout state.",
+      timestamp: task?.latestSettlement?.settlementTimestamp || null
+    }
+  ];
+  return {
+    steps,
+    currentLabel,
+    statusDisplay,
+    fundingLabel,
+    evaluationLabel,
+    settlementLabel,
+    settlementMessage,
+    paymentStateLabel,
+    paymentDisplay,
+    reviewStateLabel,
+    primaryAction,
+    nextActor,
+    nextActionHelper,
+    assignmentLabel,
+    assignedAgent,
+    isSettled: settled,
+    isRefunded: refunded,
+    isRejected: rejected,
+    isRevisionRequested: revisionRequested,
+    isDisputed: disputed,
+    isUnresolved: unresolved,
+    isCancelled: cancelled
+  };
+}
+function buildTaskRevisionDisplayModel(task, options = {}) {
+  const sourceItems = [
+    ...Array.isArray(task?.revisionRequests) ? task.revisionRequests : [],
+    ...Array.isArray(options.revisionRequests) ? options.revisionRequests : []
+  ];
+  const normalizedItems = sourceItems.filter(Boolean).map((item, index2) => {
+    const changeRequest = String(item.changeRequest || item.note || item.reason || "").trim();
+    const missingDetails = String(item.missingDetails || item.missing || "").trim();
+    const extraInstruction = String(item.extraInstruction || item.instruction || "").trim();
+    return {
+      id: item.id || `revision_${index2 + 1}`,
+      changeRequest: changeRequest || "Revision details were not provided.",
+      missingDetails: missingDetails || "Not specified.",
+      extraInstruction: extraInstruction || "",
+      requestedAt: item.requestedAt || item.createdAt || null,
+      requestedBy: item.requestedBy || item.actorWallet || "Task owner",
+      resubmissionNote: item.resubmissionNote || null
+    };
+  }).sort((left, right) => new Date(right.requestedAt || 0).getTime() - new Date(left.requestedAt || 0).getTime());
+  const hasRevisionRequested = normalizedItems.length > 0 || String(task?.resultStatus || "").toLowerCase() === "needs_revision" || task?.userReview?.decision === "needs_human_review";
+  return {
+    hasRevisionRequested,
+    items: normalizedItems,
+    latestRequest: normalizedItems[0] || null,
+    headline: hasRevisionRequested ? "Revision requested" : "No revision requested",
+    description: hasRevisionRequested ? "Payment remains funded and locked until the owner approves revised work." : "Revision history will appear here after changes are requested.",
+    emptyMessage: "No revision requested. Review actions appear after the agent submits work."
+  };
+}
+function buildTaskDisputeDisplayModel(task, options = {}) {
+  const sourceItems = [
+    ...Array.isArray(task?.disputeRecords) ? task.disputeRecords : [],
+    ...Array.isArray(options.disputeRecords) ? options.disputeRecords : [],
+    task?.disputeRecord || null
+  ];
+  const normalizedItems = sourceItems.filter(Boolean).map((item, index2) => {
+    const reason = String(item.reason || item.disputeReason || "").trim();
+    const details = String(item.details || item.evidence || item.description || "").trim();
+    const requestedResolution = String(item.requestedResolution || item.resolution || "").trim();
+    const status = String(item.status || "under_review").trim();
+    return {
+      id: item.id || `dispute_${index2 + 1}`,
+      reason: reason || "Dispute reason not provided.",
+      details: details || "No evidence details provided yet.",
+      requestedResolution: requestedResolution || "Request platform review",
+      status: status || "under_review",
+      statusLabel: labelize(status || "under_review"),
+      openedAt: item.openedAt || item.createdAt || item.requestedAt || null,
+      openedBy: item.openedBy || item.actorWallet || "Task owner"
+    };
+  }).sort((left, right) => new Date(right.openedAt || 0).getTime() - new Date(left.openedAt || 0).getTime());
+  const hasOpenDispute = normalizedItems.some((item) => String(item.status || "").toLowerCase() !== "resolved") || String(task?.status || "").toUpperCase() === "DISPUTED" || String(task?.settlementState || "").toLowerCase() === "disputed";
+  return {
+    hasOpenDispute,
+    items: normalizedItems,
+    latestDispute: normalizedItems[0] || null,
+    headline: hasOpenDispute ? "Dispute under review" : "No dispute open",
+    description: hasOpenDispute ? "Payment remains funded and locked while the dispute is reviewed. No refund or payout is created by this local dispute record." : "Dispute details will appear here if the owner opens a dispute.",
+    emptyMessage: "No dispute open. Use disputes only when approval or revision cannot safely resolve the task."
+  };
+}
+var taskBriefTemplates = [
+  {
+    id: "write_x_thread",
+    name: "Write X Thread",
+    category: "writing",
+    description: "Turn a topic, links, or notes into a polished X thread.",
+    expectedOutput: "A polished X thread based on the details above.",
+    fields: [
+      { key: "topic", label: "Topic", required: true },
+      { key: "audience", label: "Audience", required: true },
+      { key: "tone", label: "Tone", required: true },
+      { key: "keyPoints", label: "Key points", required: true, multiline: true },
+      { key: "referenceLinks", label: "Reference links", required: false, multiline: true },
+      { key: "tweetCount", label: "Number of tweets", required: true },
+      { key: "cta", label: "CTA", required: false }
+    ]
+  },
+  {
+    id: "summarize_article",
+    name: "Summarize Article",
+    category: "summarization",
+    description: "Summarize an article, link, transcript, or pasted text.",
+    expectedOutput: "A concise summary with the requested style, length, and key points.",
+    fields: [
+      { key: "article", label: "Article/link/text", required: true, multiline: true },
+      { key: "summaryStyle", label: "Summary style", required: true },
+      { key: "length", label: "Length", required: true },
+      { key: "mainPoints", label: "Main points to extract", required: false, multiline: true },
+      { key: "audience", label: "Audience", required: false }
+    ]
+  },
+  {
+    id: "debug_code",
+    name: "Debug Code",
+    category: "coding",
+    description: "Explain and debug a code issue with clear reproduction context.",
+    expectedOutput: "A clear diagnosis, likely cause, suggested fix, and next steps.",
+    fields: [
+      { key: "techStack", label: "Tech stack", required: true },
+      { key: "errorMessage", label: "Error message", required: true, multiline: true },
+      { key: "expectedBehavior", label: "Expected behavior", required: true, multiline: true },
+      { key: "actualBehavior", label: "Actual behavior", required: true, multiline: true },
+      { key: "codeSnippet", label: "Code snippet/link", required: false, multiline: true },
+      { key: "alreadyTried", label: "What you already tried", required: false, multiline: true }
+    ]
+  },
+  {
+    id: "research_project",
+    name: "Research Project",
+    category: "research",
+    description: "Research a project, market, or topic and return a structured brief.",
+    expectedOutput: "A structured research brief with comparisons, risks, and conclusion.",
+    fields: [
+      { key: "projectName", label: "Project name", required: true },
+      { key: "links", label: "Links", required: false, multiline: true },
+      { key: "researchGoal", label: "Research goal", required: true, multiline: true },
+      { key: "whatToCompare", label: "What to compare", required: false, multiline: true },
+      { key: "outputFormat", label: "Output format", required: true },
+      { key: "risksToCover", label: "Risks to cover", required: false, multiline: true }
+    ]
+  },
+  {
+    id: "rewrite_content",
+    name: "Rewrite Content",
+    category: "writing",
+    description: "Rewrite rough content for a clearer tone, audience, and length.",
+    expectedOutput: "A rewritten version that preserves meaning while improving clarity and tone.",
+    fields: [
+      { key: "originalText", label: "Original text", required: true, multiline: true },
+      { key: "targetTone", label: "Target tone", required: true },
+      { key: "audience", label: "Audience", required: false },
+      { key: "length", label: "Length", required: false },
+      { key: "whatToImprove", label: "What to improve", required: true, multiline: true }
+    ]
+  },
+  {
+    id: "custom_task",
+    name: "Custom Task",
+    category: "",
+    description: "Write your own task brief from scratch.",
+    expectedOutput: "",
+    fields: []
+  }
+];
+function getTaskBriefTemplate(templateId) {
+  return taskBriefTemplates.find((template) => template.id === templateId) || taskBriefTemplates.at(-1);
+}
+function buildTaskTemplateBrief(templateId, values = {}) {
+  const template = getTaskBriefTemplate(templateId);
+  if (!template || template.id === "custom_task") {
+    return {
+      template,
+      brief: "",
+      missingFields: [],
+      isCustom: true
+    };
+  }
+  const missingFields = template.fields.filter((field) => field.required && !String(values[field.key] || "").trim()).map((field) => field.label);
+  const lines = [
+    `Task Type: ${template.name}`,
+    "",
+    ...template.fields.flatMap((field) => [
+      `${field.label}:`,
+      String(values[field.key] || "").trim() || "Not provided yet",
+      ""
+    ]),
+    "Expected output:",
+    template.expectedOutput
+  ];
+  return {
+    template,
+    brief: lines.join("\n").trim(),
+    missingFields,
+    isCustom: false
+  };
+}
 function buildPostTaskChecklist(form, selectedAgent) {
   const isDirect = form.hiringMode === "direct_hire";
+  const templateResult = buildTaskTemplateBrief(form.templateId || "custom_task", form.templateFields || {});
+  const templateReady = templateResult.isCustom || templateResult.missingFields.length === 0;
   return {
-    summary: isDirect ? selectedAgent ? `${selectedAgent.profile.publicName} is preselected for funded execution.` : "Select an agent before funding this direct hire." : `Open market task with up to ${Number(form.maxParticipants || 1)} participating agents.`,
+    summary: isDirect ? selectedAgent ? `${selectedAgent.profile.publicName} is preselected for this funded Arc task.` : "Select an agent before funding this direct hire." : `Open market funded task with up to ${Number(form.maxParticipants || 1)} participating agents.`,
     items: [
       {
         id: "scope",
-        label: "Task scope is clear",
+        label: "Funded task scope is clear",
         complete: String(form.title || "").trim().length >= 3 && String(form.description || "").trim().length >= 20
+      },
+      {
+        id: "template",
+        label: templateResult.isCustom ? "Custom brief ready" : "Template fields ready",
+        complete: templateReady
       },
       {
         id: "selection",
@@ -47064,10 +47632,555 @@ function buildPostTaskChecklist(form, selectedAgent) {
       },
       {
         id: "settlement",
-        label: "Review path chosen",
+        label: "Owner review and settlement path chosen",
         complete: Boolean(form.evaluationPreference)
       }
     ]
+  };
+}
+function buildSuggestedTaskTemplatesForAgent(agent) {
+  const haystack = [
+    agent?.profile?.publicName,
+    agent?.profile?.slug,
+    agent?.profile?.category,
+    ...agent?.profile?.skills || [],
+    ...agent?.profile?.capabilityTags || [],
+    ...agent?.profile?.skillCategories || []
+  ].join(" ").toLowerCase();
+  const ids = haystack.includes("thread") ? ["write_x_thread", "rewrite_content"] : haystack.includes("summar") ? ["summarize_article", "rewrite_content"] : haystack.includes("research") ? ["research_project", "summarize_article"] : haystack.includes("rewrit") ? ["rewrite_content", "write_x_thread"] : haystack.includes("repurpos") || haystack.includes("content") ? ["write_x_thread", "rewrite_content"] : haystack.includes("code") || haystack.includes("debug") ? ["debug_code", "research_project"] : ["custom_task"];
+  return ids.map(getTaskBriefTemplate).filter(Boolean);
+}
+function classifyServicePackageFamily(agent) {
+  const haystack = [
+    agent?.profile?.publicName,
+    agent?.profile?.slug,
+    agent?.profile?.category,
+    ...agent?.profile?.skills || [],
+    ...agent?.profile?.capabilityTags || [],
+    ...agent?.profile?.skillCategories || []
+  ].join(" ").toLowerCase();
+  if (haystack.includes("thread")) return "thread_writer";
+  if (haystack.includes("summar")) return "summarizer";
+  if (haystack.includes("debug") || haystack.includes("code")) return "debugging";
+  if (haystack.includes("research")) return "research";
+  if (haystack.includes("rewrit")) return "rewriter";
+  if (haystack.includes("repurpos") || haystack.includes("content")) return "content_repurposer";
+  return "generic";
+}
+var servicePackageCatalog = {
+  thread_writer: [
+    { tier: "Basic", name: "5-tweet thread", priceUsdc: 10, deliveryEstimate: "Fast delivery", templateId: "write_x_thread", description: "Turn one topic or link into a concise X thread.", expectedOutput: "Hook, 5-tweet thread, and simple CTA.", bestFor: "Quick launch posts and simple thought-leadership threads.", fields: { tweetCount: "5", tone: "clear and direct", cta: "Invite readers to learn more or try the product" } },
+    { tier: "Standard", name: "10-tweet thread", priceUsdc: 20, deliveryEstimate: "Balanced delivery", templateId: "write_x_thread", description: "Build a fuller thread with stronger flow and positioning.", expectedOutput: "Hook, 10-tweet thread, CTA, and structure notes.", bestFor: "Product launches, announcements, and founder updates.", fields: { tweetCount: "10", tone: "sharp and useful", cta: "Drive readers toward the next action" } },
+    { tier: "Pro", name: "15-tweet thread + hooks", priceUsdc: 35, deliveryEstimate: "High-detail delivery", templateId: "write_x_thread", description: "Create a deeper thread with multiple hook options.", expectedOutput: "3 hook options, 15-tweet thread, CTA, and suggested visuals.", bestFor: "Important launches and crypto-native campaigns.", fields: { tweetCount: "15", tone: "high-signal and crypto-native", cta: "Clear next step for readers" } }
+  ],
+  summarizer: [
+    { tier: "Basic", name: "Short summary", priceUsdc: 8, deliveryEstimate: "Fast delivery", templateId: "summarize_article", description: "Summarize long text into a short useful brief.", expectedOutput: "Short summary and key takeaways.", bestFor: "Articles, notes, and quick reading shortcuts.", fields: { summaryStyle: "short", length: "brief", mainPoints: "Extract the most important points" } },
+    { tier: "Standard", name: "Detailed summary + key points", priceUsdc: 18, deliveryEstimate: "Balanced delivery", templateId: "summarize_article", description: "Turn source material into a structured summary.", expectedOutput: "Detailed summary, key points, and action items if applicable.", bestFor: "Research notes, documents, and meeting transcripts.", fields: { summaryStyle: "structured", length: "detailed", mainPoints: "Key ideas, useful details, and action items" } },
+    { tier: "Pro", name: "Summary + thread-ready breakdown", priceUsdc: 30, deliveryEstimate: "High-detail delivery", templateId: "summarize_article", description: "Summarize material and make it easy to repurpose.", expectedOutput: "Summary, key points, action items, and thread-ready breakdown.", bestFor: "Turning long material into usable content assets.", fields: { summaryStyle: "repurposable", length: "comprehensive", mainPoints: "Summary, key insights, content angles, and actions" } }
+  ],
+  debugging: [
+    { tier: "Basic", name: "Explain error", priceUsdc: 10, deliveryEstimate: "Fast delivery", templateId: "debug_code", description: "Explain what an error likely means.", expectedOutput: "Plain-English diagnosis and likely next checks.", bestFor: "Understanding build/runtime errors quickly.", fields: { outputFormat: "diagnosis" } },
+    { tier: "Standard", name: "Find bug + suggest fix", priceUsdc: 25, deliveryEstimate: "Balanced delivery", templateId: "debug_code", description: "Analyze the issue and suggest a practical fix.", expectedOutput: "Likely cause, suggested fix, and verification steps.", bestFor: "Stuck bugs with enough context to reason from.", fields: { alreadyTried: "List anything already tested so the agent avoids repeats" } },
+    { tier: "Pro", name: "Review file + propose patch", priceUsdc: 50, deliveryEstimate: "High-detail delivery", templateId: "debug_code", description: "Review a code snippet or file and propose a patch plan.", expectedOutput: "Diagnosis, patch recommendation, risks, and test checklist.", bestFor: "Higher-value debugging where correctness matters.", fields: { alreadyTried: "Include relevant file links, snippets, and reproduction steps" } }
+  ],
+  research: [
+    { tier: "Basic", name: "Quick research summary", priceUsdc: 10, deliveryEstimate: "Fast delivery", templateId: "research_project", description: "Get a quick structured overview of a topic.", expectedOutput: "Overview, key points, and conclusion.", bestFor: "Early exploration and fast context building.", fields: { outputFormat: "quick research summary", risksToCover: "Mention obvious risks or uncertainties" } },
+    { tier: "Standard", name: "Detailed research brief", priceUsdc: 25, deliveryEstimate: "Balanced delivery", templateId: "research_project", description: "Produce a clearer breakdown with useful insights.", expectedOutput: "Overview, key insights, pros, risks, and conclusion.", bestFor: "Project reviews, market checks, and decision support.", fields: { outputFormat: "structured research brief", risksToCover: "Product, adoption, execution, and market risks" } },
+    { tier: "Pro", name: "Research + comparison + risks", priceUsdc: 50, deliveryEstimate: "High-detail delivery", templateId: "research_project", description: "Research a topic and compare it against alternatives.", expectedOutput: "Research brief, comparison table, risks, and recommendation.", bestFor: "Investment-style, product, or competitor research tasks.", fields: { outputFormat: "research brief with comparison and risks", whatToCompare: "Compare against relevant alternatives" } }
+  ],
+  rewriter: [
+    { tier: "Basic", name: "Clean rewrite", priceUsdc: 8, deliveryEstimate: "Fast delivery", templateId: "rewrite_content", description: "Make rough text clearer and more polished.", expectedOutput: "Clean rewritten version preserving original meaning.", bestFor: "Paragraphs, emails, and rough product copy.", fields: { targetTone: "clear and polished", whatToImprove: "Clarity, flow, and readability" } },
+    { tier: "Standard", name: "Rewrite + stronger hook", priceUsdc: 18, deliveryEstimate: "Balanced delivery", templateId: "rewrite_content", description: "Improve the text and strengthen its opening.", expectedOutput: "Polished rewrite, stronger hook, and structure notes.", bestFor: "Posts, landing sections, and announcement copy.", fields: { targetTone: "stronger and sharper", whatToImprove: "Hook, clarity, flow, and persuasion" } },
+    { tier: "Pro", name: "Rewrite + 3 angle variations", priceUsdc: 30, deliveryEstimate: "High-detail delivery", templateId: "rewrite_content", description: "Rewrite the text and explore multiple angles.", expectedOutput: "Polished rewrite plus 3 alternate angle variations.", bestFor: "High-impact posts and copy where angle matters.", fields: { targetTone: "premium and compelling", whatToImprove: "Clarity, hook, angle, and conversion strength" } }
+  ],
+  content_repurposer: [
+    { tier: "Basic", name: "Repurpose into summary", priceUsdc: 10, deliveryEstimate: "Fast delivery", templateId: "summarize_article", description: "Turn one input into a short reusable summary.", expectedOutput: "Summary, key points, and short caption.", bestFor: "Fast content reuse from long notes.", fields: { summaryStyle: "content-ready", length: "short", mainPoints: "Extract reusable points and a short caption" } },
+    { tier: "Standard", name: "Thread + bullet points", priceUsdc: 22, deliveryEstimate: "Balanced delivery", templateId: "write_x_thread", description: "Turn one piece of content into a thread and bullet set.", expectedOutput: "Hook, thread, bullet points, and CTA.", bestFor: "Repurposing articles or transcripts for X.", fields: { tweetCount: "8", tone: "clear and useful", cta: "Encourage the reader to take the next step" } },
+    { tier: "Pro", name: "Multi-format content pack", priceUsdc: 40, deliveryEstimate: "High-detail delivery", templateId: "write_x_thread", description: "Create multiple usable content formats from one source.", expectedOutput: "Thread, summary, bullet points, short post, and CTA.", bestFor: "Campaign-ready content repurposing.", fields: { tweetCount: "12", tone: "high-signal and practical", cta: "Clear next step for the audience" } }
+  ]
+};
+function buildAgentServicePackages(agent) {
+  const family = classifyServicePackageFamily(agent);
+  if (family === "generic") return [];
+  const catalogItems = servicePackageCatalog[family] || [];
+  const agentId = agent?.profile?.agentId || "";
+  const agentSlug = agent?.profile?.slug || "agent";
+  return catalogItems.map((item) => ({
+    id: `${agentSlug}_${item.tier.toLowerCase()}_${item.templateId}`,
+    agentId,
+    ...item,
+    includedRevisions: "Revision requests stay available through Dispatch review, but this package does not guarantee an automatic revision count."
+  }));
+}
+function buildServicePackageDisplayModel(servicePackage, agent = null) {
+  return {
+    id: servicePackage?.id || "",
+    tier: servicePackage?.tier || "Package",
+    name: servicePackage?.name || "Service package",
+    description: servicePackage?.description || "Ready-made service for a funded Dispatch task.",
+    priceDisplay: `${Number(servicePackage?.priceUsdc || 0).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    deliveryEstimate: servicePackage?.deliveryEstimate || "Delivery estimate not available yet",
+    expectedOutput: servicePackage?.expectedOutput || "Structured output for owner review.",
+    bestFor: servicePackage?.bestFor || "Funded AI work with review before payment.",
+    agentName: agent?.profile?.publicName || "Selected agent",
+    templateName: getTaskBriefTemplate(servicePackage?.templateId)?.name || "Custom Task",
+    includedRevisions: servicePackage?.includedRevisions || "Revisions follow the normal Dispatch review flow."
+  };
+}
+function buildTaskDraftFromServicePackage(servicePackage, agent = null) {
+  const template = getTaskBriefTemplate(servicePackage?.templateId || "custom_task");
+  const fields = {
+    ...servicePackage?.fields || {}
+  };
+  const briefSections = [
+    `Service Package: ${servicePackage?.tier || "Package"} - ${servicePackage?.name || "Service package"}`,
+    "",
+    `Agent: ${agent?.profile?.publicName || "Selected agent"}`,
+    `Price: ${Number(servicePackage?.priceUsdc || 0).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    `Delivery estimate: ${servicePackage?.deliveryEstimate || "Not available yet"}`,
+    "",
+    "What the user is buying:",
+    servicePackage?.description || "Ready-made service for a funded Dispatch task.",
+    "",
+    "Best for:",
+    servicePackage?.bestFor || "Funded AI work with review before payment.",
+    "",
+    "Expected output:",
+    servicePackage?.expectedOutput || "Structured output for owner review.",
+    "",
+    "Editable brief:",
+    "Add your specific topic, source text, links, constraints, and preferred tone before funding.",
+    "This package only prefills task creation. You still fund the task, review the submitted work, and release payment only after approval."
+  ];
+  return {
+    title: servicePackage?.name ? `${servicePackage.name} with ${agent?.profile?.publicName || "agent"}` : `Task for ${agent?.profile?.publicName || "agent"}`,
+    description: briefSections.join("\n"),
+    category: template.category || agent?.profile?.category || "research",
+    rewardAmount: servicePackage?.priceUsdc ? String(servicePackage.priceUsdc) : "",
+    templateId: template.id,
+    templateFields: fields,
+    hiringMode: "direct_hire",
+    selectedAgentId: agent?.profile?.agentId || servicePackage?.agentId || "",
+    servicePackage: servicePackage ? {
+      id: servicePackage.id,
+      name: servicePackage.name,
+      tier: servicePackage.tier,
+      priceUsdc: servicePackage.priceUsdc,
+      deliveryEstimate: servicePackage.deliveryEstimate,
+      agentId: agent?.profile?.agentId || servicePackage.agentId || ""
+    } : null,
+    templateMessage: `${servicePackage?.name || "Service package"} prefilled this task. Review and edit the brief before funding.`
+  };
+}
+function collectTaskBuckets(taskCollections = {}) {
+  return [
+    ...taskCollections.myPostedTasks || [],
+    ...taskCollections.allOpenTasks || [],
+    ...taskCollections.activeTasks || [],
+    ...taskCollections.completedTasks || [],
+    ...taskCollections.rejectedTasks || [],
+    ...taskCollections.disputedTasks || []
+  ].filter((task, index2, items) => task?.taskId && items.findIndex((candidate) => candidate?.taskId === task.taskId) === index2);
+}
+function taskBelongsToAgent(task, agentId) {
+  return task?.selectedAgentId === agentId || (task?.participatingAgentIds || []).includes(agentId);
+}
+function readTaskReward(task) {
+  const value = Number(task?.rewardAmount);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+function isTaskFundedForEarnings(task) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  return !["Not Funded", "Funding Pending", "Unknown"].includes(lifecycle.paymentDisplay.label);
+}
+function isTaskSettledForEarnings(task) {
+  const status = String(task?.status || "").toUpperCase();
+  const settlementState = String(task?.settlementState || "").toLowerCase();
+  return status === "SETTLED" || settlementState === "settled" || task?.latestSettlement?.outcome === "paid";
+}
+function isTaskDisputedForEarnings(task) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  return lifecycle.isDisputed;
+}
+function isTaskPendingLockedForEarnings(task) {
+  const status = String(task?.status || "").toUpperCase();
+  if (isTaskSettledForEarnings(task) || isTaskDisputedForEarnings(task)) return false;
+  return isTaskFundedForEarnings(task) && ["ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(status);
+}
+function buildAgentAttentionItems(agent, taskCollections = {}) {
+  const agentId = agent?.profile?.agentId;
+  if (!agentId) return [];
+  return collectTaskBuckets(taskCollections).filter((task) => taskBelongsToAgent(task, agentId)).filter((task) => {
+    const status = String(task.status || "").toUpperCase();
+    const resultStatus = String(task.resultStatus || "").toLowerCase();
+    return ["ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "DISPUTED"].includes(status) || ["submitted", "needs_revision", "disputed"].includes(resultStatus) || Boolean(task.revisionRequests?.length) || Boolean(task.disputeRecords?.length);
+  }).slice(0, 5).map((task) => {
+    const lifecycle = buildTaskLifecycleModel(task);
+    return {
+      taskId: task.taskId,
+      title: buildSafeTaskSummary(task),
+      statusLabel: lifecycle.statusDisplay.label,
+      paymentLabel: lifecycle.paymentDisplay.label,
+      nextAction: lifecycle.statusDisplay.nextActionText,
+      whoActsNext: lifecycle.statusDisplay.whoActsNext
+    };
+  });
+}
+function buildEarningsActivityRows(agents = [], taskCollections = {}) {
+  const agentById = new Map(agents.map((agent) => [agent?.profile?.agentId, agent]));
+  return collectTaskBuckets(taskCollections).flatMap((task) => {
+    const agentIds = [
+      task?.selectedAgentId,
+      ...task?.participatingAgentIds || []
+    ].filter(Boolean);
+    return [...new Set(agentIds)].map((agentId) => ({ task, agent: agentById.get(agentId) || null, agentId }));
+  }).filter(({ task }) => readTaskReward(task) > 0 && isTaskFundedForEarnings(task)).map(({ task, agent, agentId }) => {
+    const lifecycle = buildTaskLifecycleModel(task);
+    const settlementTxLink = buildArcTransactionLink(task?.latestSettlement?.txReference);
+    const fundingTxLink = buildArcTransactionLink(task?.latestFundTxHash);
+    return {
+      taskId: task.taskId,
+      title: buildSafeTaskSummary(task),
+      agentId,
+      agentName: agent?.profile?.publicName || "Assigned agent",
+      amount: readTaskReward(task),
+      amountDisplay: `${readTaskReward(task).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+      paymentState: lifecycle.paymentDisplay.label,
+      reviewState: lifecycle.reviewStateLabel,
+      settlementState: lifecycle.settlementLabel,
+      dateLabel: task?.latestSettlement?.settlementTimestamp || task?.updatedAt || task?.createdAt ? new Date(task.latestSettlement?.settlementTimestamp || task.updatedAt || task.createdAt).toLocaleDateString() : "Waiting for update",
+      txLink: settlementTxLink || fundingTxLink,
+      txLabel: settlementTxLink ? "Settlement tx" : fundingTxLink ? "Funding tx" : "No transaction link"
+    };
+  }).sort((left, right) => {
+    if (left.dateLabel === "Waiting for update") return 1;
+    if (right.dateLabel === "Waiting for update") return -1;
+    return 0;
+  });
+}
+function buildAgentEarningsBreakdown(agent, taskCollections = {}) {
+  const summary = agent?.performanceSummary || {};
+  const agentId = agent?.profile?.agentId || "";
+  const tasks = collectTaskBuckets(taskCollections).filter((task) => taskBelongsToAgent(task, agentId));
+  const paidTasks = Number(summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0);
+  const settledEarnings = Number(summary.paidEarnings ?? summary.totalEarnings ?? 0);
+  const pendingLockedValue = tasks.filter(isTaskPendingLockedForEarnings).reduce((sum, task) => sum + readTaskReward(task), 0);
+  const disputedLockedValue = tasks.filter((task) => isTaskDisputedForEarnings(task) && isTaskFundedForEarnings(task)).reduce((sum, task) => sum + readTaskReward(task), 0);
+  const averagePaidTaskValue = paidTasks > 0 ? settledEarnings / paidTasks : null;
+  const packages = buildAgentServicePackages(agent);
+  return {
+    settledEarnings,
+    settledEarningsDisplay: settledEarnings > 0 ? `${settledEarnings.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No settled earnings yet",
+    paidTasks,
+    paidTasksDisplay: paidTasks > 0 ? String(paidTasks) : "No paid tasks completed yet",
+    pendingLockedValue,
+    pendingLockedDisplay: pendingLockedValue > 0 ? `${pendingLockedValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Pending value appears after funded assigned tasks exist.",
+    disputedLockedValue,
+    disputedLockedDisplay: disputedLockedValue > 0 ? `${disputedLockedValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No disputed locked value.",
+    approvalRateDisplay: typeof summary.approvalRate === "number" && (summary.tasksAttempted || summary.totalReviews || paidTasks) > 0 ? `${Math.round(summary.approvalRate * 100)}%` : "Not enough data yet",
+    averagePaidTaskValueDisplay: averagePaidTaskValue == null ? "Waiting for first approved task" : `${averagePaidTaskValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    packageStartingPriceDisplay: packages.length ? `${Math.min(...packages.map((item) => item.priceUsdc)).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No service package yet"
+  };
+}
+function buildAgentEarningsSummary(agents = [], taskCollections = {}) {
+  const breakdowns = agents.map((agent) => buildAgentEarningsBreakdown(agent, taskCollections));
+  const settledEarnings = breakdowns.reduce((sum, item) => sum + item.settledEarnings, 0);
+  const pendingLockedValue = breakdowns.reduce((sum, item) => sum + item.pendingLockedValue, 0);
+  const disputedLockedValue = breakdowns.reduce((sum, item) => sum + item.disputedLockedValue, 0);
+  const paidTasks = breakdowns.reduce((sum, item) => sum + item.paidTasks, 0);
+  return {
+    settledEarnings,
+    settledEarningsDisplay: settledEarnings > 0 ? `${settledEarnings.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No settled earnings yet",
+    pendingLockedValue,
+    pendingLockedDisplay: pendingLockedValue > 0 ? `${pendingLockedValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Pending value appears after funded assigned tasks exist.",
+    disputedLockedValue,
+    disputedLockedDisplay: disputedLockedValue > 0 ? `${disputedLockedValue.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "No disputed locked value.",
+    paidTasks,
+    averagePaidTaskValueDisplay: paidTasks > 0 ? `${(settledEarnings / paidTasks).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Waiting for first approved task"
+  };
+}
+function buildAgentEarningsDashboardModel(agents = [], taskCollections = {}) {
+  return {
+    summary: buildAgentEarningsSummary(agents, taskCollections),
+    breakdowns: agents.map((agent) => ({
+      agentId: agent?.profile?.agentId || "",
+      slug: agent?.profile?.slug || "",
+      name: agent?.profile?.publicName || "Unnamed Agent",
+      typeLabel: agent?.profile?.originType === "external" ? "External Agent" : "Platform Agent",
+      ...buildAgentEarningsBreakdown(agent, taskCollections)
+    })),
+    activityRows: buildEarningsActivityRows(agents, taskCollections),
+    note: "Agent earnings from available Dispatch task data. Wallet-specific builder earnings require reliable ownership/account persistence."
+  };
+}
+function checklistItem(id, label, state2, description) {
+  const stateLabels = {
+    passed: "Passed",
+    missing: "Missing",
+    limited: "Limited data",
+    not_enough_data: "Not enough data yet",
+    needs_review: "Needs review"
+  };
+  return {
+    id,
+    label,
+    state: state2,
+    stateLabel: stateLabels[state2] || "Limited data",
+    description
+  };
+}
+function isHealthyConnection(value) {
+  return ["active", "healthy", "online", "connected", "ready"].includes(String(value || "").toLowerCase());
+}
+function isUnavailableConnection(value) {
+  return ["offline", "unavailable", "disabled", "paused", "failed", "rejected"].includes(String(value || "").toLowerCase());
+}
+function buildAgentVerificationChecklist(agent, taskCollections = {}) {
+  const profile = agent?.profile || {};
+  const summary = agent?.performanceSummary || {};
+  const agentId = profile.agentId || "";
+  const tasks = collectTaskBuckets(taskCollections).filter((task) => taskBelongsToAgent(task, agentId));
+  const paidTasksFromTasks = tasks.filter(isTaskSettledForEarnings).length;
+  const paidTasks = Math.max(Number(summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0), paidTasksFromTasks);
+  const reviewCount = Math.max(Number(summary.totalReviews ?? summary.totalApprovals ?? summary.tasksAttempted ?? 0), tasks.filter((task) => task.latestEvaluation || task.userReview || task.resultStatus).length);
+  const disputeCount = Math.max(Number(summary.disputeCount ?? 0), tasks.filter(isTaskDisputedForEarnings).length);
+  const packages = buildAgentServicePackages(agent);
+  const connectionValue = profile.connectionStatus || agent?.healthStatus || profile.healthStatus || summary.status || "";
+  const isPlatform = profile.originType !== "external";
+  const hasProfile = Boolean(profile.publicName && (profile.description || profile.skills?.length || profile.capabilityTags?.length));
+  const hasWallet = Boolean(profile.payoutWallet || profile.ownerWallet || profile.operatorWallet);
+  const hasConnectionData = Boolean(profile.connectionStatus || agent?.healthStatus || profile.healthStatus);
+  return [
+    checklistItem(
+      "profile",
+      "Agent profile available",
+      hasProfile ? "passed" : profile.publicName ? "limited" : "missing",
+      hasProfile ? "Name and marketplace description are available." : profile.publicName ? "Basic name exists, but profile detail is still thin." : "Agent profile data is missing."
+    ),
+    checklistItem(
+      "connection",
+      "Connection status available",
+      isPlatform ? "passed" : hasConnectionData ? isHealthyConnection(connectionValue) ? "passed" : "needs_review" : "missing",
+      isPlatform ? "Platform agent is managed by Dispatch." : hasConnectionData ? `Connection reports ${labelize(connectionValue)}.` : "External endpoint connection data is unavailable."
+    ),
+    checklistItem(
+      "health",
+      "Health check available",
+      isPlatform ? "passed" : hasConnectionData ? isHealthyConnection(connectionValue) ? "passed" : "needs_review" : "missing",
+      isPlatform ? "Platform runtime is Dispatch-managed." : hasConnectionData ? "Endpoint status is available for review." : "Connection check needed before stronger readiness can be shown."
+    ),
+    checklistItem(
+      "wallet",
+      "Payout/owner wallet available",
+      hasWallet ? "passed" : "missing",
+      hasWallet ? "A payout or owner wallet is present." : "Payout or owner wallet is not available yet."
+    ),
+    checklistItem(
+      "packages",
+      "Service packages configured",
+      packages.length ? "passed" : "limited",
+      packages.length ? `${packages.length} ready-made package${packages.length === 1 ? "" : "s"} configured.` : "No ready-made packages yet; custom tasks can still be created."
+    ),
+    checklistItem(
+      "paid_history",
+      "Completed paid task history",
+      paidTasks > 0 ? "passed" : "not_enough_data",
+      paidTasks > 0 ? `${paidTasks} paid funded task${paidTasks === 1 ? "" : "s"} recorded.` : "Waiting for first approved funded task."
+    ),
+    checklistItem(
+      "review_history",
+      "Review/approval history",
+      reviewCount > 0 ? "passed" : "not_enough_data",
+      reviewCount > 0 ? `${reviewCount} review signal${reviewCount === 1 ? "" : "s"} available.` : "Approval rate appears after reviewed work exists."
+    ),
+    checklistItem(
+      "disputes",
+      "Dispute history",
+      disputeCount > 0 ? "limited" : "not_enough_data",
+      disputeCount > 0 ? `${disputeCount} disputed task${disputeCount === 1 ? "" : "s"} found in available data.` : "No dispute history found in available task data."
+    )
+  ];
+}
+function buildAgentVerificationModel(agent, taskCollections = {}) {
+  const profile = agent?.profile || {};
+  const checklist = buildAgentVerificationChecklist(agent, taskCollections);
+  const connectionValue = profile.connectionStatus || agent?.healthStatus || profile.healthStatus || agent?.performanceSummary?.status || "";
+  const isPlatform = profile.originType !== "external";
+  const missingCount = checklist.filter((item) => item.state === "missing").length;
+  const limitedCount = checklist.filter((item) => item.state === "limited" || item.state === "not_enough_data").length;
+  const needsReviewCount = checklist.filter((item) => item.state === "needs_review").length;
+  const paidHistory = checklist.find((item) => item.id === "paid_history");
+  const hasExplicitVerification = profile.verificationStatus === "verified" || profile.verified === true;
+  const externalConnectionMissing = !isPlatform && checklist.some((item) => ["connection", "health"].includes(item.id) && item.state === "missing");
+  const externalConnectionUnavailable = !isPlatform && isUnavailableConnection(connectionValue);
+  const walletMissing = profile.originType === "external" && checklist.some((item) => item.id === "wallet" && item.state === "missing");
+  let state2 = "limited_data";
+  let stateLabel = "Limited data";
+  let tone = "warning";
+  let nextAction = "Complete more paid tasks";
+  let trustNote = "This agent is visible, but more completed work is needed before stronger trust signals appear.";
+  if (hasExplicitVerification && missingCount === 0 && needsReviewCount === 0) {
+    state2 = "verified";
+    stateLabel = "Verified";
+    tone = "success";
+    nextAction = "Ready for funded tasks";
+    trustNote = "Verification data is available and setup checks are complete.";
+  } else if (externalConnectionUnavailable) {
+    state2 = "offline";
+    stateLabel = "Offline / unavailable";
+    tone = "danger";
+    nextAction = "Check endpoint health";
+    trustNote = "This external agent does not currently look available for funded work.";
+  } else if (externalConnectionMissing) {
+    state2 = "connection_check_needed";
+    stateLabel = "Connection check needed";
+    tone = "warning";
+    nextAction = "Check endpoint health";
+    trustNote = "Connection state is missing, so users should review carefully before assigning funded work.";
+  } else if (needsReviewCount > 0 || walletMissing) {
+    state2 = "needs_review";
+    stateLabel = "Needs review";
+    tone = "warning";
+    nextAction = walletMissing ? "Add payout wallet" : "Review agent setup";
+    trustNote = "This agent is listed, but setup data needs review before stronger readiness can be shown.";
+  } else if (paidHistory?.state !== "passed") {
+    state2 = "limited_data";
+    stateLabel = "Limited data";
+    tone = "warning";
+    nextAction = "Wait for first completed task";
+    trustNote = "This agent has enough setup data to appear, but needs completed paid work before stronger trust signals appear.";
+  } else {
+    state2 = "ready";
+    stateLabel = "Ready";
+    tone = "success";
+    nextAction = "Ready for funded tasks";
+    trustNote = "This agent has enough setup and paid-work data to accept funded tasks.";
+  }
+  return {
+    state: state2,
+    stateLabel,
+    tone,
+    checklist,
+    missingCount,
+    limitedCount,
+    needsReviewCount,
+    passedCount: checklist.filter((item) => item.state === "passed").length,
+    nextAction,
+    trustNote
+  };
+}
+function buildAgentBuilderAgentRowModel(agent, taskCollections = {}) {
+  const display = buildAgentDisplayModel(agent, taskCollections);
+  const packages = buildAgentServicePackages(agent);
+  const attentionItems = buildAgentAttentionItems(agent, taskCollections);
+  return {
+    agentId: agent?.profile?.agentId || "",
+    slug: agent?.profile?.slug || "",
+    name: display.name,
+    typeLabel: display.typeLabel,
+    statusLabel: display.statusLabel,
+    connectionStatus: display.connectionStatus,
+    verificationLabel: display.verificationLabel,
+    readinessLabel: display.readinessLabel,
+    readinessTone: display.readinessTone,
+    verificationNextAction: display.verificationNextAction,
+    verificationMissingCount: display.verificationMissingCount,
+    verificationLimitedCount: display.verificationLimitedCount,
+    packageSummary: display.packageSummary,
+    firstPackageId: packages[0]?.id || null,
+    completedTasksDisplay: display.completedTasksDisplay,
+    totalEarnedDisplay: display.totalEarnedDisplay,
+    approvalRateDisplay: display.approvalRateDisplay,
+    attentionItems,
+    attentionCount: attentionItems.length
+  };
+}
+function buildAgentBuilderSummaryModel(agents = [], taskCollections = {}) {
+  const rows = agents.map((agent) => buildAgentBuilderAgentRowModel(agent, taskCollections));
+  const paidTasksCompleted = agents.reduce((sum, agent) => {
+    const summary = agent?.performanceSummary || {};
+    return sum + Number(summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0);
+  }, 0);
+  const paidEarnings = agents.reduce((sum, agent) => {
+    const summary = agent?.performanceSummary || {};
+    return sum + Number(summary.paidEarnings ?? summary.totalEarnings ?? 0);
+  }, 0);
+  const activeAgents = agents.filter((agent) => {
+    const status = String(agent?.performanceSummary?.status || agent?.profile?.connectionStatus || "").toLowerCase();
+    return ["active", "healthy", "online", "connected"].includes(status) || agent?.profile?.originType === "platform";
+  }).length;
+  const attentionCount = rows.reduce((sum, row) => sum + row.attentionCount, 0);
+  return {
+    agentsListed: agents.length,
+    activeAgents,
+    paidTasksCompleted,
+    paidEarnings,
+    paidEarningsDisplay: `${paidEarnings.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    attentionCount,
+    ownershipNote: "Builder dashboard preview. Showing agents available in this Dispatch demo; wallet-specific ownership requires backend/account persistence."
+  };
+}
+function buildAgentBuilderDashboardModel(agents = [], taskCollections = {}) {
+  return {
+    summary: buildAgentBuilderSummaryModel(agents, taskCollections),
+    agentRows: agents.map((agent) => buildAgentBuilderAgentRowModel(agent, taskCollections))
+  };
+}
+function buildAgentDisplayModel(agent, taskCollections = {}) {
+  const profile = agent?.profile || {};
+  const summary = agent?.performanceSummary || {};
+  const paidCompleted = summary.paidTasksCompleted ?? summary.tasksCompleted ?? 0;
+  const tasksAttempted = summary.tasksAttempted ?? summary.totalTasks ?? paidCompleted ?? 0;
+  const paidEarnings = summary.paidEarnings ?? summary.totalEarnings ?? 0;
+  const approvalRate = typeof summary.approvalRate === "number" && tasksAttempted > 0 ? `${Math.round(summary.approvalRate * 100)}%` : "Not enough data yet";
+  const averageScore = typeof summary.averageScore === "number" && summary.averageScore > 0 ? String(Math.round(summary.averageScore)) : "Not enough data yet";
+  const deliveryTime = summary.averageResponseTimeMs || summary.averageLatencyMs ? formatResponseMetric(agent) : "Not enough data yet";
+  const typeLabel = profile.originType === "external" ? "External Agent" : "Platform Agent";
+  const connectionStatus = profile.originType === "external" ? labelize(profile.connectionStatus || agent?.healthStatus || profile.healthStatus || "unknown") : "Dispatch managed";
+  const verification = buildAgentVerificationModel(agent, taskCollections);
+  const verificationLabel = verification.stateLabel;
+  const bestUseCases = (profile.skills?.length ? profile.skills : profile.capabilityTags || profile.skillCategories || []).slice(0, 5).map((item) => labelize(item));
+  const recentWork = buildRecentAgentWork(agent, taskCollections);
+  const suggestedTemplates = buildSuggestedTaskTemplatesForAgent(agent);
+  const servicePackages = buildAgentServicePackages(agent);
+  const description = profile.description || "Marketplace worker for structured funded AI tasks.";
+  const specialty = bestUseCases[0] || labelize(profile.category || "general work");
+  return {
+    name: profile.publicName || "Unnamed Agent",
+    slug: profile.slug || "",
+    categoryLabel: labelize(profile.category || "general"),
+    typeLabel,
+    description,
+    shortDescription: description.split(".")[0].slice(0, 110),
+    specialty,
+    bestUseCases,
+    badges: buildAgentIdentityBadges(agent),
+    connectionStatus,
+    verificationLabel,
+    verificationState: verification.state,
+    verificationTone: verification.tone,
+    readinessLabel: verification.stateLabel,
+    readinessTone: verification.tone,
+    verificationChecklist: verification.checklist,
+    verificationMissingCount: verification.missingCount,
+    verificationLimitedCount: verification.limitedCount,
+    verificationNextAction: verification.nextAction,
+    verificationTrustNote: verification.trustNote,
+    statusLabel: labelize(summary.status || "new"),
+    completedTasksDisplay: String(paidCompleted || 0),
+    approvalRateDisplay: approvalRate,
+    totalEarnedDisplay: `${Number(paidEarnings || 0).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
+    averageDeliveryDisplay: deliveryTime,
+    averageScoreDisplay: averageScore,
+    reviewsDisplay: (summary.totalReviews || summary.totalApprovals || 0) > 0 ? String(summary.totalReviews || summary.totalApprovals) : "No reviews yet",
+    rankDisplay: summary.rankPosition ? `#${summary.rankPosition}` : "Not ranked yet",
+    pricingNote: profile.pricingHint || "Set per funded task reward",
+    payoutWalletDisplay: shortWallet(profile.payoutWallet || profile.ownerWallet),
+    recentWork,
+    suggestedTemplates,
+    servicePackages,
+    packageSummary: servicePackages.length ? `Packages from ${Math.min(...servicePackages.map((item) => item.priceUsdc))} USDC` : "Custom funded tasks available",
+    trustNote: paidCompleted > 0 ? "Trust comes from funded task completions, owner-approved outcomes, settlement history, and reliability over time." : "Not enough completed work yet. Reputation will build as this agent completes approved funded tasks."
   };
 }
 function buildAgentIdentityBadges(agent) {
@@ -47075,26 +48188,89 @@ function buildAgentIdentityBadges(agent) {
   if (agent?.profile?.originType === "platform") {
     badges.push("Platform Agent");
   }
+  if (agent?.profile?.originType === "external") {
+    badges.push("External Agent");
+    badges.push("ERC-8183 compatible");
+  }
+  if ((agent?.performanceSummary?.rankPosition || 0) === 1 && (agent?.performanceSummary?.tasksAttempted || 0) > 0) {
+    badges.push("Top Agent");
+  }
+  if (agent?.performanceSummary?.status === "new") {
+    badges.push("New");
+  }
   if (agent?.profile?.skillCategories?.length) {
     badges.push(labelize(agent.profile.skillCategories[0]));
   }
   return badges;
 }
+function buildRecentAgentWork(agent, taskCollections = {}) {
+  const allTasks = [
+    ...taskCollections.completedTasks || [],
+    ...taskCollections.rejectedTasks || [],
+    ...taskCollections.disputedTasks || []
+  ];
+  return allTasks.filter((task) => task.participatingAgentIds?.includes(agent.profile.agentId) || task.selectedAgentId === agent.profile.agentId).filter((task, index2, items) => items.findIndex((candidate) => candidate.taskId === task.taskId) === index2).sort((left, right) => new Date(right.updatedAt || right.createdAt || 0).getTime() - new Date(left.updatedAt || left.createdAt || 0).getTime()).slice(0, 5).map((task) => ({
+    taskId: task.taskId,
+    title: buildSafeTaskSummary(task),
+    category: labelize(task.category),
+    status: labelize(task.status),
+    rewardAmount: Number(task.rewardAmount || 0),
+    evaluationScore: typeof task.latestEvaluation?.overallScore === "number" ? Math.round(task.latestEvaluation.overallScore) : null,
+    settlementStatus: task.settlementSummary?.settlementReadinessLabel || labelize(task.settlementState || task.status),
+    completedAt: task.latestSettlement?.settlementTimestamp || task.updatedAt || task.createdAt,
+    approvalIndicator: buildApprovalIndicator(task)
+  }));
+}
+function buildSafeTaskSummary(task) {
+  const raw = String(task?.title || "").trim();
+  if (!raw) return `${labelize(task?.category || "task")} task`;
+  return raw.length > 72 ? `${raw.slice(0, 69)}...` : raw;
+}
+function buildApprovalIndicator(task) {
+  const status = String(task?.status || "").toUpperCase();
+  if (status === "SETTLED") return "Paid";
+  if (status === "APPROVED") return "Approved";
+  if (status === "REFUNDED") return "Refunded";
+  if (status === "REJECTED") return "Rejected";
+  if (status === "DISPUTED") return "Disputed";
+  return labelize(task?.resultStatus || "completed");
+}
+function formatResponseMetric(agent) {
+  const latency = agent.performanceSummary?.averageResponseTimeMs || agent.performanceSummary?.averageLatencyMs || 0;
+  if (!latency) return "No response data yet";
+  if (latency < 1e3) return `${latency} ms`;
+  if (latency < 6e4) return `${Math.round(latency / 1e3)} sec`;
+  return `${Math.round(latency / 6e4)} min`;
+}
+function readBigIntLike(value) {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return BigInt(Math.trunc(value));
+  if (typeof value === "string" && value.trim()) {
+    try {
+      return BigInt(value);
+    } catch {
+      return 0n;
+    }
+  }
+  return 0n;
+}
 function buildReviewPanelModel(task) {
   const hasEvaluation = Boolean(task?.latestEvaluation);
   const canReviewSubmittedResult = ["SUBMITTED", "UNDER_REVIEW"].includes(task?.status);
-  const canDispute = ["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task?.status);
+  const revisionRequested = Boolean(task?.revisionRequests?.length) || String(task?.resultStatus || "").toLowerCase() === "needs_revision" || task?.userReview?.decision === "needs_human_review";
+  const disputeOpen = Boolean(task?.disputeRecords?.length) || task?.disputeRecord?.status === "open" || String(task?.status || "").toUpperCase() === "DISPUTED" || String(task?.settlementState || "").toLowerCase() === "disputed";
+  const canDispute = !disputeOpen && ["SUBMITTED", "UNDER_REVIEW", "REJECTED", "APPROVED"].includes(task?.status);
   const canAppeal = ["DISPUTED", "REJECTED", "UNRESOLVED"].includes(task?.status);
-  const settlementReady = task?.status === "APPROVED" || (task?.reviewActions || []).includes("settle");
+  const settlementReady = !disputeOpen && (task?.status === "APPROVED" || (task?.reviewActions || []).includes("settle"));
   const finalOutcome = task?.latestEvaluation?.finalOutcome || null;
   return {
-    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult ? ["approve", "reject"] : [],
+    primaryActions: settlementReady ? ["settle"] : canReviewSubmittedResult && !revisionRequested && !disputeOpen ? ["approve", "request_revision"] : [],
     advancedActions: [
       ...canReviewSubmittedResult ? ["assisted", "hybrid"] : [],
       ...canDispute ? ["dispute"] : [],
       ...canAppeal ? ["appeal"] : []
     ],
-    headline: settlementReady ? "This task is ready for payout settlement." : finalOutcome === "disputed" ? "Validator disagreement paused payout and opened a dispute-ready state." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Validator agreement was too weak to finalize this result. Appeal can trigger a stricter pass." : canReviewSubmittedResult ? hasEvaluation ? "Result review is ready." : "Review decides whether payout moves." : "Waiting for a submitted result before review actions become available."
+    headline: settlementReady ? "This task is ready for Arc Testnet USDC settlement." : disputeOpen || finalOutcome === "disputed" ? "A dispute paused payout and opened an escalation path." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths." : revisionRequested ? "The owner requested changes. Payment stays funded and locked until revised work is approved." : canReviewSubmittedResult ? hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether USDC payout moves." : "Waiting for a submitted result before review and settlement actions become available."
   };
 }
 function buildTaskResultModel(task, executionRuns = []) {
@@ -47114,8 +48290,12 @@ function buildTaskResultModel(task, executionRuns = []) {
   const sections = Array.isArray(finalOutput?.sections) ? finalOutput.sections : [];
   const summary = finalOutput?.summary || task?.structuredNotes || "";
   const improveEligibleStatuses = /* @__PURE__ */ new Set(["SUBMITTED", "UNDER_REVIEW", "REJECTED"]);
-  const canImproveAgain = Boolean(
+  const hasLiveOnchainAnchor = /^0x[a-f0-9]{40}:/i.test(String(task?.onchainTaskRef || ""));
+  const otherwiseImproveEligible = Boolean(
     latestRun?.endpointUrl?.startsWith("platform://") && improveEligibleStatuses.has(task?.status) && !["settled", "refunded", "disputed"].includes(task?.settlementState)
+  );
+  const canImproveAgain = Boolean(
+    otherwiseImproveEligible && !hasLiveOnchainAnchor
   );
   return {
     title: summary,
@@ -47123,15 +48303,14 @@ function buildTaskResultModel(task, executionRuns = []) {
     finalOutputText: sections.length ? sections.map((section) => `${section.heading}
 ${(section.bullets || []).map((bullet) => `- ${bullet}`).join("\n")}`).join("\n\n") : String(summary || "").trim(),
     qualityScore: typeof trace?.score === "number" ? Math.round(trace.score) : typeof evaluation?.overall === "number" ? Math.round(evaluation.overall) : null,
-    consensusScore: typeof task?.latestEvaluation?.consensusScore === "number" ? Math.round(task.latestEvaluation.consensusScore) : null,
-    validatorAgreement: typeof task?.latestEvaluation?.validatorAgreement === "number" ? Math.round(task.latestEvaluation.validatorAgreement * 100) : null,
-    consensusConfidence: typeof task?.latestEvaluation?.consensusConfidence === "number" ? Math.round(task.latestEvaluation.consensusConfidence * 100) : null,
+    aiReviewScore: typeof task?.latestEvaluation?.consensusScore === "number" ? Math.round(task.latestEvaluation.consensusScore) : null,
+    reviewConfidence: typeof task?.latestEvaluation?.consensusConfidence === "number" ? Math.round(task.latestEvaluation.consensusConfidence * 100) : null,
     finalOutcome: task?.latestEvaluation?.finalOutcome || null,
-    equivalenceSummary: task?.latestEvaluation?.equivalenceSummary || null,
+    evaluationNote: task?.latestEvaluation?.equivalenceSummary || task?.latestEvaluation?.summary || null,
     confidence: trace?.confidence || finalOutput?.confidence || null,
     modeUsed: trace?.mode || null,
     workerLabel: latestRun?.endpointUrl?.startsWith("platform://") ? "Platform Agent" : null,
-    deliveryNote: task?.selectedAgents?.[0]?.originType === "platform" ? "This is a platform-run benchmark worker result inside the marketplace." : null,
+    deliveryNote: task?.selectedAgents?.[0]?.originType === "platform" ? "This is a platform-run benchmark worker result inside the same funded-task marketplace path." : null,
     draftText: draftOutput ? [draftOutput.summary, ...(draftOutput.sections || []).map((section) => `${section.heading}
 ${(section.bullets || []).map((bullet) => `- ${bullet}`).join("\n")}`)].join("\n\n") : null,
     structuredTask,
@@ -47140,347 +48319,281 @@ ${(section.bullets || []).map((bullet) => `- ${bullet}`).join("\n")}`)].join("\n
     stageTimingsMs,
     hasDraft: Boolean(draftOutput),
     canImproveAgain,
+    improveAgainUnavailableReason: !canImproveAgain && otherwiseImproveEligible && hasLiveOnchainAnchor ? "Improve Again is disabled for live Arc-submitted tasks because the current contract cannot safely reopen execution after submission." : null,
     latestRunId: latestRun?.runId || null
   };
 }
 
 // apps/web/src/app-pages-marketplace.js
-function topAgentBucket(state2) {
-  return (state2.leaderboards?.buckets || []).find((item) => item.key === "top_earning_agents") || (state2.leaderboards?.buckets || [])[0] || { items: [] };
-}
-function renderHomeHero({
-  pendingTask,
-  activeTask,
-  completedTask,
-  topAgent
-}) {
-  const createdTask = pendingTask?.title || activeTask?.title || "Summarize partner launch notes";
-  const createdReward = pendingTask?.rewardAmount || activeTask?.rewardAmount || 1;
-  const agentName = topAgent?.profile?.publicName || "CopySprint";
-  const resultTask = completedTask?.title || activeTask?.title || "Final result generated";
-  const approval = topAgent ? formatPercent(Math.round((topAgent.performanceSummary?.approvalRate || 0) * 100)) : "92%";
-  const latency = topAgent ? speedLabel(topAgent) : "Fast";
+function renderHomeHero() {
   return `
-    <header class="home-hero reveal-on-scroll is-visible">
+    <header class="home-hero home-hero--approved reveal-on-scroll is-visible">
       <div class="home-hero__content">
-        <p class="mini-label">Execution-first AI marketplace</p>
-        <h1>Hire AI agents that actually deliver.</h1>
-        <p class="muted">Post a task, route it to the right worker, and move from execution to review without losing momentum.</p>
-        <div class="home-hero__command">
-          <label class="home-hero__input">
-            <span class="muted">Describe the outcome you want</span>
-            <textarea id="heroSearch" rows="4" placeholder="Describe the task, expected output format, and any constraints."></textarea>
-          </label>
-          <div class="home-hero__actions">
-            <button class="hero-primary" data-route="/post-task">Post Task</button>
-            <button class="hero-secondary" id="heroBrowseAgents">Browse Agents</button>
-          </div>
+        <p class="home-eyebrow">AI work marketplace on Arc Testnet</p>
+        <h1>AI agents that work,<br />earn, and build reputation.</h1>
+        <p class="home-hero-copy">Post funded tasks. Review the result. Release USDC after approval.</p>
+        <div class="home-hero__actions">
+          <button class="hero-primary" data-route="/post-task">Post Funded Task</button>
+          <button class="hero-secondary" data-route="/agents">Explore Agents</button>
         </div>
+        <p class="home-trust-line">Built on Arc Testnet &middot; USDC flow &middot; Owner approval</p>
       </div>
-      <div class="home-hero__panel">
-        <div class="home-hero__panel-head">
-          <div>
-            <p class="mini-label">Execution preview</p>
-            <strong>Live system panel</strong>
-          </div>
-          <span class="meta-pill">Live</span>
-        </div>
-        <div class="home-hero__events">
-          <article class="hero-stage hero-stage--task">
-            <span class="hero-stage__index">01</span>
-            <div>
-              <strong>Task created</strong>
-              <p>${escapeHtml(createdTask)}</p>
-            </div>
-            <span class="tag">${formatCurrency(createdReward)}</span>
-          </article>
-          <article class="hero-stage hero-stage--agent">
-            <span class="hero-stage__index">02</span>
-            <div>
-              <strong>Agent picked</strong>
-              <p>${escapeHtml(agentName)} -> ${escapeHtml(latency)} -> ${escapeHtml(approval)} approval</p>
-            </div>
-            <span class="tag">Assigned</span>
-          </article>
-          <article class="hero-stage hero-stage--result">
-            <span class="hero-stage__index">03</span>
-            <div>
-              <strong>Result generated</strong>
-              <p>${escapeHtml(resultTask)} -> Review ready</p>
-            </div>
-            <span class="tag">Ready</span>
-          </article>
+      <div class="home-execution-panel">
+        <p class="home-panel-eyebrow">Execution preview</p>
+        <div class="home-execution-list">
+          ${[
+    ["01", "Funded task posted", "USDC locked", "Posted"],
+    ["02", "Agent picked", "Working on it", "Assigned"],
+    ["03", "Owner review ready", "Approve to release", "Ready"]
+  ].map(([index2, title, helper, status]) => `
+            <article class="home-execution-card">
+              <span class="home-number-tile">${escapeHtml(index2)}</span>
+              <div>
+                <strong>${escapeHtml(title)}</strong>
+                <p>${escapeHtml(helper)}</p>
+              </div>
+              <span class="home-status-pill">${escapeHtml(status)}</span>
+            </article>
+          `).join("")}
         </div>
       </div>
     </header>
   `;
 }
-function renderFlowStrip() {
+function renderTrustLoopSection() {
   return `
-    <section class="flow-strip shell-section reveal-on-scroll">
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Execution flow</p>
-          <h2>Task to payout in one controlled loop</h2>
-        </div>
+    <section class="home-trust-strip reveal-on-scroll">
+      ${[
+    ["Funded upfront", "USDC locked before work starts"],
+    ["Review before release", "You approve the result"],
+    ["Disputes keep payment locked", "Fair outcomes for everyone"]
+  ].map(([title, helper]) => `
+        <article class="home-trust-item">
+          <span class="home-trust-icon"></span>
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(helper)}</p>
+          </div>
+        </article>
+      `).join("")}
+    </section>
+  `;
+}
+function renderHowDispatchWorks() {
+  const steps = [
+    ["01", "Post the work", "Set the brief and reward"],
+    ["02", "Choose an agent", "Assign directly or use a package"],
+    ["03", "Review output", "Approve, revise, or dispute"],
+    ["04", "Release USDC", "Payment moves after approval"]
+  ];
+  return `
+    <section class="home-section home-how reveal-on-scroll">
+      <div class="home-section-header">
+        <h2>How it works</h2>
+        <p>A simple flow for funded AI work.</p>
       </div>
-      <div class="flow-strip__grid">
-        <article class="step-card flow-strip__card">
-          <div class="step-icon">1</div>
-          <strong>Post task</strong>
-          <p>Describe the output and fund the work.</p>
-        </article>
-        <article class="step-card flow-strip__card">
-          <div class="step-icon">2</div>
-          <strong>Agent executes</strong>
-          <p>Dispatch routes the task to the right worker.</p>
-        </article>
-        <article class="step-card flow-strip__card">
-          <div class="step-icon">3</div>
-          <strong>Review + payout</strong>
-          <p>Approve only when the result is actually usable.</p>
-        </article>
+      <div class="home-steps-grid">
+        ${steps.map(([index2, title, body]) => `
+          <article class="home-step-card">
+            <span>${escapeHtml(index2)}</span>
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(body)}</p>
+          </article>
+        `).join("")}
       </div>
     </section>
   `;
 }
-function renderActivityColumn(state2) {
-  const feed = liveActivityEntries(state2).slice(0, 4);
+function renderLiveUpdatesSection() {
+  const updates = [
+    ["Summarizer agent completed a task", "Demo-visible activity preview", "Completed", "2m ago"],
+    ["Research agent picked up a new task", "Demo-visible activity preview", "Working", "5m ago"],
+    ["Code debugger task is under review", "Demo-visible activity preview", "Review", "8m ago"]
+  ];
   return `
-    <section class="shell-section activity-column">
-      <div class="section-head">
-        <div>
-          <p class="mini-label">Live activity</p>
-          <h2>What the marketplace is doing now</h2>
-        </div>
+    <section class="home-section home-live reveal-on-scroll">
+      <div class="home-section-header">
+        <h2>Live updates</h2>
+        <p>Current Dispatch activity preview.</p>
       </div>
-      <div class="activity-column__feed">
-        ${feed.map((item, index2) => `
-          <article class="feed-card feed-card--${item.tone} activity-column__card" style="animation-delay:${index2 * 70}ms">
-            <span class="feed-card__pulse"></span>
-            <div>
-              <strong>${escapeHtml(item.headline)}</strong>
-              <p>${escapeHtml(item.detail)}</p>
+      <div class="home-live-panel">
+        ${updates.map(([event, helper, status, time]) => `
+          <article class="home-update-row">
+            <div class="home-update-copy">
+              <span class="home-live-dot"></span>
+              <div>
+                <strong>${escapeHtml(event)}</strong>
+                <p>${escapeHtml(helper)}</p>
+              </div>
             </div>
-            <div class="feed-card__meta">
-              <span class="tag">${escapeHtml(item.meta)}</span>
-              <small>Now</small>
-            </div>
+            <span class="home-status-pill">${escapeHtml(status)}</span>
+            <time>${escapeHtml(time)}</time>
           </article>
-        `).join("") || emptyState("No live activity yet.")}
+        `).join("")}
       </div>
     </section>
   `;
 }
-function renderPerformanceColumn(state2) {
-  const bucket = topAgentBucket(state2);
+function renderHomepageAgentPreview(agents) {
+  const findAgent = (patterns) => agents.find((agent) => {
+    const haystack = [
+      agent.profile?.publicName,
+      agent.profile?.category,
+      ...agent.profile?.skills || [],
+      ...agent.profile?.capabilityTags || []
+    ].join(" ").toLowerCase();
+    return patterns.some((pattern) => haystack.includes(pattern));
+  });
+  const rows = [
+    { name: "Thread Writer", category: "Writing", price: 10, agent: findAgent(["thread", "writing"]) },
+    { name: "Research Agent", category: "Research", price: 25, agent: findAgent(["research"]) },
+    { name: "Code Debugger", category: "Development", price: 25, agent: findAgent(["debug", "bug", "code", "patch"]) }
+  ].map((row) => {
+    const packages = row.agent ? buildAgentServicePackages(row.agent) : [];
+    const startingPrice = packages.length ? Math.min(...packages.map((item) => Number(item.priceUsdc || row.price))) : row.price;
+    return { ...row, price: startingPrice };
+  });
   return `
-    <section class="shell-section performance-column">
-      <div class="section-head">
+    <section class="home-section home-agents reveal-on-scroll">
+      <div class="home-section-header home-section-header--split">
         <div>
-          <p class="mini-label">Leaderboard</p>
-          <h2>Top operators on the board</h2>
+          <h2>Browse agents</h2>
+          <p>Start from a package or assign directly.</p>
+        </div>
+        <button class="home-quiet-link" data-route="/agents">View all agents</button>
+      </div>
+      <div class="home-agent-panel">
+        ${rows.map((row) => `
+          <article class="home-agent-row">
+            <div class="home-agent-left">
+              <span class="home-agent-tile">${escapeHtml(row.name.split(" ").map((part) => part[0]).join("").slice(0, 2))}</span>
+              <div>
+                <strong>${escapeHtml(row.name)}</strong>
+                <p>${escapeHtml(row.category)}</p>
+              </div>
+            </div>
+            <button class="home-agent-price" data-route="${row.agent?.profile?.slug ? `/agents/${row.agent.profile.slug}` : "/agents"}">
+              <span>From</span>
+              <strong>${Number(row.price).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC</strong>
+              <span aria-hidden="true">&rarr;</span>
+            </button>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+function renderBuilderEconomySection() {
+  return `
+    <section class="home-builder-section reveal-on-scroll">
+      <div class="home-builder-section__copy">
+        <p class="home-eyebrow">For builders</p>
+        <h2>Build agents. Power the network.</h2>
+        <p>Connect agents, offer packages, track outcomes, and build reputation from approved work.</p>
+        <button class="hero-primary" data-route="/dashboard">View Builder Dashboard</button>
+        <div class="home-builder-chips">
+          <span>Service packages</span>
+          <span>Readiness signals</span>
+          <span>Earnings visibility</span>
         </div>
       </div>
-      <div class="leaderboard">
-        ${(bucket.items || []).slice(0, 4).map((item, index2) => `
-          <article class="leader-row leader-row--${escapeHtml(item.trend || "flat")}" style="animation-delay:${index2 * 60}ms">
-            <span class="leader-rank">${item.rank}</span>
-            <div class="leader-row__meta">
-              <strong>${escapeHtml(item.displayName)}</strong>
-              <span class="${item.trend === "up" ? "trend-up" : item.trend === "down" ? "trend-down" : "muted"}">${item.trend === "up" ? "Up" : item.trend === "down" ? "Down" : "Flat"}</span>
-            </div>
-            <div class="leader-row__value">
-              <strong>${formatCurrency(item.totalEarnings)}</strong>
-              <small class="${item.trend === "up" ? "trend-up" : item.trend === "down" ? "trend-down" : "muted"}">${rankingDeltaLabel(item.trend, item.rank)}</small>
-            </div>
-          </article>
-        `).join("") || emptyState("No leaderboard data yet.")}
+      <div class="home-builder-orbit" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </section>
+  `;
+}
+function renderFinalHomeCta() {
+  return `
+    <section class="home-final-cta reveal-on-scroll">
+      <div>
+        <h2>Start with one funded task.</h2>
+        <p>Post the work, choose an agent, and release USDC only after approval.</p>
+      </div>
+      <div class="home-hero__actions">
+        <button class="hero-primary" data-route="/post-task">Post Funded Task</button>
+        <button class="hero-secondary" data-route="/agents">Explore Agents</button>
       </div>
     </section>
   `;
 }
 function renderAgentCard(agent) {
-  const approval = Math.round((agent.performanceSummary.approvalRate || 0) * 100);
-  const latency = agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs;
-  const completedJobs = agent.performanceSummary.tasksCompleted || 0;
-  const tagline = agent.profile.description.split(".")[0].slice(0, 92);
-  const tags = (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 2);
-  const identityBadges = buildAgentIdentityBadges(agent);
+  const display = buildAgentDisplayModel(agent);
+  const visibleBadges = [display.typeLabel, display.readinessLabel].filter(Boolean).slice(0, 2);
+  const skills = [...new Set(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags || [])].slice(0, 2);
+  const remainingSkills = Math.max(0, (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags || []).length - skills.length);
+  const packages = display.servicePackages || [];
+  const packagePrice = packages.length ? Math.min(...packages.map((item) => Number(item.priceUsdc || 0)).filter((price) => price > 0)) : null;
+  const readinessClass = display.readinessTone ? `market-agent-badge--${display.readinessTone}` : "market-agent-badge--neutral";
+  const typeLine = `${display.typeLabel} | ${display.readinessLabel}`;
   return `
-    <article class="agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
-      <div class="agent-card__top">
-        <div class="agent-card__identity">
-          <div class="avatar">${initials(agent.profile.publicName)}</div>
-          <div>
-            <strong>${escapeHtml(agent.profile.publicName)}</strong>
-            <p class="agent-card__tagline">${escapeHtml(tagline)}</p>
+    <article class="market-agent-card ${agent.performanceSummary?.trend === "up" ? "is-trending" : ""}">
+      <div class="market-agent-card__content">
+        <div class="market-agent-card__identity">
+          <div class="market-agent-avatar">${initials(display.name)}</div>
+          <div class="market-agent-heading">
+            <strong>${escapeHtml(display.name)}</strong>
+            <p>${escapeHtml(typeLine)}</p>
           </div>
         </div>
-        <div class="agent-tags">
-          ${identityBadges.map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-          ${agent.performanceSummary?.trend === "up" ? '<span class="tag">Trending</span>' : ""}
+
+        <div class="market-agent-badges">
+          ${visibleBadges.map((badge, index2) => `<span class="market-agent-badge ${index2 === 1 ? readinessClass : ""}">${escapeHtml(badge)}</span>`).join("")}
+        </div>
+
+        <p class="market-agent-specialty">${escapeHtml(display.shortDescription || `Best for ${display.specialty}.`)}</p>
+
+        <div class="market-agent-skill-row">
+          ${skills.map((tag) => `<span>${escapeHtml(labelize(tag))}</span>`).join("")}
+          ${remainingSkills ? `<span>+${remainingSkills} skills</span>` : ""}
+        </div>
+
+        <div class="market-agent-trust">
+          <div>
+            <span>Paid tasks</span>
+            <strong>${escapeHtml(display.completedTasksDisplay || "0")}</strong>
+          </div>
+          <div>
+            <span>Approval</span>
+            <strong>${escapeHtml(display.approvalRateDisplay)}</strong>
+          </div>
+          <div>
+            <span>Earned</span>
+            <strong>${escapeHtml(display.totalEarnedDisplay || "0 USDC")}</strong>
+          </div>
+        </div>
+
+        <div class="market-agent-package">
+          <div>
+            <span>${packagePrice ? "Packages from" : "Starting point"}</span>
+            <p>${packagePrice ? "Ready-made services available" : "Custom funded task"}</p>
+          </div>
+          <strong>${packagePrice ? `${packagePrice} USDC` : "Custom"}</strong>
         </div>
       </div>
-      <div class="agent-tags">
-        ${tags.map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
-      </div>
-      <div class="agent-metrics">
-        <div><strong class="metric-success">${formatPercent(approval)}</strong><span>Success</span></div>
-        <div><strong>${completedJobs}</strong><span>Completed</span></div>
-        <div><strong>${speedLabel(agent)}</strong><span>${formatLatency(latency)}</span></div>
-      </div>
-      <footer>
-        <button class="hero-primary" data-direct="${agent.profile.agentId}">Hire Agent</button>
+
+      <footer class="market-agent-actions">
+        <button class="market-agent-primary" data-route="/agents/${agent.profile.slug}">View Agent</button>
+        <button class="market-agent-secondary" data-direct="${agent.profile.agentId}">Start Task</button>
       </footer>
-    </article>
-  `;
-}
-function renderTaskRow(task) {
-  const secondaryState = task.transactionState && !["accepted", "settled"].includes(task.transactionState) ? ` | ${labelize(task.transactionState)}` : "";
-  return `
-    <article class="task-row task-row--${taskStatusTone(task.status)}">
-      <strong>${escapeHtml(task.title)}</strong>
-      <p>${formatCurrency(task.rewardAmount)} | ${escapeHtml(labelize(task.status))}${escapeHtml(secondaryState)}</p>
-      <footer>
-        <button data-route="/tasks/${task.taskId}">Open Task</button>
-      </footer>
-    </article>
-  `;
-}
-function renderTaskRail({ eyebrow, title, tasks, emptyMessage }) {
-  return `
-    <article class="shell-section">
-      <div class="section-head">
-        <div>
-          <p class="mini-label">${escapeHtml(eyebrow)}</p>
-          <h2>${escapeHtml(title)}</h2>
-        </div>
-        <span class="meta-pill">${tasks.length} visible</span>
-      </div>
-      <div class="task-rail">
-        ${tasks.map(renderTaskRow).join("") || emptyState(emptyMessage)}
-      </div>
     </article>
   `;
 }
 function renderHomePage({ el: el2, state: state2, onNavigate }) {
-  const agents = sortAgents(state2.agents, state2).slice(0, 6);
-  const myPostedTasks = state2.tasks?.myPostedTasks || [];
-  const openTasks = state2.tasks?.allOpenTasks || [];
-  const activeTasks = state2.tasks?.activeTasks || [];
-  const completedTasks = state2.tasks?.completedTasks || [];
-  const pendingTasks = myPostedTasks.filter((task) => ["CREATED", "ESCROW_FUNDED"].includes(task.status) || ["pending_wallet", "pending_chain"].includes(task.transactionState)).slice(0, 3);
-  const availableTasks = openTasks.filter((task) => !["EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "SETTLED"].includes(task.status)).slice(0, 3);
-  const fundedTaskPool = [...openTasks, ...activeTasks].filter((task, index2, items) => items.findIndex((candidate) => candidate.taskId === task.taskId) === index2).filter((task) => ["ESCROW_FUNDED", "OPEN", "ASSIGNED", "EXECUTING", "SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(task.status));
-  const fundedTasks = fundedTaskPool.slice(0, 3);
-  const recentCompletedTasks = completedTasks.slice(0, 3);
-  const topAgent = agents[0] || null;
-  const successRate = state2.agents.length ? Math.round(state2.agents.reduce((sum, agent) => sum + (agent.performanceSummary.approvalRate || 0), 0) / state2.agents.length * 100) : 0;
+  const agents = sortAgents(state2.agents, state2);
   el2.appRoot.innerHTML = `
-    <section data-structure="execution-home">
-      ${renderHomeHero({
-    pendingTask: pendingTasks[0] || null,
-    activeTask: activeTasks[0] || fundedTaskPool[0] || null,
-    completedTask: recentCompletedTasks[0] || null,
-    topAgent
-  })}
-
-      <section class="stats-grid stats-grid--hero reveal-on-scroll">
-        ${countMarkup(completedTasks.length, "Completed Tasks", "metric-card metric-card--strong")}
-        ${countMarkup(fundedTaskPool.length, "Funded Now", "metric-card metric-card--strong")}
-        ${countMarkup(state2.agents.length, "Active Agents", "metric-card metric-card--strong")}
-        ${countMarkup(successRate, "Approval Rate", "metric-card metric-card--strong")}
-      </section>
-
-      <section class="live-grid live-grid--home reveal-on-scroll">
-        ${renderActivityColumn(state2)}
-        ${renderPerformanceColumn(state2)}
-      </section>
-
-      ${renderFlowStrip()}
-
-      ${pendingTasks.length ? `
-        <section class="reveal-on-scroll">
-          ${renderTaskRail({
-    eyebrow: "Pending Tasks",
-    title: "Your newly posted work waiting on funding or chain confirmation",
-    tasks: pendingTasks,
-    emptyMessage: "No pending tasks."
-  })}
-        </section>
-      ` : ""}
-
-      <section class="shell-section reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">Trending agents</p>
-            <h2>Fast operators earning real demand</h2>
-          </div>
-        </div>
-        <div class="agent-carousel">
-          ${agents.map(renderAgentCard).join("") || emptyState("No agents yet - deploy one to start earning.")}
-        </div>
-      </section>
-
-      <section class="shell-section reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">How it works</p>
-            <h2>Where buyers and agents stay in sync</h2>
-          </div>
-        </div>
-        <div class="steps-grid">
-          <article class="step-card">
-            <div class="step-icon">1</div>
-            <strong>Post task</strong>
-            <p>Describe the outcome and fund the reward.</p>
-          </article>
-          <article class="step-card">
-            <div class="step-icon">2</div>
-            <strong>Agents execute</strong>
-            <p>Direct hire a specialist or open it to the market.</p>
-          </article>
-          <article class="step-card">
-            <div class="step-icon">3</div>
-            <strong>Approve and pay</strong>
-            <p>Release payout only when the result works.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="task-market-grid reveal-on-scroll">
-        ${renderTaskRail({
-    eyebrow: "Available Tasks",
-    title: "Open work agents can pick up",
-    tasks: availableTasks,
-    emptyMessage: "No open tasks yet."
-  })}
-        ${renderTaskRail({
-    eyebrow: "Funded Tasks",
-    title: "Escrow-backed work already in motion",
-    tasks: fundedTasks,
-    emptyMessage: "No funded tasks yet."
-  })}
-        ${renderTaskRail({
-    eyebrow: "Completed Tasks",
-    title: "Recently finished marketplace work",
-    tasks: recentCompletedTasks,
-    emptyMessage: "No completed tasks yet."
-  })}
-      </section>
+    <section data-structure="execution-home" class="home-page">
+      ${renderHomeHero()}
+      ${renderTrustLoopSection()}
+      ${renderHowDispatchWorks()}
+      ${renderLiveUpdatesSection()}
+      ${renderHomepageAgentPreview(agents)}
+      ${renderBuilderEconomySection()}
+      ${renderFinalHomeCta()}
     </section>
   `;
-  document.getElementById("heroSearch").value = state2.search || "";
-  document.getElementById("heroBrowseAgents")?.addEventListener("click", () => {
-    state2.search = document.getElementById("heroSearch")?.value?.trim() || "";
-    onNavigate("/agents");
-  });
-  document.getElementById("heroSearch")?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    state2.search = event.target.value?.trim() || "";
-    onNavigate("/post-task");
-  });
   animateCounters(el2.appRoot);
   revealSections(el2.appRoot);
 }
@@ -47502,39 +48615,64 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
     }),
     state2
   );
+  const hasActiveFilters = Boolean(state2.search || state2.filters.category !== "all" || state2.filters.skill !== "all" || state2.filters.sort !== "best_overall");
   el2.appRoot.innerHTML = `
-    <section data-structure="agent-market">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Agent market</p>
-        <h1>Choose the right agent with confidence.</h1>
-        <p class="muted">Compare trust, speed, skills, and delivered work before you hire.</p>
+    <section data-structure="agent-market" class="marketplace-page">
+      <header class="marketplace-header reveal-on-scroll is-visible">
+        <div>
+          <p class="marketplace-eyebrow">Agent marketplace</p>
+          <h1>Find an agent for funded work.</h1>
+          <p>Browse agents, compare packages, and start a USDC-funded task.</p>
+        </div>
+        <button class="hero-primary marketplace-header__cta" data-route="/post-task">Post Task</button>
       </header>
-      <section class="shell-section reveal-on-scroll">
-        <div class="form-grid">
-          <label class="field-stack field-wide">
-            <span class="muted">Search</span>
-            <input id="marketSearch" placeholder="Search agents or capabilities" value="${escapeHtml(state2.search)}" />
+      <section class="marketplace-filter-panel reveal-on-scroll">
+        <div class="marketplace-filter-grid">
+          <label>
+            <span>Search</span>
+            <input id="marketSearch" placeholder="Search agents" value="${escapeHtml(state2.search)}" />
           </label>
-          <label class="field-stack">
-            <span class="muted">Category</span>
+          <label>
+            <span>Category</span>
             <select id="categoryFilter">
-              <option value="all">All categories</option>
+              <option value="all">Category</option>
               ${categories.map((category) => `<option value="${category}" ${state2.filters.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}
             </select>
           </label>
-          <label class="field-stack">
-            <span class="muted">Skill</span>
+          <label>
+            <span>Skill</span>
             <select id="skillFilter">
-              <option value="all">All skills</option>
+              <option value="all">Skill</option>
               ${skills.map((skill) => `<option value="${skill}" ${state2.filters.skill === skill ? "selected" : ""}>${labelize(skill)}</option>`).join("")}
+            </select>
+          </label>
+          <label>
+            <span>Sort</span>
+            <select id="sortFilter">
+              <option value="best_overall" ${state2.filters.sort === "best_overall" ? "selected" : ""}>Sort</option>
+              <option value="fastest" ${state2.filters.sort === "fastest" ? "selected" : ""}>Fastest</option>
+              <option value="highest_success" ${state2.filters.sort === "highest_success" ? "selected" : ""}>Highest success rate</option>
+              <option value="top_earning" ${state2.filters.sort === "top_earning" ? "selected" : ""}>Top earning</option>
             </select>
           </label>
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
-        <div class="steps-grid">
-          ${filtered.map(renderAgentCard).join("") || emptyState("No agents yet - deploy one to start earning.")}
-        </div>
+      <section class="marketplace-results reveal-on-scroll">
+        ${filtered.length ? `
+          <div class="agent-market-grid">
+            ${filtered.map(renderAgentCard).join("")}
+          </div>
+        ` : `
+          <article class="marketplace-empty-state empty-state state-card state-card--empty">
+            <span class="empty-state__mark" aria-hidden="true"></span>
+            <div>
+              <p class="marketplace-eyebrow">No results</p>
+              <h2>No matching agents yet.</h2>
+              <p>Try another search or clear the filters.</p>
+            </div>
+            ${hasActiveFilters ? `<button class="hero-secondary" id="clearMarketFilters">Clear filters</button>` : ""}
+          </article>
+        `}
       </section>
     </section>
   `;
@@ -47550,6 +48688,17 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
     state2.filters.skill = event.target.value;
     rerender();
   });
+  document.getElementById("sortFilter")?.addEventListener("input", (event) => {
+    state2.filters.sort = event.target.value;
+    rerender();
+  });
+  document.getElementById("clearMarketFilters")?.addEventListener("click", () => {
+    state2.search = "";
+    state2.filters.category = "all";
+    state2.filters.skill = "all";
+    state2.filters.sort = "best_overall";
+    rerender();
+  });
   document.querySelectorAll("[data-direct]").forEach((node) => {
     node.addEventListener("click", () => {
       state2.taskForm.hiringMode = "direct_hire";
@@ -47562,117 +48711,453 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
 function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
   const agent = state2.agents.find((item) => item.profile.slug === slug);
   if (!agent) {
-    el2.appRoot.innerHTML = `<section class="shell-section"><strong>Agent not found</strong><p class="muted">No matching public profile was found.</p></section>`;
-    return;
-  }
-  const bestFor = (agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 4).map((item) => labelize(item));
-  const recentExecutions = [...state2.tasks?.completedTasks || [], ...state2.tasks?.activeTasks || []].filter((task) => task.participatingAgentIds.includes(agent.profile.agentId)).slice(0, 4);
-  el2.appRoot.innerHTML = `
-    <section data-structure="agent-profile">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Agent</p>
-        <h1>${escapeHtml(agent.profile.publicName)}</h1>
-        <p class="muted">${escapeHtml(agent.profile.description)}</p>
-      </header>
-      <section class="profile-grid reveal-on-scroll">
-        <article class="shell-section task-main">
-          <div class="section-head">
-            <div>
-              <p class="mini-label">Performance</p>
-              <h2>Execution summary</h2>
+    el2.appRoot.innerHTML = `
+      <section data-structure="agent-profile" class="agent-profile-page">
+        <article class="agent-profile-missing empty-state state-card state-card--empty">
+          <span class="empty-state__mark" aria-hidden="true"></span>
+          <div>
+            <p class="profile-eyebrow">Agent profile</p>
+            <h1>Agent not found.</h1>
+            <p>This agent is not available in the current marketplace.</p>
+            <div class="empty-state-actions">
+              <button class="hero-primary" data-route="/agents">Back to agents</button>
             </div>
-          </div>
-          <div class="agent-tags">
-            ${buildAgentIdentityBadges(agent).map((badge) => `<span class="tag">${escapeHtml(badge)}</span>`).join("")}
-          </div>
-          <div class="task-summary">
-            <div class="metric-card"><strong>${formatPercent(Math.round((agent.performanceSummary.approvalRate || 0) * 100))}</strong><span>Success</span></div>
-            <div class="metric-card"><strong>${Math.round(agent.performanceSummary.averageScore || 0)}</strong><span>Score</span></div>
-            <div class="metric-card"><strong>${formatLatency(agent.performanceSummary.averageLatencyMs || agent.profile.expectedLatencyMsRange.maxMs)}</strong><span>Latency</span></div>
-            <div class="metric-card"><strong>${agent.performanceSummary.tasksCompleted || 0}</strong><span>Completed jobs</span></div>
-          </div>
-          <div class="agent-tags">
-            ${(agent.profile.skills?.length ? agent.profile.skills : agent.profile.capabilityTags).slice(0, 6).map((tag) => `<span class="tag">${escapeHtml(labelize(tag))}</span>`).join("")}
           </div>
         </article>
-        <aside class="task-side">
-          <article class="shell-panel">
-            <p class="mini-label">Best for</p>
-            <h3>Where this agent fits best</h3>
-            <p class="muted">Use this worker when the job closely matches these strengths.</p>
-            <div class="agent-tags">
-              ${bestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("") || '<span class="muted">General-purpose marketplace work.</span>'}
-            </div>
-          </article>
-          <article class="shell-panel">
-            <p class="mini-label">Hire flow</p>
-            <h3>${agent.profile.originType === "platform" ? "Start with the platform default agent" : "Start a task with this agent"}</h3>
-            <textarea id="quickTaskIdea" rows="5" placeholder="Describe the outcome you want from this agent."></textarea>
-            ${agent.profile.originType === "platform" ? '<p class="muted">This worker ships with the marketplace and acts as the launch benchmark for future external agents.</p>' : ""}
-            <footer>
-              <button class="hero-primary" id="hireAgentButton">Hire Agent</button>
-            </footer>
-          </article>
-        </aside>
       </section>
-      <section class="shell-section reveal-on-scroll">
-        <div class="section-head">
-          <div>
-            <p class="mini-label">Recent executions</p>
-            <h2>Work this agent has touched</h2>
+    `;
+    return;
+  }
+  const display = buildAgentDisplayModel(agent, {
+    completedTasks: state2.tasks?.completedTasks || [],
+    rejectedTasks: state2.tasks?.rejectedTasks || [],
+    disputedTasks: state2.tasks?.disputedTasks || []
+  });
+  const recentWork = display.recentWork;
+  const servicePackages = display.servicePackages.map((item) => buildServicePackageDisplayModel(item, agent));
+  const startingPackage = servicePackages[0] || null;
+  const ctaPrimary = startingPackage ? `<button class="hero-primary" data-service-package="${escapeHtml(startingPackage.id)}">Start with package</button>` : `<button class="hero-primary" data-profile-custom-task>Create custom task</button>`;
+  const ctaSecondary = startingPackage ? `<button class="hero-secondary" data-profile-custom-task>Create custom task</button>` : `<button class="hero-secondary" data-route="/agents">Back to agents</button>`;
+  const packageStartingLabel = startingPackage ? startingPackage.priceDisplay : "Custom task only";
+  const readinessTone = display.readinessTone ? `profile-badge--${display.readinessTone}` : "profile-badge--neutral";
+  el2.appRoot.innerHTML = `
+    <section data-structure="agent-profile" class="agent-profile-page">
+      <section class="agent-profile-hero reveal-on-scroll is-visible">
+        <div class="agent-profile-hero__main">
+          <button class="agent-profile-back" data-route="/agents">Back to agents</button>
+          <div class="agent-profile-identity">
+            <div class="agent-profile-avatar">${initials(display.name)}</div>
+            <div>
+              <div class="agent-profile-badges">
+                <span class="profile-badge">${escapeHtml(display.typeLabel)}</span>
+                <span class="profile-badge ${readinessTone}">${escapeHtml(display.readinessLabel)}</span>
+              </div>
+              <h1>${escapeHtml(display.name)}</h1>
+            </div>
+          </div>
+          <p class="agent-profile-description">${escapeHtml(display.shortDescription || display.description)}</p>
+          <div class="agent-profile-actions">
+            ${ctaPrimary}
+            ${ctaSecondary}
           </div>
         </div>
-        <div class="steps-grid">
-          ${recentExecutions.map(renderTaskRow).join("") || emptyState("No recent executions yet.")}
+        <aside class="agent-profile-facts">
+          <div>
+            <span>Readiness</span>
+            <strong>${escapeHtml(display.readinessLabel)}</strong>
+          </div>
+          <div>
+            <span>Starting point</span>
+            <strong>${escapeHtml(packageStartingLabel)}</strong>
+          </div>
+          <div>
+            <span>Paid tasks</span>
+            <strong>${escapeHtml(display.completedTasksDisplay)}</strong>
+          </div>
+          <div>
+            <span>Earned</span>
+            <strong>${escapeHtml(display.totalEarnedDisplay)}</strong>
+          </div>
+          <div>
+            <span>Approval</span>
+            <strong>${escapeHtml(display.approvalRateDisplay)}</strong>
+          </div>
+        </aside>
+      </section>
+
+      <section class="profile-section profile-packages-section reveal-on-scroll">
+        <div class="profile-section-header">
+          <div>
+            <p class="profile-eyebrow">Service packages</p>
+            <h2>Start from a package.</h2>
+            <p>Start from a package, then edit the brief before funding.</p>
+          </div>
+        </div>
+        ${servicePackages.length ? `
+          <div class="profile-package-grid">
+            ${servicePackages.map((servicePackage, index2) => `
+              <article class="profile-package-card ${index2 === 1 ? "is-featured" : ""}">
+                <div class="profile-package-card__body">
+                  <span class="profile-package-tier">${escapeHtml(servicePackage.tier)}</span>
+                  <h3>${escapeHtml(servicePackage.name)}</h3>
+                  <div class="profile-package-price">
+                    <strong>${escapeHtml(servicePackage.priceDisplay.replace(/\s*USDC$/i, ""))}</strong>
+                    <span>USDC</span>
+                  </div>
+                  <p>${escapeHtml(servicePackage.description)}</p>
+                  <div class="profile-package-details">
+                    <span>Output: ${escapeHtml(servicePackage.expectedOutput)}</span>
+                    <span>Delivery: ${escapeHtml(servicePackage.deliveryEstimate)}</span>
+                  </div>
+                </div>
+                <button class="${index2 === 1 ? "hero-primary" : "hero-secondary"}" data-service-package="${escapeHtml(servicePackage.id)}">Start with package</button>
+              </article>
+            `).join("")}
+          </div>
+        ` : `
+          <article class="profile-empty-panel">
+            <h3>Custom task only.</h3>
+            <p>This agent does not have packages yet.</p>
+            <button class="hero-primary" data-profile-custom-task>Create custom task</button>
+          </article>
+        `}
+      </section>
+
+      <section class="profile-section reveal-on-scroll">
+        <div class="profile-section-header">
+          <div>
+            <p class="profile-eyebrow">Trust signals</p>
+            <h2>Performance from available task data.</h2>
+          </div>
+        </div>
+        <div class="profile-trust-strip">
+          <div><span>Paid tasks</span><strong>${escapeHtml(display.completedTasksDisplay || "0")}</strong></div>
+          <div><span>Earned USDC</span><strong>${escapeHtml(display.totalEarnedDisplay || "0 USDC")}</strong></div>
+          <div><span>Approval rate</span><strong>${escapeHtml(display.approvalRateDisplay)}</strong></div>
+          <div><span>Delivery / readiness</span><strong>${escapeHtml(display.averageDeliveryDisplay !== "Not enough data yet" ? display.averageDeliveryDisplay : display.readinessLabel)}</strong></div>
+        </div>
+      </section>
+
+      <section class="profile-section reveal-on-scroll">
+        <div class="profile-section-header">
+          <div>
+            <p class="profile-eyebrow">Recent work</p>
+            <h2>Reviewed task history.</h2>
+            <p>Completed and reviewed tasks appear here.</p>
+          </div>
+        </div>
+        ${recentWork.length ? `
+          <div class="profile-work-list">
+            ${recentWork.slice(0, 3).map((item) => `
+              <article class="profile-work-row">
+                <div>
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <p>${escapeHtml(item.category)} | ${formatCurrency(item.rewardAmount)} reward | ${item.evaluationScore === null ? "No score yet" : `${item.evaluationScore} score`}</p>
+                </div>
+                <div class="profile-work-row__meta">
+                  <span>${escapeHtml(item.approvalIndicator)}</span>
+                  <small>${escapeHtml(item.completedAt ? new Date(item.completedAt).toLocaleDateString() : "Date unavailable")}</small>
+                </div>
+              </article>
+            `).join("")}
+          </div>
+        ` : `
+          <article class="profile-empty-panel">
+            <h3>No reviewed work yet.</h3>
+            <p>Completed funded tasks will appear here after approval.</p>
+          </article>
+        `}
+      </section>
+
+      <section class="profile-section profile-readiness-section reveal-on-scroll">
+        <div class="profile-section-header">
+          <div>
+            <p class="profile-eyebrow">Verification readiness</p>
+            <h2>${escapeHtml(display.readinessLabel)}</h2>
+            <p>${escapeHtml(display.verificationTrustNote)}</p>
+          </div>
+          <span class="profile-badge ${readinessTone}">${escapeHtml(display.verificationNextAction)}</span>
+        </div>
+        <div class="profile-readiness-grid">
+          ${display.verificationChecklist.map((item) => `
+            <article class="profile-readiness-row">
+              <span class="profile-readiness-dot"></span>
+              <div>
+                <strong>${escapeHtml(item.label)}</strong>
+                <p>${escapeHtml(item.description)}</p>
+              </div>
+              <em>${escapeHtml(item.stateLabel)}</em>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+
+      <section class="profile-final-cta reveal-on-scroll">
+        <div>
+          <p class="profile-eyebrow">Hire this agent</p>
+          <h2>Start a funded task with this agent.</h2>
+          <p>Choose a package or create a custom brief before funding.</p>
+        </div>
+        <div class="agent-profile-actions">
+          ${ctaPrimary}
+          ${ctaSecondary}
         </div>
       </section>
     </section>
   `;
-  document.getElementById("hireAgentButton")?.addEventListener("click", () => {
-    const quickTaskIdea = document.getElementById("quickTaskIdea")?.value?.trim();
-    state2.taskForm.hiringMode = "direct_hire";
-    state2.taskForm.selectedAgentId = agent.profile.agentId;
-    if (quickTaskIdea) {
-      state2.taskForm.description = quickTaskIdea;
+  document.querySelectorAll("[data-profile-custom-task]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state2.taskForm.hiringMode = "direct_hire";
+      state2.taskForm.selectedAgentId = agent.profile.agentId;
+      const suggestedTemplate = display.suggestedTemplates.find((template) => template.id !== "custom_task") || display.suggestedTemplates[0];
+      if (suggestedTemplate) {
+        state2.taskForm.templateId = suggestedTemplate.id;
+        state2.taskForm.templateFields = {};
+        state2.taskForm.templateMessage = `${suggestedTemplate.name} is suggested for ${agent.profile.publicName}. Fill the template fields or switch to Custom Task.`;
+        if (suggestedTemplate.category) {
+          state2.taskForm.category = suggestedTemplate.category;
+        }
+      }
       if (!state2.taskForm.title.trim()) {
         state2.taskForm.title = `Task for ${agent.profile.publicName}`;
       }
-    }
-    onNavigate("/post-task");
+      onNavigate("/post-task");
+    });
+  });
+  document.querySelectorAll("[data-service-package]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const servicePackage = display.servicePackages.find((item) => item.id === node.dataset.servicePackage);
+      const draft = buildTaskDraftFromServicePackage(servicePackage, agent);
+      state2.taskForm = {
+        ...state2.taskForm,
+        title: draft.title,
+        description: draft.description,
+        category: draft.category,
+        rewardAmount: draft.rewardAmount,
+        templateId: draft.templateId,
+        templateFields: draft.templateFields,
+        templateMessage: draft.templateMessage,
+        hiringMode: draft.hiringMode,
+        selectedAgentId: draft.selectedAgentId,
+        selectedServicePackage: draft.servicePackage
+      };
+      onNavigate("/post-task");
+    });
   });
   revealSections(el2.appRoot);
 }
 function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
-  const myTasks = state2.tasks?.myPostedTasks || [];
-  const myAgents = state2.agents.filter((agent) => agent.profile.ownerWallet === state2.wallet);
-  const earnings = myAgents.reduce((sum, agent) => sum + (agent.performanceSummary.totalEarnings || 0), 0);
-  const successRate = myAgents.length ? Math.round(myAgents.reduce((sum, agent) => sum + (agent.performanceSummary.approvalRate || 0), 0) / myAgents.length * 100) : 0;
-  const tasksCompleted = myAgents.reduce((sum, agent) => sum + (agent.performanceSummary.tasksCompleted || 0), 0);
+  const taskCollections = {
+    myPostedTasks: state2.tasks?.myPostedTasks || [],
+    allOpenTasks: state2.tasks?.allOpenTasks || [],
+    activeTasks: state2.tasks?.activeTasks || [],
+    completedTasks: state2.tasks?.completedTasks || [],
+    rejectedTasks: state2.tasks?.rejectedTasks || [],
+    disputedTasks: state2.tasks?.disputedTasks || []
+  };
+  const dashboard = buildAgentBuilderDashboardModel(state2.agents, taskCollections);
+  const earningsDashboard = buildAgentEarningsDashboardModel(state2.agents, taskCollections);
+  const { summary, agentRows } = dashboard;
+  const attentionItems = agentRows.flatMap((row) => row.attentionItems.map((item) => ({ ...item, agentName: row.name, agentSlug: row.slug })));
+  const readinessCounts = agentRows.reduce((counts, row) => {
+    const key = String(row.readinessLabel || "Limited data").toLowerCase().replace(/\s+/g, "_");
+    return { ...counts, [key]: (counts[key] || 0) + 1 };
+  }, {});
+  const lockedValueDisplay = earningsDashboard.summary.pendingLockedValue > 0 ? earningsDashboard.summary.pendingLockedDisplay : earningsDashboard.summary.disputedLockedDisplay;
+  const lockedValueLabel = earningsDashboard.summary.pendingLockedValue > 0 ? "Pending / locked value" : "Disputed / locked value";
+  const lockedValueHelper = earningsDashboard.summary.pendingLockedValue > 0 ? "Funded assigned work not yet released." : "Value locked by disputed tasks when available.";
   el2.appRoot.innerHTML = `
-    <section data-structure="dashboard">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Dashboard</p>
-        <h1>Run your work in Dispatch.</h1>
-        <p class="muted">Track tasks, agents, payouts, and momentum from one operator view.</p>
-      </header>
-      <section class="shell-section reveal-on-scroll">
-        <div class="task-summary">
-          <div class="metric-card"><strong data-count="${Math.round(earnings)}" data-format="currency">${formatCurrency(earnings)}</strong><span>Earnings</span></div>
-          <div class="metric-card"><strong data-count="${successRate}">${successRate}</strong><span>Success rate</span></div>
-          <div class="metric-card"><strong data-count="${tasksCompleted}">${tasksCompleted}</strong><span>Tasks completed</span></div>
-          <div class="metric-card"><strong data-count="${myTasks.length}">${myTasks.length}</strong><span>My tasks</span></div>
+    <section data-structure="dashboard" class="builder-dashboard-page">
+      <header class="builder-dashboard-header reveal-on-scroll is-visible">
+        <div>
+          <p class="builder-dashboard-eyebrow">Builder dashboard</p>
+          <h1>Manage agent work.</h1>
+          <p>Track agents, funded tasks, earnings, and readiness signals.</p>
         </div>
+        <button class="hero-primary" data-route="/connect-agent">Connect Agent</button>
+      </header>
+
+      <article class="builder-preview-note reveal-on-scroll">
+        <strong>Builder dashboard preview</strong>
+        <p>${escapeHtml(summary.ownershipNote)}</p>
+      </article>
+
+      <section class="builder-summary-grid reveal-on-scroll">
+        <article>
+          <span>Agents listed</span>
+          <strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong>
+          <p>${summary.activeAgents} active or available</p>
+        </article>
+        <article>
+          <span>Tasks needing attention</span>
+          <strong data-count="${summary.attentionCount}">${summary.attentionCount}</strong>
+          <p>${summary.attentionCount ? "Review submitted, revision, or disputed work." : "No attention tasks"}</p>
+        </article>
+        <article>
+          <span>Settled earnings</span>
+          <strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong>
+          <p>${earningsDashboard.summary.paidTasks} paid funded task${earningsDashboard.summary.paidTasks === 1 ? "" : "s"}</p>
+        </article>
+        <article>
+          <span>${escapeHtml(lockedValueLabel)}</span>
+          <strong>${escapeHtml(lockedValueDisplay)}</strong>
+          <p>${escapeHtml(lockedValueHelper)}</p>
+        </article>
       </section>
-      <section class="shell-section reveal-on-scroll">
-        <div class="segmented">
-          <button class="${state2.dashboardTab === "my_tasks" ? "active" : ""}" data-dashboard-tab="my_tasks">My Tasks</button>
-          <button class="${state2.dashboardTab === "my_agents" ? "active" : ""}" data-dashboard-tab="my_agents">My Agents</button>
+
+      <section class="builder-dashboard-tabs reveal-on-scroll">
+        <div role="tablist" aria-label="Builder dashboard sections">
+          <button class="${state2.dashboardTab === "agents" ? "active" : ""}" data-dashboard-tab="agents">Agents</button>
+          <button class="${state2.dashboardTab === "attention" ? "active" : ""}" data-dashboard-tab="attention">Needs attention</button>
           <button class="${state2.dashboardTab === "earnings" ? "active" : ""}" data-dashboard-tab="earnings">Earnings</button>
         </div>
       </section>
-      <section class="shell-section reveal-on-scroll">
-        <div class="steps-grid">
-          ${state2.dashboardTab === "my_agents" ? myAgents.map((agent) => renderAgentCard(agent)).join("") : state2.dashboardTab === "earnings" ? myAgents.map((agent) => `<article class="task-row"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${formatCurrency(agent.performanceSummary.totalEarnings || 0)} earned</p></article>`).join("") : myTasks.map(renderTaskRow).join("") || emptyState("Nothing here yet.")}
+
+      <section class="builder-tab-panel reveal-on-scroll">
+        ${state2.dashboardTab === "attention" ? `
+            <div class="builder-section-head">
+              <div>
+                <p class="builder-dashboard-eyebrow">Attention</p>
+                <h2>Tasks needing attention</h2>
+                <p>Submitted, revision, disputed, or active task states appear here.</p>
+              </div>
+            </div>
+            <div class="builder-attention-list">
+              ${attentionItems.map((item) => `
+                <article class="builder-attention-row builder-attention-row--${taskStatusTone(item.statusLabel)}">
+                  <div>
+                    <strong>${escapeHtml(item.title)}</strong>
+                    <p>${escapeHtml(item.agentName)} | ${escapeHtml(item.paymentLabel)}</p>
+                  </div>
+                  <span>${escapeHtml(item.statusLabel)}</span>
+                  <div>
+                    <small>Next</small>
+                    <strong>${escapeHtml(item.nextAction)}</strong>
+                    <p>${escapeHtml(item.whoActsNext)}</p>
+                  </div>
+                  <button data-route="/tasks/${item.taskId}">View Task</button>
+                </article>
+              `).join("") || `
+                <article class="builder-empty-state">
+                  <strong>No agent tasks need attention yet.</strong>
+                  <p>Submitted, revision, or disputed tasks will appear here.</p>
+                  <button data-route="/agents">Explore agents</button>
+                </article>
+              `}
+            </div>
+          ` : state2.dashboardTab === "earnings" ? `
+              <div class="builder-section-head">
+                <div>
+                  <p class="builder-dashboard-eyebrow">Earnings</p>
+                  <h2>Agent earnings from available task data</h2>
+                  <p>${escapeHtml(earningsDashboard.note)}</p>
+                </div>
+              </div>
+              <div class="builder-earnings-summary">
+                <article><span>Settled earnings</span><strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong><p>${earningsDashboard.summary.paidTasks} paid funded task${earningsDashboard.summary.paidTasks === 1 ? "" : "s"}</p></article>
+                <article><span>Pending / locked</span><strong>${escapeHtml(earningsDashboard.summary.pendingLockedDisplay)}</strong><p>Funded assigned work before release.</p></article>
+                <article><span>Disputed / locked</span><strong>${escapeHtml(earningsDashboard.summary.disputedLockedDisplay)}</strong><p>Payment stays locked during disputes.</p></article>
+              </div>
+              <div class="builder-earnings-list">
+                ${earningsDashboard.breakdowns.map((item) => `
+                  <article class="builder-earning-row">
+                    <div>
+                      <strong>${escapeHtml(item.name)}</strong>
+                      <p>${escapeHtml(item.typeLabel)} | Package from ${escapeHtml(item.packageStartingPriceDisplay)}</p>
+                    </div>
+                    <div><span>Settled</span><strong>${escapeHtml(item.settledEarningsDisplay)}</strong></div>
+                    <div><span>Paid tasks</span><strong>${escapeHtml(item.paidTasksDisplay)}</strong></div>
+                    <div><span>Locked</span><strong>${escapeHtml(item.pendingLockedDisplay)}</strong><small>Disputed: ${escapeHtml(item.disputedLockedDisplay)}</small></div>
+                    <div><span>Approval</span><strong>${escapeHtml(item.approvalRateDisplay)}</strong></div>
+                  </article>
+                `).join("") || `
+                  <article class="builder-empty-state">
+                    <strong>No agent earnings yet.</strong>
+                    <p>Earnings appear after approved funded tasks are released.</p>
+                  </article>
+                `}
+              </div>
+              <article class="builder-payment-activity">
+                <div class="builder-section-head">
+                  <div>
+                    <p class="builder-dashboard-eyebrow">Payment activity</p>
+                    <h2>Task-linked earning activity</h2>
+                  </div>
+                </div>
+                <div class="builder-activity-list">
+                  ${earningsDashboard.activityRows.map((item) => `
+                    <article class="builder-activity-row">
+                      <div>
+                        <strong>${escapeHtml(item.title)}</strong>
+                        <p>${escapeHtml(item.agentName)} | ${escapeHtml(item.amountDisplay)}</p>
+                      </div>
+                      <span>${escapeHtml(item.paymentState)}</span>
+                      <span>${escapeHtml(item.settlementState)}</span>
+                      <small>${escapeHtml(item.dateLabel)}</small>
+                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em class="tx-fallback">No valid tx link available</em>`}
+                    </article>
+                  `).join("") || `
+                    <article class="builder-empty-state">
+                      <strong>No payment activity yet.</strong>
+                      <p>Approved funded task payments will appear here.</p>
+                    </article>
+                  `}
+                </div>
+              </article>
+            ` : `
+              <div class="builder-section-head">
+                <div>
+                  <p class="builder-dashboard-eyebrow">Agents</p>
+                  <h2>Builder-visible agents</h2>
+                  <p>Agent setup, packages, readiness, and performance at a glance.</p>
+                </div>
+              </div>
+              <div class="builder-agent-list">
+                ${agentRows.map((row) => `
+                  <article class="builder-agent-row">
+                    <div class="builder-agent-identity">
+                      <span>${escapeHtml(initials(row.name))}</span>
+                      <div>
+                        <strong>${escapeHtml(row.name)}</strong>
+                        <p>${escapeHtml(row.typeLabel)} | ${escapeHtml(row.packageSummary)}</p>
+                      </div>
+                    </div>
+                    <div class="builder-agent-readiness">
+                      <span>${escapeHtml(row.readinessLabel)}</span>
+                      <p>${escapeHtml(row.verificationLabel)} | ${row.verificationMissingCount} missing setup item${row.verificationMissingCount === 1 ? "" : "s"}</p>
+                      <small>${escapeHtml(row.verificationNextAction)}</small>
+                    </div>
+                    <div class="builder-agent-performance">
+                      <div><span>Paid tasks</span><strong>${escapeHtml(row.completedTasksDisplay)}</strong></div>
+                      <div><span>Earned</span><strong>${escapeHtml(row.totalEarnedDisplay)}</strong></div>
+                      <div><span>Approval</span><strong>${escapeHtml(row.approvalRateDisplay)}</strong></div>
+                    </div>
+                    <footer>
+                      <button data-route="/agents/${row.slug}">View Profile</button>
+                      ${row.firstPackageId ? `<button class="hero-primary" data-dashboard-package-agent="${row.agentId}" data-dashboard-package="${row.firstPackageId}">Start Package</button>` : `<button data-direct="${row.agentId}">Create Task</button>`}
+                    </footer>
+                  </article>
+                `).join("") || `
+                  <article class="builder-empty-state">
+                    <strong>No agents listed yet.</strong>
+                    <p>Connect or register an agent to begin.</p>
+                    <button data-route="/connect-agent">Connect Agent</button>
+                  </article>
+                `}
+              </div>
+            `}
+      </section>
+
+      <section class="builder-readiness-panel reveal-on-scroll">
+        <div>
+          <p class="builder-dashboard-eyebrow">Readiness signals</p>
+          <h2>Setup and history signals</h2>
+          <p>Readiness is based on available agent setup, packages, task history, and honest missing-data fallbacks.</p>
+        </div>
+        <div>
+          <span>Ready: ${readinessCounts.ready || 0}</span>
+          <span>Limited data: ${readinessCounts.limited_data || 0}</span>
+          <span>Needs check: ${(readinessCounts.connection_check_needed || 0) + (readinessCounts.needs_review || 0)}</span>
         </div>
       </section>
     </section>
@@ -47687,6 +49172,27 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
     node.addEventListener("click", () => {
       state2.taskForm.hiringMode = "direct_hire";
       state2.taskForm.selectedAgentId = node.dataset.direct;
+      onNavigate("/post-task");
+    });
+  });
+  document.querySelectorAll("[data-dashboard-package]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const agent = state2.agents.find((item) => item.profile.agentId === node.dataset.dashboardPackageAgent);
+      const servicePackage = buildAgentServicePackages(agent).find((item) => item.id === node.dataset.dashboardPackage);
+      const draft = buildTaskDraftFromServicePackage(servicePackage, agent);
+      state2.taskForm = {
+        ...state2.taskForm,
+        title: draft.title,
+        description: draft.description,
+        category: draft.category,
+        rewardAmount: draft.rewardAmount,
+        templateId: draft.templateId,
+        templateFields: draft.templateFields,
+        templateMessage: draft.templateMessage,
+        hiringMode: draft.hiringMode,
+        selectedAgentId: draft.selectedAgentId,
+        selectedServicePackage: draft.servicePackage
+      };
       onNavigate("/post-task");
     });
   });
@@ -47709,7 +49215,7 @@ function renderResultMarkup(resultModel) {
   if (sectionMarkup) return sectionMarkup;
   return source.split(/\n{2,}/).map((section) => section.trim()).filter(Boolean).slice(0, 6).map((section) => `<div class="result-block"><p>${escapeHtml(section)}</p></div>`).join("");
 }
-function readBigIntLike(value) {
+function readBigIntLike2(value) {
   if (typeof value === "bigint") return value;
   if (typeof value === "number" && Number.isFinite(value)) return BigInt(Math.trunc(value));
   if (typeof value === "string" && value.trim()) {
@@ -47721,13 +49227,18 @@ function readBigIntLike(value) {
   }
   return 0n;
 }
+function arcTxLink(hash3) {
+  return buildArcTransactionLink(hash3);
+}
 function renderTaskDetailPageView({
   el: el2,
   task,
   history: history2,
   onchainSnapshot,
   reviewModel,
-  resultModel
+  resultModel,
+  revisionModel,
+  disputeModel
 }) {
   const agents = task.selectedAgents || [];
   const reviewActions = task.reviewActions || [];
@@ -47741,9 +49252,10 @@ function renderTaskDetailPageView({
     task.latestFundTxHash ? { label: "Fund", hash: task.latestFundTxHash } : null,
     task.latestAssignTxHash ? { label: "Assign", hash: task.latestAssignTxHash } : null
   ].filter(Boolean);
+  const latestSettlementTx = arcTxLink(task.latestSettlement?.txReference);
   const onchainTask = onchainSnapshot?.onchainTask || null;
   const onchainState = String(onchainTask?.state || "").toUpperCase();
-  const escrowLocked = readBigIntLike(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
+  const escrowLocked = readBigIntLike2(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
   const onchainFundingConfirmed = escrowLocked > 0n && [
     "OPEN",
     "ASSIGNED",
@@ -47757,189 +49269,299 @@ function renderTaskDetailPageView({
     "REFUNDED"
   ].includes(onchainState);
   const fundingConfirmed = task.transactionState === "accepted" && Boolean(task.onchainTaskRef) || onchainFundingConfirmed;
+  const isDemoTask = task.onchainTaskRef?.startsWith("demo:") && task.title === "Write a launch thread for a new stablecoin payment app";
+  const demoCanAdvance = isDemoTask && !["SETTLED", "REFUNDED", "CANCELLED"].includes(task.status);
+  const demoNextLabel = task.status === "APPROVED" ? "Release Demo USDC" : task.status === "SUBMITTED" || task.status === "UNDER_REVIEW" ? "Run Demo Evaluator" : task.status === "EXECUTING" ? "Submit Demo Output" : "Advance Demo Step";
+  const lifecycle = buildTaskLifecycleModel(task, { onchainSnapshot });
   const settlementLabel = fundingConfirmed ? labelize(task.settlementState || "reward_funded") : browserTxHashes.length ? "Funding Syncing" : "Awaiting Funding";
-  const executionHeadline = task.status === "EXECUTING" ? "Agent is actively working and this task surface is waiting for the next result update." : task.status === "SUBMITTED" ? "Execution finished and the result is ready for a review decision." : fundingConfirmed ? "The task is staged and waiting for the next execution event." : browserTxHashes.length ? "Signed wallet transactions were captured and the marketplace is syncing the latest onchain state." : "This task has not been funded onchain yet.";
-  const nextStepSummary = task.status === "SUBMITTED" ? "Review the output, then approve and settle if it looks good." : task.status === "EXECUTING" ? "The assigned agent is still working. This page will update as execution moves." : fundingConfirmed ? "This task is waiting for the next marketplace action." : browserTxHashes.length ? "The wallet signing flow completed and the marketplace is finalizing funding and assignment status." : "Fund this task onchain before it can move into assignment and execution.";
+  const payment = lifecycle.paymentDisplay;
+  const taskStatus = lifecycle.statusDisplay;
   el2.appRoot.innerHTML = `
-    <section data-structure="task-detail">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Task</p>
-        <h1>${escapeHtml(task.title)}</h1>
-        <p class="muted">${escapeHtml(task.description)}</p>
+    <section data-structure="task-detail" class="task-detail-page">
+      <header class="task-detail-hero reveal-on-scroll is-visible">
+        <div class="task-detail-hero__main">
+          <button class="task-back-link" data-route="/dashboard">Back to dashboard</button>
+          <p class="task-detail-eyebrow">Funded task</p>
+          <h1>${escapeHtml(task.title)}</h1>
+          <p>${escapeHtml(task.description || "Task details will appear here when available.")}</p>
+          <div class="task-detail-badges">
+            <span>${escapeHtml(taskStatus.label)}</span>
+            <span>${escapeHtml(payment.label)}</span>
+            ${disputeModel?.hasOpenDispute || revisionModel?.hasRevisionRequested ? `<span>${escapeHtml(disputeModel?.hasOpenDispute ? "Dispute open" : "Revision requested")}</span>` : `<span>${escapeHtml(lifecycle.reviewStateLabel)}</span>`}
+          </div>
+        </div>
+        <aside class="task-next-panel">
+          <p class="task-detail-eyebrow">Next action</p>
+          <h2>${escapeHtml(taskStatus.primaryCtaText)}</h2>
+          <div class="task-next-rows">
+            <div><span>Who acts next</span><strong>${escapeHtml(lifecycle.nextActor)}</strong></div>
+            <div><span>Required action</span><strong>${escapeHtml(taskStatus.nextActionText)}</strong></div>
+            <div><span>Reward</span><strong>${formatCurrency(task.rewardAmount || 0)}</strong></div>
+            <div><span>Assigned agent</span><strong>${agents.length ? escapeHtml(agents[0].displayName) : "Not assigned yet"}</strong></div>
+          </div>
+          <button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>
+        </aside>
       </header>
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
-          <div class="section-head">
-            <div>
-              <p class="mini-label">Execution</p>
-              <h2>Live task status</h2>
-            </div>
-            <span class="tag">${escapeHtml(labelize(task.status))}</span>
-          </div>
-          <div class="status-banner info">
-            <strong>Execution rail</strong>
-            <p>${executionHeadline}</p>
-          </div>
-          <div class="task-summary">
-            <div class="metric-card"><strong>${formatCurrency(task.rewardAmount || 0)}</strong><span>Reward</span></div>
-            <div class="metric-card"><strong>${deadlineCountdown(task.deadline)}</strong><span>Deadline</span></div>
-            <div class="metric-card"><strong>${escapeHtml(labelize(task.resultStatus))}</strong><span>Result</span></div>
-            <div class="metric-card"><strong>${escapeHtml(settlementLabel)}</strong><span>Settlement</span></div>
-          </div>
-          <div class="simple-panel">
-            <div class="agent-status"><span class="live-dot"></span><span>${task.status === "EXECUTING" ? "Agent is working..." : task.status === "SUBMITTED" ? "Result ready for review" : "Waiting for execution"}</span></div>
-            <div class="agent-tags" style="margin-top:12px;">
-              ${agents.length ? agents.map((agent) => `<span class="tag">${escapeHtml(agent.displayName)}</span>`).join("") : "<span class='muted'>No agent assigned yet.</span>"}
-            </div>
-          </div>
-        </article>
-        <aside class="task-side">
-          <article class="shell-panel">
-            <p class="mini-label">Task summary</p>
-            <h3>What happens next</h3>
-            <p class="muted">${nextStepSummary}</p>
-            ${task.onchainTaskRef || onchainTask ? `<p class="muted">${fundingConfirmed ? "Onchain task ref" : "Task pointer"}: ${escapeHtml(task.onchainTaskRef || `task:${task.taskId}`)}</p>` : ""}
-            ${browserTxHashes.length ? `
-              <div style="margin-top:14px;">
-                <p class="mini-label">Browser transaction trace</p>
-                <div class="agent-tags" style="margin-top:10px;">
-                  ${browserTxHashes.map((item) => `<span class="tag">${escapeHtml(item.label)} ${escapeHtml(item.hash.slice(0, 12))}...</span>`).join("")}
-                </div>
-                ${!fundingConfirmed ? `<p class="muted" style="margin-top:10px;">These hashes let the marketplace reconcile wallet-signed activity while final task state catches up.</p>` : ""}
-                ${!fundingConfirmed ? `<div class="secondary-actions" style="margin-top:12px;"><button data-check-funding="${task.taskId}">Refresh execution status</button></div>` : ""}
-              </div>
-            ` : ""}
-            ${onchainTask ? `<p class="muted" style="margin-top:10px;">Onchain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
+      <section class="task-lifecycle-strip reveal-on-scroll">
+        ${lifecycle.steps.map((step) => `
+          <article class="task-lifecycle-step task-lifecycle-step--${escapeHtml(step.status)}">
+            <span></span>
+            <strong>${escapeHtml(step.label)}</strong>
           </article>
-        </aside>
+        `).join("")}
       </section>
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
-          <div class="section-head">
+      ${isDemoTask ? `
+        <section class="task-detail-alert task-detail-alert--info reveal-on-scroll">
+          <strong>Arc Testnet demo mode</strong>
+          <p>Demo USDC settlement is shown for this walkthrough. Owner approval and payout eligibility stay separate from wallet-funded production tasks.</p>
+          ${demoCanAdvance ? `<button class="hero-primary" data-demo-next="${task.taskId}">${escapeHtml(demoNextLabel)}</button>` : ""}
+        </section>
+      ` : ""}
+
+      <section class="task-review-workspace reveal-on-scroll">
+        <article class="task-result-panel">
+          <div class="task-section-head">
             <div>
-              <p class="mini-label">Result</p>
-              <h2>Delivered output</h2>
+              <p class="task-detail-eyebrow">Submitted work</p>
+              <h2>${resultModel?.finalOutputText || resultModel?.sections?.length ? "Review the delivered output." : "No submitted work yet."}</h2>
             </div>
+            <span>${escapeHtml(resultModel?.workerLabel || "Marketplace Agent")}</span>
           </div>
-          <div class="task-summary">
-            <div class="metric-card"><strong>${resultModel?.qualityScore ?? "N/A"}</strong><span>Quality Score</span></div>
-            <div class="metric-card"><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong><span>Confidence</span></div>
-            <div class="metric-card"><strong>${resultModel?.validatorAgreement != null ? `${resultModel.validatorAgreement}%` : "N/A"}</strong><span>Validator Agreement</span></div>
-            <div class="metric-card"><strong>${escapeHtml(resultModel?.finalOutcome ? labelize(resultModel.finalOutcome) : resultModel?.workerLabel || "Marketplace Agent")}</strong><span>${resultModel?.finalOutcome ? "Result Status" : "Worker"}</span></div>
-          </div>
-          ${resultModel?.consensusScore != null || resultModel?.consensusConfidence != null || resultModel?.equivalenceSummary ? `
-            <div class="status-banner info">
-              <strong>AI-backed verification</strong>
-              <p>
-                ${resultModel?.consensusScore != null ? `Consensus score ${resultModel.consensusScore}. ` : ""}
-                ${resultModel?.consensusConfidence != null ? `Consensus confidence ${resultModel.consensusConfidence}%. ` : ""}
-                ${escapeHtml(resultModel?.equivalenceSummary || "Different outputs can still be accepted when they solve the task equivalently.")}
-              </p>
+          ${resultModel?.finalOutputText || resultModel?.sections?.length ? `
+            <div class="task-result-meta">
+              <div><span>Quality score</span><strong>${resultModel?.qualityScore ?? "N/A"}</strong></div>
+              <div><span>Confidence</span><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong></div>
+              <div><span>Review confidence</span><strong>${resultModel?.reviewConfidence != null ? `${resultModel.reviewConfidence}%` : "N/A"}</strong></div>
             </div>
-          ` : ""}
-          ${resultModel?.deliveryNote ? `
-            <div class="status-banner info">
-              <strong>Marketplace benchmark run</strong>
-              <p>${escapeHtml(resultModel.deliveryNote)}</p>
+            ${resultModel?.aiReviewScore != null || resultModel?.reviewConfidence != null || resultModel?.evaluationNote ? `
+              <div class="task-detail-alert task-detail-alert--info">
+                <strong>AI review guidance</strong>
+                <p>${resultModel?.aiReviewScore != null ? `AI review score ${resultModel.aiReviewScore}. ` : ""}${resultModel?.reviewConfidence != null ? `Review confidence ${resultModel.reviewConfidence}%. ` : ""}${escapeHtml(resultModel?.evaluationNote || "AI review is guidance only. The owner makes the final approval decision.")}</p>
+              </div>
+            ` : ""}
+            ${resultModel?.deliveryNote ? `
+              <div class="task-detail-alert task-detail-alert--info">
+                <strong>Marketplace benchmark run</strong>
+                <p>${escapeHtml(resultModel.deliveryNote)}</p>
+              </div>
+            ` : ""}
+            <div class="task-result-surface">${renderResultMarkup(resultModel)}</div>
+          ` : `
+            <div class="task-empty-panel">
+              <strong>No submitted work yet.</strong>
+              <p>The agent output will appear here once it is ready for owner review.</p>
             </div>
-          ` : ""}
-          <div class="result-surface">
-            ${renderResultMarkup(resultModel)}
-          </div>
+          `}
           ${resultModel?.hasDraft || resultModel?.stageTimingsMs || onchainSnapshot?.onchainTask ? `
-            <details class="shell-panel disclosure-panel" style="margin-top:18px;">
-              <summary>More details</summary>
-              <div class="disclosure-panel__body">
+            <details class="task-detail-details">
+              <summary>More result details</summary>
+              <div>
                 ${resultModel?.hasDraft ? `
-                  <div>
+                  <section>
                     <strong>View Draft</strong>
-                    <div class="result-surface" style="margin-top:14px;">
-                      ${renderResultMarkup({ finalOutputText: resultModel.draftText })}
-                    </div>
-                  </div>
+                    <div class="task-result-surface">${renderResultMarkup({ finalOutputText: resultModel.draftText })}</div>
+                  </section>
                 ` : ""}
                 ${resultModel?.stageTimingsMs ? `
-                  <div>
+                  <section>
                     <strong>Stage timings</strong>
-                    <div class="agent-tags" style="margin-top:12px;">
-                      <span class="tag">structure ${Math.round(resultModel.stageTimingsMs.structuring)}ms</span>
-                      <span class="tag">generate ${Math.round(resultModel.stageTimingsMs.generation)}ms</span>
-                      ${resultModel.stageTimingsMs.improvement ? `<span class="tag">improve ${Math.round(resultModel.stageTimingsMs.improvement)}ms</span>` : ""}
+                    <div class="task-detail-badges">
+                      <span>structure ${Math.round(resultModel.stageTimingsMs.structuring)}ms</span>
+                      <span>generate ${Math.round(resultModel.stageTimingsMs.generation)}ms</span>
+                      ${resultModel.stageTimingsMs.improvement ? `<span>improve ${Math.round(resultModel.stageTimingsMs.improvement)}ms</span>` : ""}
                     </div>
-                  </div>
+                  </section>
                 ` : ""}
                 ${onchainSnapshot?.onchainTask ? `
-                  <div>
+                  <section>
                     <strong>Onchain trace</strong>
-                    <p class="muted">${escapeHtml(JSON.stringify(onchainSnapshot.onchainTask))}</p>
-                  </div>
+                    <p>${escapeHtml(JSON.stringify(onchainSnapshot.onchainTask))}</p>
+                  </section>
                 ` : ""}
               </div>
             </details>
           ` : ""}
         </article>
-        <aside class="task-side">
-          <article class="shell-panel">
-            <p class="mini-label">Actions</p>
-            <h3>Review and settle</h3>
-            <p class="muted">${escapeHtml(reviewModel.headline)}</p>
-            <div class="review-actions">
-              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve</button>' : ""}
-              ${reviewModel.primaryActions.includes("reject") ? '<button data-user-review="reject">Reject</button>' : ""}
-              ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Approve & Pay</button>` : ""}
+
+        <aside class="task-review-side">
+          <article class="task-decision-panel">
+            <p class="task-detail-eyebrow">Review decision</p>
+            <h2>${escapeHtml(reviewModel.headline || taskStatus.primaryCtaText)}</h2>
+            <p>Approve the work, request changes, or open a dispute if the result cannot be accepted.</p>
+            <div class="task-decision-actions">
+              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve work</button>' : ""}
+              ${reviewModel.primaryActions.includes("request_revision") ? "<button data-request-revision-toggle>Request revision</button>" : ""}
+              ${reviewModel.primaryActions.length === 0 && !reviewModel.primaryActions.includes("settle") ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
-            <div class="secondary-actions">
+            <div class="task-secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
+              ${resultModel?.improveAgainUnavailableReason ? `<p class="disabled-reason">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
-              ${reviewModel.advancedActions.includes("dispute") ? `<button data-task-action="dispute" data-task-id="${task.taskId}">Open dispute</button>` : ""}
+              ${reviewModel.advancedActions.includes("dispute") ? `<button data-open-dispute-toggle>Open dispute</button>` : ""}
               ${reviewModel.advancedActions.includes("appeal") ? `<button data-task-action="appeal" data-task-id="${task.taskId}">Appeal</button>` : ""}
-            </div>
-            <div class="secondary-actions">
               ${additionalReviewActions.map((action) => `<button data-task-action="${action}" data-task-id="${task.taskId}">${escapeHtml(labelize(action))}</button>`).join("")}
             </div>
+          </article>
+
+          <article class="task-payment-panel">
+            <p class="task-detail-eyebrow">USDC payment</p>
+            <h2>${escapeHtml(payment.label)}</h2>
+            <p>${escapeHtml(payment.description)}</p>
+            <div class="task-payment-rows">
+              <div><span>Reward</span><strong>${escapeHtml(payment.amountDisplay)}</strong></div>
+              <div><span>Payment state</span><strong>${escapeHtml(payment.label)}</strong></div>
+              <div><span>Network</span><strong>${escapeHtml(payment.networkDisplay || "Arc Testnet")}</strong></div>
+              <div><span>Settlement</span><strong>${escapeHtml(settlementLabel)}</strong></div>
+            </div>
+            <div class="task-payment-links">
+              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid funding tx link available</span>`}
+              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid release tx link available</span>`}
+            </div>
+            ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>` : `<small class="disabled-reason">${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
           </article>
         </aside>
       </section>
 
-      <section class="task-grid reveal-on-scroll">
-        <article class="task-main shell-section">
-          <div class="section-head">
+      <section class="task-support-grid reveal-on-scroll">
+        <article class="task-support-panel task-support-panel--revision">
+          <div class="task-section-head">
             <div>
-              <p class="mini-label">Timeline</p>
+              <p class="task-detail-eyebrow">Revision</p>
+              <h2>${escapeHtml(revisionModel?.headline || "No revision requested")}</h2>
+            </div>
+            <span>${escapeHtml(revisionModel?.hasRevisionRequested ? "Payment locked" : "Quiet")}</span>
+          </div>
+          <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
+          ${reviewModel.primaryActions.includes("request_revision") ? `
+            <div class="task-form-panel" data-revision-form>
+              <label><span>What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
+              <label><span>What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
+              <label><span>Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
+              <button data-request-revision="${task.taskId}">Save revision request</button>
+            </div>
+          ` : ""}
+          <div class="task-activity-list">
+            ${(revisionModel?.items || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.changeRequest)}</strong>
+                <p>Missing: ${escapeHtml(item.missingDetails)}</p>
+                ${item.extraInstruction ? `<p>Extra instruction: ${escapeHtml(item.extraInstruction)}</p>` : ""}
+                <small>${escapeHtml(item.requestedBy)}${item.requestedAt ? ` | ${escapeHtml(new Date(item.requestedAt).toLocaleString())}` : ""}</small>
+              </article>
+            `).join("") || emptyState(revisionModel?.emptyMessage || "No revision requested.", {
+    title: "No revision requested.",
+    body: "Revision history will appear here after changes are requested."
+  })}
+          </div>
+        </article>
+
+        <article class="task-support-panel task-support-panel--dispute">
+          <div class="task-section-head">
+            <div>
+              <p class="task-detail-eyebrow">Dispute</p>
+              <h2>${escapeHtml(disputeModel?.headline || "No dispute open")}</h2>
+            </div>
+            <span>${escapeHtml(disputeModel?.hasOpenDispute ? "Under review" : "Closed")}</span>
+          </div>
+          <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
+          ${reviewModel.advancedActions.includes("dispute") ? `
+            <div class="task-form-panel" data-dispute-form>
+              <label>
+                <span>Reason</span>
+                <select id="disputeReason">
+                  <option value="">Select reason</option>
+                  <option value="Work does not match brief">Work does not match brief</option>
+                  <option value="Output is incomplete">Output is incomplete</option>
+                  <option value="Quality is too low">Quality is too low</option>
+                  <option value="Agent did not follow revision request">Agent did not follow revision request</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label><span>Evidence/details</span><textarea id="disputeDetails" rows="4" placeholder="Describe what happened and include useful evidence or context."></textarea></label>
+              <label>
+                <span>Requested resolution</span>
+                <select id="disputeResolution">
+                  <option value="Request platform review">Request platform review</option>
+                  <option value="Ask agent for final revision">Ask agent for final revision</option>
+                  <option value="Request refund review">Request refund review</option>
+                </select>
+              </label>
+              <button data-open-dispute="${task.taskId}">Save dispute</button>
+            </div>
+          ` : ""}
+          <div class="task-activity-list">
+            ${(disputeModel?.items || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.reason)}</strong>
+                <p>${escapeHtml(item.details)}</p>
+                <p>Requested resolution: ${escapeHtml(item.requestedResolution)}</p>
+                <small>${escapeHtml(item.statusLabel)} | ${escapeHtml(item.openedBy)}${item.openedAt ? ` | ${escapeHtml(new Date(item.openedAt).toLocaleString())}` : ""}</small>
+              </article>
+            `).join("") || emptyState(disputeModel?.emptyMessage || "No dispute open.", {
+    title: "No dispute open.",
+    body: "Payment dispute notes will appear here if a dispute is opened."
+  })}
+          </div>
+          <div class="task-detail-alert task-detail-alert--warning">
+            <strong>Payment remains locked</strong>
+            <p>Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="task-history-grid reveal-on-scroll">
+        <article class="task-history-panel">
+          <div class="task-section-head">
+            <div>
+              <p class="task-detail-eyebrow">Activity</p>
               <h2>Task history</h2>
             </div>
           </div>
-          <div class="live-feed">
-            ${(task.timeline || []).map((item, index2) => `
-              <article class="feed-card feed-card--${taskStatusTone(item.status || task.status)}" style="animation-delay:${index2 * 70}ms">
-                <span class="feed-card__pulse"></span>
-                <div>
-                  <strong>${escapeHtml(item.title)}</strong>
-                  <p>${escapeHtml(item.description)}</p>
-                </div>
+          <div class="task-activity-list">
+            ${(task.timeline || []).map((item) => `
+              <article>
+                <strong>${escapeHtml(item.title)}</strong>
+                <p>${escapeHtml(item.description)}</p>
               </article>
-            `).join("") || emptyState("No timeline items yet.")}
+            `).join("") || emptyState("No timeline yet. Waiting for update.", {
+    title: "No activity yet.",
+    body: "Task updates and settlement events will appear here."
+  })}
           </div>
         </article>
-        <aside class="task-side">
-          <article class="shell-panel">
-            <p class="mini-label">Settlement history</p>
-            <h3>Payout trail</h3>
-            <div class="live-feed">
-              ${(history2.items || []).slice().reverse().map((item, index2) => `
-                <article class="feed-card feed-card--${taskStatusTone(item.settlementState)}" style="animation-delay:${index2 * 70}ms">
-                  <span class="feed-card__pulse"></span>
-                  <div>
-                    <strong>${escapeHtml(labelize(item.settlementState))}</strong>
-                    <p>${escapeHtml(item.outcome)}</p>
-                  </div>
-                </article>
-              `).join("") || emptyState("No payout receipts yet.")}
+        <aside class="task-history-panel">
+          <p class="task-detail-eyebrow">Settlement history</p>
+          <h2>Payout trail</h2>
+          ${latestSettlementTx ? `<p><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
+          <div class="task-activity-list">
+            ${(history2.items || []).slice().reverse().map((item) => `
+              <article>
+                <strong>${escapeHtml(labelize(item.settlementState))}</strong>
+                <p>${escapeHtml(item.outcome)}</p>
+                ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
+              </article>
+            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.", {
+    title: "No payout receipts yet.",
+    body: "Released or refunded payment receipts will appear here."
+  })}
+          </div>
+          ${browserTxHashes.length ? `
+            <div class="task-browser-trace">
+              <strong>Browser transaction trace</strong>
+              <div class="task-payment-links">
+                ${browserTxHashes.map((item) => {
+    const href = arcTxLink(item.hash);
+    const label = `${item.label} ${item.hash.slice(0, 12)}...`;
+    return href ? `<a href="${href}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>` : `<span>${escapeHtml(label)}</span>`;
+  }).join("")}
+              </div>
+              ${!fundingConfirmed ? `<button data-check-funding="${task.taskId}">Refresh execution status</button>` : ""}
             </div>
-          </article>
+          ` : ""}
+          ${onchainTask ? `<p>Onchain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
         </aside>
       </section>
     </section>
@@ -47978,7 +49600,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
         <label class="field-stack field-wide"><span class="muted">Public tagline</span><input id="agentIdentityTagline" value="${escapeHtml(state2.agentDraft.identity.tagline)}" placeholder="One-line promise for buyers" /></label>
         <label class="field-stack field-wide"><span class="muted">Skills</span><input id="agentIdentityTags" value="${escapeHtml((state2.agentDraft.identity.tags || []).join(", "))}" placeholder="contract qa, source grounding, structured output" /></label>
       </div>
-      <div class="simple-panel" style="margin-top:16px;">
+      <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Suggested skills</strong>
         <p class="muted">Keep them plain-English. These become capability labels and quality hints for the agent later.</p>
         <div class="agent-tags" style="margin-top:12px;">
@@ -48006,7 +49628,10 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       </div>
       <button id="addKnowledge">Add Source</button>
       <div class="live-feed" style="margin-top:16px;">
-        ${state2.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.")}
+        ${state2.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.", {
+      title: "No sources yet.",
+      body: "Knowledge pointers will appear here after they are added."
+    })}
       </div>
     `,
     `
@@ -48015,9 +49640,12 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
     `
       <label class="field-stack"><span class="muted">Sample task</span><textarea id="testRunTask" rows="5">${escapeHtml(state2.agentDraft.testRun.sampleTask)}</textarea></label>
       <button id="runTest">Run Test</button>
-      <div class="simple-panel" style="margin-top:16px;">
+      <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
-        <p class="muted">${escapeHtml(state2.agentDraft.testRun.result || "No test run yet.")}</p>
+        ${state2.agentDraft.testRun.result ? `<p class="muted">${escapeHtml(state2.agentDraft.testRun.result)}</p>` : emptyState("Run a test before publishing.", {
+      title: "No test run yet.",
+      body: "Run a test before treating this draft as publish-ready."
+    })}
         <div class="agent-tags" style="margin-top:12px;">
           ${state2.agentDraft.testRun.latencyMs ? `<span class="tag">Latency ${Math.round(state2.agentDraft.testRun.latencyMs)}ms</span>` : ""}
           ${state2.agentDraft.testRun.valid === true ? `<span class="tag">Schema valid</span>` : ""}
@@ -48027,14 +49655,14 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       </div>
     `,
     `
-      <div class="simple-panel">
+      <div class="simple-panel surface-panel">
         <strong>${escapeHtml(state2.agentDraft.identity.name)}</strong>
         <p class="muted">${escapeHtml(state2.agentDraft.identity.category)}</p>
         <div class="agent-tags" style="margin-top:12px;">
           ${(state2.agentDraft.identity.tags || []).slice(0, 4).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || `<span class="muted">No skills added yet.</span>`}
         </div>
       </div>
-      <div class="status-banner ${draftStatusTone}" style="margin-top:16px;">
+      <div class="status-banner surface-alert ${draftStatusTone}" style="margin-top:16px;">
         <strong>Backend draft status</strong>
         <p>${escapeHtml(state2.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
         ${state2.agentDraftMeta?.draftId ? `<small>Draft ID: ${escapeHtml(state2.agentDraftMeta.draftId)}</small>` : ""}
@@ -48042,36 +49670,36 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
     `
   ];
   el2.appRoot.innerHTML = `
-    <section data-structure="create-agent">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Create agent</p>
-        <h1>Design an agent draft for the marketplace.</h1>
-        <p class="muted">Configure identity, behavior, skills, tools, knowledge, schema, and a real backend test preview. Final publish still needs the owner proof flow.</p>
+    <section data-structure="create-agent" class="builder-onboarding-page builder-onboarding-page--create">
+      <header class="builder-onboarding-header reveal-on-scroll is-visible">
+        <p class="builder-onboarding-eyebrow">Create agent</p>
+        <h1>Create an agent for funded work.</h1>
+        <p>Define the agent, test its behavior, and prepare it for Dispatch tasks.</p>
       </header>
 
       <section class="wizard-shell reveal-on-scroll">
-        <div class="wizard-progress shell-section">
+        <div class="wizard-progress builder-progress-panel">
           <div class="wizard-progress__bar"><span style="width:${state2.wizardStep / 7 * 100}%"></span></div>
           <div class="wizard-steps">
-            ${wizardSteps.map((step, index2) => `<button data-step="${index2 + 1}" class="${state2.wizardStep === index2 + 1 ? "active" : index2 + 1 < state2.wizardStep ? "done" : ""}">${index2 + 1}. ${step}</button>`).join("")}
+            ${wizardSteps.map((step, index2) => `<button data-step="${index2 + 1}" class="${state2.wizardStep === index2 + 1 ? "active" : index2 + 1 < state2.wizardStep ? "done" : ""}"><span>${index2 + 1}</span>${step}</button>`).join("")}
           </div>
         </div>
         <div class="wizard-layout">
           <div class="wizard-main">
-            <article class="shell-section wizard-stage-card">
-              <div class="section-head">
+            <article class="wizard-stage-card builder-form-panel">
+              <div class="builder-form-head">
                 <div>
-                  <p class="mini-label">${escapeHtml(currentStep.eyebrow)}</p>
+                  <p class="builder-onboarding-eyebrow">${escapeHtml(currentStep.eyebrow)}</p>
                   <h2>${escapeHtml(currentStep.title)}</h2>
                 </div>
-                <span class="meta-pill">Step ${state2.wizardStep} / 7</span>
+                <span>Step ${state2.wizardStep} / 7</span>
               </div>
-              <p class="muted">${escapeHtml(currentStep.body)}</p>
+              <p>${escapeHtml(currentStep.body)}</p>
               <div class="wizard-stage-body">
                 ${stepBodies[state2.wizardStep - 1]}
               </div>
             </article>
-            <article class="shell-section">
+            <article class="builder-action-panel">
               <div class="review-actions">
                 <button id="wizardPrev" ${state2.wizardStep === 1 ? "disabled" : ""}>Back</button>
                 <button class="hero-primary" id="wizardNext">${state2.wizardStep === 7 ? "Save Draft" : "Next"}</button>
@@ -48079,23 +49707,24 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
             </article>
           </div>
           <aside class="wizard-side">
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Launch readiness</p>
-              <h3>${readinessScore}% ready</h3>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Setup readiness</p>
+              <h3>${readinessChecks.filter((item) => item.ready).length} / ${readinessChecks.length} complete</h3>
               <div class="wizard-progress__bar"><span style="width:${readinessScore}%"></span></div>
               <div class="launch-checklist">
-                ${readinessChecks.map((item) => `<div class="checklist-row ${item.ready ? "is-ready" : ""}"><span>${item.ready ? "Done" : "Open"}</span><strong>${escapeHtml(item.label)}</strong></div>`).join("")}
+                ${readinessChecks.map((item) => `<div class="checklist-row ${item.ready ? "is-ready" : ""}"><span>${item.ready ? "Complete" : "Missing"}</span><strong>${escapeHtml(item.label)}</strong></div>`).join("")}
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Backend draft</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Backend draft</p>
               <h3>${escapeHtml(labelize(state2.agentDraftMeta?.syncState || "idle"))}</h3>
-              <p class="muted">${escapeHtml(state2.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
+              <p>${escapeHtml(state2.agentDraftMeta?.syncMessage || "Draft not saved yet.")}</p>
               ${state2.agentDraftMeta?.lastSyncedAt ? `<small>Last synced ${escapeHtml(new Date(state2.agentDraftMeta.lastSyncedAt).toLocaleTimeString())}</small>` : ""}
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Market preview</p>
-              <div class="agent-card wizard-preview-card">
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Marketplace preview</p>
+              <p>This preview shows how the agent profile may appear after setup. It does not create ratings, earnings, or verification.</p>
+              <div class="agent-card surface-card wizard-preview-card">
                 <div class="agent-card__top">
                   <div class="agent-card__identity">
                     <div class="avatar">${escapeHtml(state2.agentDraft.identity.avatar || state2.agentDraft.identity.name.slice(0, 2).toUpperCase())}</div>
@@ -48108,16 +49737,16 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
                 <div class="agent-tags">
                   ${(state2.agentDraft.identity.tags || []).slice(0, 3).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("") || `<span class="muted">Add skills to help buyers understand the agent quickly.</span>`}
                 </div>
-                <div class="agent-metrics">
-                  <div><strong class="metric-success">92%</strong><span>Projected trust</span></div>
-                  <div><strong>${state2.agentDraft.testRun.latencyMs ? `${Math.round(state2.agentDraft.testRun.latencyMs)}ms` : "Pending"}</strong><span>Latency</span></div>
-                  <div class="metric-earnings"><strong>${state2.agentDraftMeta?.draftId ? "Live draft" : "Draft only"}</strong><span>Status</span></div>
+                <div class="builder-preview-facts">
+                  <div><span>Test run</span><strong>${state2.agentDraft.testRun.result ? "Available" : "Not tested"}</strong></div>
+                  <div><span>Latency</span><strong>${state2.agentDraft.testRun.latencyMs ? `${Math.round(state2.agentDraft.testRun.latencyMs)}ms` : "Not checked"}</strong></div>
+                  <div><span>Status</span><strong>${state2.agentDraftMeta?.draftId ? "Backend draft" : "Local draft"}</strong></div>
                 </div>
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Draft notes</p>
-              <p class="muted">${state2.wizardStep < 6 ? "Keep the setup tight. The market rewards fast, legible agents with clear skills and a strong output shape." : state2.agentDraft.testRun.result ? "This draft now has a real backend preview. Final publish still needs the owner proof and registry flow." : "Run one believable backend test before treating this draft as publish-ready."}</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Draft notes</p>
+              <p>${state2.wizardStep < 6 ? "Keep the setup tight: clear skills, clear behavior, and a predictable output shape." : state2.agentDraft.testRun.result ? "This draft has a backend preview. Final publish still needs owner proof and registry flow." : "Run a backend test before treating this draft as publish-ready."}</p>
             </article>
           </aside>
         </div>
@@ -48131,44 +49760,62 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
   const verified = Boolean(state2.externalAgentMeta.ownerProofId);
   const compatibilityNotes = state2.externalAgentMeta.compatibilityNotes || [];
   el2.appRoot.innerHTML = `
-    <section data-structure="connect-agent">
-      <header class="reveal-on-scroll is-visible">
-        <p class="mini-label">Connect external agent</p>
-        <h1>Bring your own endpoint-backed agent into the marketplace.</h1>
-        <p class="muted">This path is for external workers from OpenClaw-style setups, LangGraph services, AutoGen-style workers, custom internal agent platforms, or any other endpoint-backed runtime that can answer marketplace health and execution checks.</p>
+    <section data-structure="connect-agent" class="builder-onboarding-page builder-onboarding-page--connect">
+      <header class="builder-onboarding-header reveal-on-scroll is-visible">
+        <p class="builder-onboarding-eyebrow">Connect agent</p>
+        <h1>Connect an external agent.</h1>
+        <p>Register an existing agent endpoint and make it available for funded tasks.</p>
       </header>
+
+      <section class="builder-flow-strip reveal-on-scroll">
+        ${[
+    ["01", "Identity", "Name the agent"],
+    ["02", "Endpoint", "Add execution URL"],
+    ["03", "Verify", "Check owner and health"],
+    ["04", "Publish", "Make it available"]
+  ].map(([number, title, helper]) => `
+          <article>
+            <strong>${number}</strong>
+            <h3>${title}</h3>
+            <p>${helper}</p>
+          </article>
+        `).join("")}
+      </section>
 
       <section class="wizard-shell reveal-on-scroll">
         <div class="wizard-layout">
           <div class="wizard-main">
-            <article class="shell-section wizard-stage-card">
-              <div class="section-head">
+            <article class="wizard-stage-card builder-form-panel">
+              <div class="builder-form-head">
                 <div>
-                  <p class="mini-label">Agent identity</p>
+                  <p class="builder-onboarding-eyebrow">Agent identity</p>
                   <h2>Public profile and endpoint</h2>
                 </div>
-                <span class="meta-pill">External</span>
+                <span>External</span>
               </div>
               <div class="form-grid">
                 <label class="field-stack field-wide"><span class="muted">Public name</span><input id="externalAgentName" value="${escapeHtml(state2.externalAgentForm.publicName)}" /></label>
+                <label class="field-stack"><span class="muted">Developer or team</span><input id="externalAgentDeveloper" value="${escapeHtml(state2.externalAgentForm.developerName || "")}" placeholder="Team or builder name" /></label>
                 <label class="field-stack"><span class="muted">Slug</span><input id="externalAgentSlug" value="${escapeHtml(state2.externalAgentForm.slug)}" /></label>
                 <label class="field-stack"><span class="muted">Category</span><select id="externalAgentCategory">${categories.map((category) => `<option value="${category}" ${state2.externalAgentForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
                 <label class="field-stack field-wide"><span class="muted">Endpoint URL</span><input id="externalAgentEndpoint" value="${escapeHtml(state2.externalAgentForm.endpointUrl)}" placeholder="https://your-openclaw-or-agent-runtime.example.com" /></label>
+                <label class="field-stack field-wide"><span class="muted">Webhook URL optional</span><input id="externalAgentWebhook" value="${escapeHtml(state2.externalAgentForm.webhookUrl || "")}" placeholder="https://your-agent.example.com/dispatch-webhook" /></label>
                 <label class="field-stack field-wide"><span class="muted">Description</span><textarea id="externalAgentDescription" rows="4">${escapeHtml(state2.externalAgentForm.description)}</textarea></label>
                 <label class="field-stack field-wide"><span class="muted">Skills</span><input id="externalAgentSkills" value="${escapeHtml(state2.externalAgentForm.skills.join(", "))}" placeholder="research synthesis, source grounding, structured output" /></label>
               </div>
-              <div class="simple-panel">
+              <div class="builder-helper-panel">
                 <strong>Suggested skills</strong>
+                <p>Use plain capability labels. These help buyers understand the agent without inventing performance history.</p>
                 <div class="agent-tags" style="margin-top:12px;">
                   ${suggestedSkills.map((skill) => `<button type="button" class="tag-button" data-external-skill="${escapeHtml(skill)}">${escapeHtml(skill)}</button>`).join("") || `<span class="muted">No suggestions for this category yet.</span>`}
                 </div>
               </div>
             </article>
 
-            <article class="shell-section wizard-stage-card">
-              <div class="section-head">
+            <article class="wizard-stage-card builder-form-panel">
+              <div class="builder-form-head">
                 <div>
-                  <p class="mini-label">Marketplace checks</p>
+                  <p class="builder-onboarding-eyebrow">Marketplace checks</p>
                   <h2>Latency and compatibility hints</h2>
                 </div>
               </div>
@@ -48177,49 +49824,33 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
                 <label class="field-stack"><span class="muted">Max latency (ms)</span><input id="externalAgentMaxLatency" type="number" min="0" value="${Number(state2.externalAgentForm.maxLatencyMs || 0)}" /></label>
                 <label class="field-stack"><span class="muted">Max payload bytes</span><input id="externalAgentMaxPayload" type="number" min="1" value="${Number(state2.externalAgentForm.maxPayloadSize || 0)}" /></label>
                 <label class="field-stack"><span class="muted">Pricing hint</span><input id="externalAgentPricingHint" value="${escapeHtml(state2.externalAgentForm.pricingHint)}" /></label>
+                <label class="field-stack"><span class="muted">Adapter type</span><select id="externalAgentAdapterType">
+                  <option value="erc8183_adapter" ${state2.externalAgentForm.adapterType === "erc8183_adapter" ? "selected" : ""}>External adapter</option>
+                  <option value="http" ${state2.externalAgentForm.adapterType === "http" ? "selected" : ""}>HTTP endpoint</option>
+                  <option value="webhook" ${state2.externalAgentForm.adapterType === "webhook" ? "selected" : ""}>Webhook callback</option>
+                </select></label>
+                <label class="field-stack field-wide"><span class="muted">Payout wallet</span><input id="externalAgentPayoutWallet" value="${escapeHtml(state2.externalAgentForm.payoutWallet || "")}" placeholder="Defaults to connected owner wallet" /></label>
+                <label class="field-stack field-wide"><span class="muted">Output schema</span><textarea id="externalAgentOutputSchema" rows="3">${escapeHtml(state2.externalAgentForm.outputSchema || "")}</textarea></label>
               </div>
-              <div class="status-banner info">
+              <div class="builder-helper-panel builder-helper-panel--endpoint">
                 <strong>Expected endpoint shape</strong>
-                <p>The endpoint should expose <code>/health</code>, <code>/execute</code>, <code>/status/:runId</code>, and <code>/result/:runId</code> so the marketplace can verify and dispatch work safely.</p>
+                <p>Your agent should expose compatible execute, status, and result endpoints for Dispatch task routing.</p>
+                <div class="builder-endpoint-list">
+                  <div><code>POST /execute</code><span>Accept funded task input</span></div>
+                  <div><code>GET /status/:runId</code><span>Return queued, running, completed, failed, or cancelled</span></div>
+                  <div><code>GET /result/:runId</code><span>Return final task output for owner review</span></div>
+                </div>
               </div>
-              <details class="shell-panel disclosure-panel">
-                <summary>Builder checklist</summary>
-                <div class="disclosure-panel__body">
-                  <div class="live-feed">
-                    <article class="feed-card">
-                      <span class="feed-card__pulse"></span>
-                      <div>
-                        <strong><code>GET /health</code></strong>
-                        <p>Return <code>ok</code>, <code>version</code>, <code>supportedTaskTypes</code>, <code>maxInputBytes</code>, <code>averageLatencyHintMs</code>, and <code>schemaVersion</code>.</p>
-                      </div>
-                    </article>
-                    <article class="feed-card">
-                      <span class="feed-card__pulse"></span>
-                      <div>
-                        <strong><code>POST /execute</code></strong>
-                        <p>Accept marketplace task input and return an accepted run id or an immediate result if your runtime is synchronous.</p>
-                      </div>
-                    </article>
-                    <article class="feed-card">
-                      <span class="feed-card__pulse"></span>
-                      <div>
-                        <strong><code>GET /status/:runId</code></strong>
-                        <p>Return queued, running, completed, failed, or cancelled so the marketplace can track live execution safely.</p>
-                      </div>
-                    </article>
-                    <article class="feed-card">
-                      <span class="feed-card__pulse"></span>
-                      <div>
-                        <strong><code>GET /result/:runId</code></strong>
-                        <p>Return the final task output and any machine-readable payload your agent produces for review and settlement.</p>
-                      </div>
-                    </article>
-                  </div>
+              <details class="builder-details-panel">
+                <summary>Additional health endpoint detail</summary>
+                <div>
+                  <strong><code>GET /health</code></strong>
+                  <p>Return availability, version, supported task types, max input bytes, latency hint, and schema version if your runtime supports it.</p>
                 </div>
               </details>
             </article>
 
-            <article class="shell-section">
+            <article class="builder-action-panel">
               <div class="review-actions">
                 <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify Wallet Ownership"}</button>
                 <button class="hero-primary" id="connectExternalAgent">${verified ? "Connect Agent" : "Verify First"}</button>
@@ -48228,22 +49859,31 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
           </div>
 
           <aside class="wizard-side">
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Owner proof</p>
-              <h3>${escapeHtml(verified ? "Verified" : "Pending")}</h3>
-              <p class="muted">${escapeHtml(state2.externalAgentMeta.verificationMessage)}</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Connection checks</p>
+              <h3>${escapeHtml(verified ? "Owner proof verified" : "Owner proof pending")}</h3>
+              <div class="builder-check-list">
+                <div class="${verified ? "is-ready" : ""}"><span>${verified ? "Verified" : "Pending"}</span><strong>Owner proof</strong></div>
+                <div class="${state2.externalAgentForm.endpointUrl ? "is-ready" : ""}"><span>${state2.externalAgentForm.endpointUrl ? "Provided" : "Missing"}</span><strong>Endpoint URL</strong></div>
+                <div class="${compatibilityNotes.length ? "is-ready" : ""}"><span>${compatibilityNotes.length ? "Available" : "Not checked"}</span><strong>Compatibility</strong></div>
+                <div class="${state2.externalAgentForm.payoutWallet || state2.wallet ? "is-ready" : ""}"><span>${state2.externalAgentForm.payoutWallet || state2.wallet ? "Available" : "Missing"}</span><strong>Payout wallet</strong></div>
+              </div>
+              <p>${escapeHtml(state2.externalAgentMeta.verificationMessage || "Waiting for wallet ownership verification.")}</p>
               ${state2.externalAgentMeta.verificationMode ? `<small>Mode: ${escapeHtml(labelize(state2.externalAgentMeta.verificationMode))}</small>` : ""}
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">Compatibility</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">Compatibility</p>
               <h3>${escapeHtml(state2.externalAgentMeta.compatibilityHeadline)}</h3>
-              <div class="live-feed">
-                ${compatibilityNotes.map((note) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><p>${escapeHtml(note)}</p></div></article>`).join("") || emptyState("No compatibility notes yet.")}
+              <div class="builder-note-list">
+                ${compatibilityNotes.map((note) => `<article><p>${escapeHtml(note)}</p></article>`).join("") || emptyState("No compatibility checks yet.", {
+    title: "Endpoint not checked yet.",
+    body: "Compatibility notes will appear after ownership and endpoint checks run."
+  })}
               </div>
             </article>
-            <article class="shell-panel wizard-snapshot">
-              <p class="mini-label">What this does</p>
-              <p class="muted">This flow is for real external agents. It verifies ownership, registers the endpoint, runs marketplace checks, and then lists the worker like other agents.</p>
+            <article class="wizard-snapshot builder-setup-panel">
+              <p class="builder-onboarding-eyebrow">What this does</p>
+              <p>This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. Earnings and reputation appear only after real approved funded work.</p>
               <div class="agent-tags" style="margin-top:12px;">
                 <span class="tag">OpenClaw</span>
                 <span class="tag">LangGraph</span>
@@ -48266,6 +49906,12 @@ var ambientRefreshPending = false;
 var attachmentIngestionModulePromise = null;
 var pendingTaskAutoChecks = /* @__PURE__ */ new Set();
 var activeTaskDetailRenderToken = 0;
+function persistRevisionRequests() {
+  localStorage.setItem("dispatchRevisionRequests", JSON.stringify(state.revisionRequests || {}));
+}
+function persistDisputeRecords() {
+  localStorage.setItem("dispatchDisputeRecords", JSON.stringify(state.disputeRecords || {}));
+}
 function loadAttachmentIngestionModule() {
   if (!attachmentIngestionModulePromise) {
     attachmentIngestionModulePromise = Promise.resolve().then(() => (init_attachment_ingestion(), attachment_ingestion_exports));
@@ -48277,7 +49923,8 @@ function renderFatalAppError(error, title = "App startup failed") {
   console.error(title, error);
   if (!el.appRoot) return;
   el.appRoot.innerHTML = `
-    <section class="error-state shell-section">
+    <section class="error-state state-card state-card--error shell-section surface-page">
+      <span class="empty-state__mark" aria-hidden="true"></span>
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(message)}</p>
       <div class="empty-state-actions">
@@ -48333,10 +49980,13 @@ watchInjectedWallet({
     localStorage.setItem("walletConnectionType", state.walletConnectionType);
     localStorage.setItem("walletProviderLabel", nextProviderLabel);
     el.ownerWallet.value = nextWallet;
+    void refreshWalletNetworkState();
     renderTopbar2();
     safeRender("Wallet change render failed");
   },
   onChainChanged: () => {
+    chainClient.resetBrowserContext?.();
+    void refreshWalletNetworkState();
     safeRender("Chain change render failed");
   }
 });
@@ -48357,6 +50007,8 @@ document.addEventListener("click", (event) => {
   }
   const walletToggle = event.target.closest("[data-wallet]");
   if (walletToggle) {
+    state.mobileNavOpen = false;
+    renderNav2();
     renderWalletSheet2(walletToggle.dataset.wallet === "open");
   }
   const menuToggle = event.target.closest("[data-menu]");
@@ -48396,6 +50048,7 @@ function renderWalletSheet2(open) {
         localStorage.setItem("activeWallet", wallet);
         localStorage.setItem("walletConnectionType", state.walletConnectionType);
         localStorage.setItem("walletProviderLabel", providerLabel);
+        await refreshWalletNetworkState();
         updateStatus2("Wallet connected", `${providerLabel} connected as ${shortWallet(wallet)}.`, "success");
         closeWalletSheet(el);
         safeRender("Wallet connect render failed");
@@ -48407,6 +50060,15 @@ function renderWalletSheet2(open) {
       state.wallet = "";
       state.walletConnectionType = "manual";
       state.walletProviderLabel = "";
+      state.walletNetwork = {
+        ...state.walletNetwork,
+        error: "",
+        chainId: null,
+        isArcTestnet: false,
+        usdcBalance: null,
+        nativeGasBalance: null,
+        message: ""
+      };
       el.ownerWallet.value = "";
       localStorage.removeItem("activeWallet");
       localStorage.setItem("walletConnectionType", state.walletConnectionType);
@@ -48415,8 +50077,42 @@ function renderWalletSheet2(open) {
       closeWalletSheet(el);
       safeRender("Wallet disconnect render failed");
     },
+    onSwitchNetwork: async () => {
+      try {
+        state.walletNetwork.loading = true;
+        updateStatus2("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
+        const snapshot = await chainClient.switchWalletToArcTestnet();
+        state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+        updateStatus2("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+        renderWalletSheet2(true);
+        safeRender("Wallet network switch render failed");
+      } catch (error) {
+        state.walletNetwork = {
+          ...state.walletNetwork,
+          loading: false,
+          error: statusMessage(error, "Could not switch to Arc Testnet.")
+        };
+        updateStatus2("Network switch failed", state.walletNetwork.error, "warn");
+      }
+    },
     onClose: () => closeWalletSheet(el)
   });
+}
+async function refreshWalletNetworkState() {
+  if (!state.wallet.trim()) return null;
+  try {
+    state.walletNetwork = { ...state.walletNetwork, loading: true, error: "" };
+    const snapshot = await chainClient.getWalletNetworkSnapshot();
+    state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+    return snapshot;
+  } catch (error) {
+    state.walletNetwork = {
+      ...state.walletNetwork,
+      loading: false,
+      error: statusMessage(error, "Wallet network check failed.")
+    };
+    return null;
+  }
 }
 async function loadMarketData2() {
   return loadMarketDataModule();
@@ -48449,6 +50145,9 @@ function renderNav2() {
 function renderTopbar2() {
   return renderTopbar(el, state, shortWallet);
 }
+function renderFooter() {
+  return renderAppFooter(el, routes);
+}
 function setChrome2(eyebrow, title, sidebarTitle, sidebarLead, progress) {
   return setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progress);
 }
@@ -48459,18 +50158,38 @@ function renderHome() {
   setChrome2(
     "Landing / Home",
     "Dispatch Home",
-    "Post work, hire AI specialists, review outcomes.",
-    "Hire AI agents that actually deliver.",
+    "Post USDC-funded tasks, assign AI workers, and release payment after owner approval.",
+    "AI agents that work, earn, and build reputation on Arc Testnet.",
     100
   );
   renderHomePage({ el, state, onNavigate: navigate });
 }
+function renderArcDemoRemoved() {
+  setChrome2(
+    "Dispatch",
+    "Arc Demo Removed",
+    "This demo route is no longer part of the public Dispatch interface.",
+    "Use the marketplace, funded task flow, and task detail pages for current Arc Testnet review flows.",
+    20
+  );
+  el.appRoot.innerHTML = `
+    <section data-structure="route-removed" class="surface-page">
+      ${richEmptyState(
+    "Arc Demo removed.",
+    "This demo route is no longer part of the Dispatch interface.",
+    ['<button class="hero-primary" data-route="/">Go home</button>'],
+    "info"
+  )}
+    </section>
+  `;
+  revealSections(el.appRoot);
+}
 function renderAgentsPage() {
   setChrome2(
     "Agent Marketplace",
-    "Browse Agents",
-    "Find the right specialist faster.",
-    "Dispatch keeps trust, results, and response expectations easy to scan before you hire.",
+    "Explore Agents",
+    "Find the right worker for funded execution faster.",
+    "Dispatch makes agent reputation, earnings, recent work, and response expectations easy to scan before you assign funded work.",
     92
   );
   renderAgentsMarketplacePage({ el, state, onNavigate: navigate, rerender: renderAgentsPage });
@@ -48479,8 +50198,8 @@ async function renderAgentProfile(slug) {
   setChrome2(
     "Agent Profile",
     "Agent Profile",
-    "A sales page for hiring, not a technical profile dump.",
-    "Trust stats, recent outcomes, response time, and a strong hire action keep this page conversion-focused.",
+    "A sales page for funded hiring, not a technical profile dump.",
+    "Trust stats, approved outcomes, response time, and a strong hire action keep this page conversion-focused.",
     88
   );
   renderAgentProfilePage({ el, state, slug, onNavigate: navigate });
@@ -48747,11 +50466,17 @@ function buildExternalAgentRegistrationPayload() {
     description: state.externalAgentForm.description.trim(),
     avatarUrl: null,
     originType: "external",
+    developerName: state.externalAgentForm.developerName.trim() || void 0,
     category: state.externalAgentForm.category,
     capabilityTags: skills,
     skills,
     skillCategories: [state.externalAgentForm.category],
     endpointUrl: state.externalAgentForm.endpointUrl.trim(),
+    webhookUrl: state.externalAgentForm.webhookUrl.trim() || null,
+    adapterType: state.externalAgentForm.adapterType || "erc8183_adapter",
+    outputSchema: state.externalAgentForm.outputSchema.trim() || "External endpoint-managed output schema",
+    payoutWallet: state.externalAgentForm.payoutWallet.trim() || state.wallet,
+    erc8183Compatible: true,
     expectedLatencyMsRange: {
       minMs: Number(state.externalAgentForm.minLatencyMs || 0),
       maxMs: Number(state.externalAgentForm.maxLatencyMs || 0)
@@ -48891,7 +50616,7 @@ async function createTask() {
     const onchainSnapshot = await chainClient.readOnchainTask(taskId).catch(() => null);
     const onchainTask = onchainSnapshot?.onchainTask || null;
     const onchainState = String(onchainTask?.state || "").toUpperCase();
-    const escrowLocked = readBigIntLike2(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
+    const escrowLocked = readBigIntLike3(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
     const fundingStateConfirmed = escrowLocked > 0n && [
       "OPEN",
       "ASSIGNED",
@@ -48935,12 +50660,20 @@ async function createTask() {
     };
     payload = taskPayloadFromForm();
     requireWallet2();
+    const walletSnapshot = await refreshWalletNetworkState();
+    if (!walletSnapshot?.isArcTestnet) {
+      throw new Error("Switch to Arc Testnet to fund tasks with testnet USDC.");
+    }
+    const walletUsdcBalance = walletSnapshot.usdcBalance == null ? null : Number(walletSnapshot.usdcBalance);
+    if (walletUsdcBalance != null && walletUsdcBalance < Number(payload.rewardAmount || 0)) {
+      throw new Error(`Your ERC-20 testnet USDC balance is too low for this task reward. Required: ${payload.rewardAmount} USDC.`);
+    }
     if (payload.title.length < 3) throw new Error("Add a clearer task title.");
     if (payload.description.length < 20) throw new Error("Add a fuller task description so the agent can execute confidently.");
     if (!Number.isFinite(payload.rewardAmount) || payload.rewardAmount <= 0) throw new Error("Set a reward before posting the task.");
     if (!payload.deadline) throw new Error("Set a valid deadline before posting the task.");
     if (payload.hiringMode === "direct_hire" && !payload.selectedAgentId) throw new Error("Select an agent for direct hire.");
-    updateStatus2("Draft created", "Creating the offchain task record before the Arc write.", "neutral");
+    updateStatus2("Draft created", "Creating the offchain task record before the Arc wallet write.", "neutral");
     const draft = await sendJson2("/api/task-market/tasks/draft", "POST", payload, validateTaskDraftCreateResponse);
     taskId = draft.task.taskId;
     const metadataHash = `task_meta_${taskId}`;
@@ -48949,15 +50682,19 @@ async function createTask() {
     const selectedAgent = payload.selectedAgentId ? state.agents.find((agent) => agent.profile.agentId === payload.selectedAgentId) : null;
     state.taskForm.title = "";
     state.taskForm.description = "";
+    state.taskForm.templateId = "custom_task";
+    state.taskForm.templateFields = {};
+    state.taskForm.templateMessage = "";
+    state.taskForm.selectedServicePackage = null;
     state.taskForm.structuredNotes = "";
     state.taskForm.attachments = [];
     state.taskForm.rewardAmount = "";
     state.taskForm.deadline = "";
     state.taskForm.selectedAgentId = "";
     state.taskForm.maxParticipants = 3;
-    updateStatus2("Task created", "Opening the new task page while wallet confirmations continue.", "success");
+    updateStatus2("Funded task created", "Opening the new task page while Arc wallet confirmations continue.", "success");
     navigate(`/tasks/${taskId}`);
-    updateStatus2("Wallet ready", "Sending create_task and fund_task through the Arc client adapter.", "neutral");
+    updateStatus2("Wallet ready", "Sending create_task and fund_task through the Arc adapter for funded task creation.", "neutral");
     writeResult = await chainClient.createTaskLifecycle({
       taskId,
       rewardAmount: payload.rewardAmount,
@@ -49004,13 +50741,13 @@ async function createTask() {
         message = "Funding completed, but the direct-hire assignment step did not finish. The task may still need one more wallet confirmation.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "create_task") {
         writeResult.createTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent create_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent create_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "fund_task") {
         writeResult.fundTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent fund_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent fund_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "assign_task") {
         writeResult.assignTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent assign_task, but the app could not fully recover the consensus transaction yet. The task is being tracked as pending onchain.";
+        message = "The wallet sent assign_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
       }
     }
     if (taskId) {
@@ -49052,27 +50789,36 @@ async function renderPostTaskPage() {
     state.chainStatusError = error instanceof Error ? error.message : "Chain status request failed.";
   }
   setChrome2(
-    "Post Task",
-    "Post Task",
-    "One clean form from task idea to funded work.",
-    "The form should feel simple, buyer-friendly, and trustworthy instead of technical or protocol-heavy.",
+    "Post Funded Task",
+    "Post Funded Task",
+    "Create USDC-funded work for AI agents on Arc Testnet.",
+    "Wallet funding, structured agent execution, owner review, and payment release stay connected.",
     76
   );
   const selectedAgent = state.agents.find((agent) => agent.profile.agentId === state.taskForm.selectedAgentId);
   const selectedAgentBestFor = selectedAgent ? bestFitLabels(selectedAgent) : [];
   const selectedAgentIdeas = selectedAgent ? starterIdeasForAgent(selectedAgent) : [];
   const taskChecklist = buildPostTaskChecklist(state.taskForm, selectedAgent);
+  const selectedTemplate = getTaskBriefTemplate(state.taskForm.templateId || "custom_task");
+  const templateResult = buildTaskTemplateBrief(selectedTemplate.id, state.taskForm.templateFields || {});
   const walletReady = Boolean(state.wallet.trim());
+  if (walletReady) {
+    await refreshWalletNetworkState();
+  }
   const chainMode = state.chainConfig?.chainMode || "unknown";
   const chainStatus = state.chainStatus;
   const chainWritable = chainMode !== "read_only" && chainMode !== "unknown";
-  if (walletReady && chainMode === "browser_wallet") {
+  const walletOnArc = !walletReady || state.walletNetwork?.isArcTestnet;
+  if (walletReady && walletOnArc && chainMode === "browser_wallet") {
     void chainClient.primeBrowserLifecycle().catch(() => {
     });
   }
-  const fundingBlocked = !chainWritable;
-  const primaryActionLabel = !walletReady ? "Connect Wallet to Fund" : state.taskForm.hiringMode === "direct_hire" ? "Create, Fund, and Assign" : "Create and Fund Task";
-  const fundingHint = !walletReady ? "Connect a wallet before funding a task." : !chainWritable ? "Arc writes are disabled in this environment. Switch to a writable chain mode to fund tasks." : state.taskForm.hiringMode === "direct_hire" ? "Direct hire usually takes 3 wallet confirmations on Arc: create, fund, and assign. The first task may ask for one extra one-time USDC approval." : "Open market usually takes 2 wallet confirmations on Arc: create and fund. The first task may ask for one extra one-time USDC approval.";
+  const rewardAmountForBalance = Number(state.taskForm.rewardAmount || 0);
+  const usdcBalanceNumber = state.walletNetwork?.usdcBalance == null ? null : Number(state.walletNetwork.usdcBalance);
+  const balanceTooLow = walletReady && walletOnArc && rewardAmountForBalance > 0 && usdcBalanceNumber != null && usdcBalanceNumber < rewardAmountForBalance;
+  const fundingBlocked = !walletReady || !chainWritable || !walletOnArc || balanceTooLow;
+  const primaryActionLabel = !walletReady ? "Connect Wallet to Fund" : !walletOnArc ? "Switch to Arc Testnet" : balanceTooLow ? "Insufficient Testnet USDC" : state.taskForm.hiringMode === "direct_hire" ? "Create, Fund, and Assign Task" : "Create and Fund Task";
+  const fundingHint = !walletReady ? "Connect a wallet before funding a task." : !walletOnArc ? "Switch to Arc Testnet to fund tasks with testnet USDC." : balanceTooLow ? `Your ERC-20 testnet USDC balance is lower than the ${state.taskForm.rewardAmount} USDC reward.` : !chainWritable ? "Arc writes are disabled in this environment. Switch to a writable chain mode to fund tasks." : state.taskForm.hiringMode === "direct_hire" ? "Direct hire usually takes 3 wallet confirmations on Arc: create, fund, and assign." : "Open market usually takes 2 wallet confirmations on Arc: create and fund.";
   const chainBanner = !walletReady ? {
     title: "Wallet required",
     body: "Connect a wallet to sign and fund the task from this workspace.",
@@ -49091,96 +50837,139 @@ async function renderPostTaskPage() {
     tone: "warning"
   } : null;
   el.appRoot.innerHTML = `
-    <section data-structure="task-composer">
-      <header>
-        <p class="mini-label">Execution Input</p>
-        <h1>What do you want an AI to do?</h1>
-        <p>Describe the work, route it to the right execution path, and fund only when the task is ready to move.</p>
+    <section data-structure="task-composer" class="post-task-page">
+      <header class="post-task-header reveal-on-scroll is-visible">
+        <p class="post-task-eyebrow">Post funded task</p>
+        <h1>Create funded work for an AI agent.</h1>
+        <p>Set the brief, choose an agent, and fund the task in USDC.</p>
+        <span>Arc Testnet | USDC payment flow | Owner approval</span>
       </header>
-      <section class="composer-grid">
-        <div class="composer-main">
-          <article class="composer-intro reveal-on-scroll">
-            <div class="composer-title-row">
-              <div>
-                <p class="mini-label">Command</p>
-                <h2>Turn a task into funded execution.</h2>
-              </div>
-              <div class="composer-badges">
-                <span class="meta-pill">${escapeHtml(state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market")}</span>
-                <span class="meta-pill">${walletReady ? "Wallet connected" : "Connect wallet to fund"}</span>
-              </div>
-            </div>
-            <p class="muted">Write the task once, route it cleanly, and keep the funding path obvious. This surface is optimized for execution, not exploration.</p>
+
+      <section class="post-task-flow reveal-on-scroll">
+        ${[
+    ["01", "Brief", "Write or generate the task brief"],
+    ["02", "Agent", "Choose a package or route"],
+    ["03", "Fund", "Lock USDC before work starts"],
+    ["04", "Review", "Approve before payment release"]
+  ].map(([number, title, helper]) => `
+          <article>
+            <strong>${number}</strong>
+            <h3>${title}</h3>
+            <p>${helper}</p>
           </article>
+        `).join("")}
+      </section>
+
+      <section class="post-task-layout">
+        <div class="post-task-main">
           ${chainBanner ? `
-            <article class="status-banner ${chainBanner.tone} reveal-on-scroll">
+            <article class="post-task-alert post-task-alert--${chainBanner.tone} reveal-on-scroll">
               <strong>${escapeHtml(chainBanner.title)}</strong>
               <p>${escapeHtml(chainBanner.body)}</p>
             </article>
           ` : ""}
-          <article class="shell-section reveal-on-scroll">
-              <div class="section-head">
+
+          <article class="post-task-composer reveal-on-scroll">
+            <div class="post-task-section-head">
               <div>
-                <p class="mini-label">Composer</p>
-                <h2>Task brief</h2>
+                <p class="post-task-eyebrow">Task brief</p>
+                <h2>Describe the outcome.</h2>
+                <p>Describe the outcome the agent should deliver.</p>
               </div>
-                <div class="meta-inline">
-                <span class="meta-pill">${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
-                <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
-                </div>
+              <div class="post-task-meta">
+                <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
+                <span>${state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market"}</span>
+              </div>
             </div>
-            <div class="form-grid field-stack">
-              <label class="field-wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
-              <label class="field-wide"><strong>Description</strong><textarea id="taskDescription" rows="7" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
-              <label><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
-              <label><strong>Reward (USDC)</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /></label>
-              <label><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
-              <div class="field-wide">
-                <p class="mini-label">Route</p>
+
+            ${state.taskForm.selectedServicePackage ? `
+              <div class="post-package-summary">
+                <div>
+                  <span>Selected package</span>
+                  <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)}: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
+                  <p>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Agent selected from package"} | You can edit the brief before funding.</p>
+                </div>
+                <strong>${escapeHtml(Number(state.taskForm.selectedServicePackage.priceUsdc || 0).toLocaleString(void 0, { maximumFractionDigits: 6 }))} USDC</strong>
+              </div>
+            ` : ""}
+
+            <section class="post-template-section">
+              <div class="post-task-section-head post-task-section-head--compact">
+                <div>
+                  <p class="post-task-eyebrow">Template</p>
+                  <h3>Start from a task shape.</h3>
+                </div>
+                <span>${escapeHtml(selectedTemplate.name)}</span>
+              </div>
+              <div class="post-template-grid">
+                ${taskBriefTemplates.map((template) => `
+                  <button type="button" data-template-card="${template.id}" class="${selectedTemplate.id === template.id ? "is-selected" : ""}">
+                    <strong>${escapeHtml(template.name)}</strong>
+                    <span>${escapeHtml(template.category ? labelize(template.category) : "Custom brief")}</span>
+                  </button>
+                `).join("")}
+              </div>
+              ${selectedTemplate.id === "custom_task" ? `
+                <p class="post-helper">Custom Task keeps the blank composer. Write directly below.</p>
+              ` : `
+                <div class="post-template-fields">
+                  ${selectedTemplate.fields.map((field) => {
+    const value = state.taskForm.templateFields?.[field.key] || "";
+    return field.multiline ? `<label class="post-field post-field--wide"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><textarea data-template-field="${field.key}" rows="3" placeholder="${escapeHtml(field.label)}">${escapeHtml(value)}</textarea></label>` : `<label class="post-field"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><input data-template-field="${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.label)}" /></label>`;
+  }).join("")}
+                </div>
+                <button type="button" class="post-quiet-button" id="generateTaskBrief">Generate / Update Brief</button>
+                ${state.taskForm.templateMessage ? `<div class="post-task-alert post-task-alert--${templateResult.missingFields.length ? "warning" : "info"}"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
+              `}
+            </section>
+
+            <section class="post-brief-fields">
+              <label class="post-field post-field--wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
+              <label class="post-field post-field--wide"><strong>Final editable brief</strong><textarea id="taskDescription" rows="9" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
+              <label class="post-field"><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
+              <label class="post-field"><strong>USDC reward</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /><span>This amount is locked before the agent starts.</span></label>
+              <label class="post-field"><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
+              <div class="post-route-control">
+                <p class="post-task-eyebrow">Agent route</p>
                 <div class="segmented">
                   <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Direct Hire</button>
                   <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Open Market</button>
                 </div>
               </div>
               ${state.taskForm.hiringMode === "direct_hire" ? `
-                  <label class="field-wide"><strong>Selected agent</strong>
+                  <label class="post-field post-field--wide"><strong>Selected agent</strong>
                     <select id="selectedAgentId">
                       <option value="">Choose an agent</option>
                       ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} trust</option>`).join("")}
                     </select>
                   </label>
                 ` : `
-                  <label class="field-wide"><strong>Max participants</strong><input id="taskParticipants" type="number" min="1" max="20" value="${state.taskForm.maxParticipants}" /></label>
+                  <label class="post-field post-field--wide"><strong>Max participants</strong><input id="taskParticipants" type="number" min="1" max="20" value="${state.taskForm.maxParticipants}" /></label>
                 `}
-            </div>
+            </section>
           </article>
-          <details class="shell-section disclosure-panel reveal-on-scroll">
-            <summary>Advanced options</summary>
-            <div class="disclosure-panel__body">
-              <div class="section-head">
-                <div>
-                  <p class="mini-label">Advanced</p>
-                  <h2>Review settings and extra context</h2>
-                </div>
-                <span class="meta-pill">${state.taskForm.attachments.length ? `${state.taskForm.attachments.length} attachment${state.taskForm.attachments.length === 1 ? "" : "s"}` : "Optional"}</span>
-              </div>
-              <div class="form-grid field-stack">
-                <label><strong>Evaluation preference</strong>
+
+          <details class="post-advanced reveal-on-scroll">
+            <summary>
+              <span>Advanced options</span>
+              <small>Optional evaluation and attachment settings</small>
+            </summary>
+            <div class="post-advanced__body">
+              <div class="post-advanced-grid">
+                <label class="post-field"><strong>Evaluation preference</strong>
                   <select id="taskEvaluationPreference">
                     <option value="user_review_only" ${state.taskForm.evaluationPreference === "user_review_only" ? "selected" : ""}>User review only</option>
                     <option value="assisted_evaluation" ${state.taskForm.evaluationPreference === "assisted_evaluation" ? "selected" : ""}>Assisted evaluation</option>
                     <option value="hybrid_review" ${state.taskForm.evaluationPreference === "hybrid_review" ? "selected" : ""}>Hybrid review</option>
                   </select>
                 </label>
-                <label class="field-wide"><strong>Structured notes</strong><textarea id="taskStructuredNotes" rows="4" placeholder="Formatting rules, references, or approval hints.">${escapeHtml(state.taskForm.structuredNotes)}</textarea></label>
-                <label><strong>Attachment title</strong><input id="attachmentTitle" placeholder="Product brief" /></label>
-                <label><strong>Attachment pointer</strong><input id="attachmentPointer" placeholder="https://... or ipfs://..." /></label>
-                <label class="field-wide"><strong>Attachment text</strong><textarea id="attachmentText" rows="5" placeholder="Paste source text here if you want grounded summarization, extraction, or clause review."></textarea></label>
-                <label class="field-wide"><strong>Upload file</strong><input id="attachmentFile" type="file" accept=".txt,.md,.csv,.json,.pdf,.docx,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/json,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp" /></label>
+                <label class="post-field post-field--wide"><strong>Structured notes</strong><textarea id="taskStructuredNotes" rows="4" placeholder="Formatting rules, references, or approval hints.">${escapeHtml(state.taskForm.structuredNotes)}</textarea></label>
+                <label class="post-field"><strong>Attachment title</strong><input id="attachmentTitle" placeholder="Product brief" /></label>
+                <label class="post-field"><strong>Attachment pointer</strong><input id="attachmentPointer" placeholder="https://... or ipfs://..." /></label>
+                <label class="post-field post-field--wide"><strong>Attachment text</strong><textarea id="attachmentText" rows="5" placeholder="Paste source text here if you want grounded summarization, extraction, or clause review."></textarea></label>
+                <label class="post-field post-field--wide"><strong>Upload file</strong><input id="attachmentFile" type="file" accept=".txt,.md,.csv,.json,.pdf,.docx,.png,.jpg,.jpeg,.webp,text/plain,text/markdown,application/json,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp" /></label>
               </div>
-              <div class="ops-actions">
-                <button type="button" id="addAttachment">Add Attachment</button>
-              </div>
+              <button type="button" class="post-quiet-button" id="addAttachment">Add Attachment</button>
               <div class="attachment-list">
                 ${state.taskForm.attachments.length ? state.taskForm.attachments.map((attachment) => `
                       <div class="attachment-item">
@@ -49189,61 +50978,79 @@ async function renderPostTaskPage() {
                         <small>${attachment.textContent ? `${Math.min(attachment.textContent.length, 2e4)} chars of inline source text attached` : "Pointer-only reference"}</small>
                         ${attachment.extractionSource ? `<small>Parsed from ${escapeHtml(attachment.extractionSource.toUpperCase())}${attachment.truncated ? " | truncated for task safety" : ""}</small>` : ""}
                       </div>
-                    `).join("") : emptyState("No supporting material yet. Add briefs, docs, or references to make execution sharper.")}
+                    `).join("") : emptyState("No supporting material yet. Add briefs, docs, or references to make execution sharper.", {
+    title: "No supporting material yet.",
+    body: "Add briefs, docs, or references if the task needs grounded context."
+  })}
               </div>
             </div>
           </details>
         </div>
-        <aside class="composer-side">
-          <article class="shell-panel task-preview reveal-on-scroll">
-            <p class="mini-label">Preview</p>
-            <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
-              <p class="muted">${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
-              <div class="preview-tags">
-                <span class="meta-pill">${labelize(state.taskForm.category)}</span>
-                <span class="meta-pill">${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
-                <span class="meta-pill">${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
-              </div>
-          </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Readiness</p>
-            <h3>Ready to route</h3>
-            <p class="muted">${escapeHtml(taskChecklist.summary)}</p>
-            <div class="tag-cloud">${taskChecklist.items.map((item) => `<span class="tag ${item.complete ? "tag-success" : "tag-muted"}">${escapeHtml(item.label)}</span>`).join("")}</div>
-          </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Assignment</p>
-            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Open execution path"}</h3>
-            <p class="muted">${selectedAgent ? selectedAgent.profile.description : "Choose an agent directly or let the market compete for the task."}</p>
-            ${selectedAgent ? `
-              <div class="tag-cloud">
-                ${selectedAgentBestFor.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}
-              </div>
-              <div class="attachment-list">
-                ${selectedAgentIdeas.map((idea, index2) => `
-                  <button type="button" class="task-row suggested-task" data-suggested-task="${index2}">
-                    <strong>Starter idea ${index2 + 1}</strong>
-                    <p>${escapeHtml(idea)}</p>
-                  </button>
-                `).join("")}
-              </div>
-            ` : ""}
-          </article>
-          <article class="shell-panel info-panel reveal-on-scroll">
-            <p class="mini-label">Funding state</p>
-            <h3>${escapeHtml(primaryActionLabel)}</h3>
-            <p class="muted">${escapeHtml(fundingHint)}</p>
+
+        <aside class="post-task-side">
+          <article class="post-funding-summary reveal-on-scroll">
+            <p class="post-task-eyebrow">Funding summary</p>
+            <h2>${escapeHtml(primaryActionLabel)}</h2>
+            <div class="post-summary-list">
+              <div><span>Reward</span><strong>${state.taskForm.rewardAmount ? formatCurrency(state.taskForm.rewardAmount) : "Not set"}</strong></div>
+              <div><span>Network</span><strong>Arc Testnet</strong></div>
+              <div><span>Payment token</span><strong>USDC</strong></div>
+              <div><span>Wallet</span><strong>${walletReady ? shortWallet(state.wallet) : "Required"}</strong></div>
+              <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
+              <div><span>Agent route</span><strong>${state.taskForm.hiringMode === "direct_hire" ? selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose agent" : "Open market"}</strong></div>
+              <div><span>Package</span><strong>${state.taskForm.selectedServicePackage ? escapeHtml(state.taskForm.selectedServicePackage.name) : "Custom task"}</strong></div>
+            </div>
+            ${!walletOnArc && walletReady ? `<button type="button" class="hero-secondary post-switch-button" id="switchArcFromPost">Switch to Arc Testnet</button>` : ""}
             ${state.chainTransaction?.state && state.chainTransaction.state !== "idle" ? `
-              <div class="status-banner ${state.chainTransaction.state === "failed" ? "warning" : "info"}">
+              <div class="post-task-alert post-task-alert--${state.chainTransaction.state === "failed" ? "warning" : "info"}">
                 <strong>${escapeHtml(labelize(state.chainTransaction.state))}</strong>
                 <p>${escapeHtml(state.chainTransaction.message)}</p>
               </div>
             ` : ""}
             <button class="hero-primary" id="fundTaskButton" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
+            <p class="post-funding-hint disabled-reason">${escapeHtml(fundingHint)}</p>
+          </article>
+
+          <article class="post-route-summary reveal-on-scroll">
+            <p class="post-task-eyebrow">Agent route</p>
+            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose an agent or open market"}</h3>
+            <p>${selectedAgent ? escapeHtml(selectedAgent.profile.description) : "Choose an agent directly or post to available agents."}</p>
+            ${selectedAgent ? `
+              <div class="post-route-tags">
+                ${selectedAgentBestFor.slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+              </div>
+              <div class="post-suggested-list">
+                ${selectedAgentIdeas.slice(0, 2).map((idea, index2) => `
+                  <button type="button" data-suggested-task="${index2}">
+                    <strong>Starter idea ${index2 + 1}</strong>
+                    <span>${escapeHtml(idea)}</span>
+                  </button>
+                `).join("")}
+              </div>
+            ` : ""}
+          </article>
+
+          <article class="post-preview-card reveal-on-scroll">
+            <p class="post-task-eyebrow">Preview</p>
+            <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
+            <p>${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
+            <div>
+              <span>${labelize(state.taskForm.category)}</span>
+              <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
+              <span>${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
+            </div>
+          </article>
+
+          <article class="post-demo-card reveal-on-scroll">
+            <strong>Arc Testnet demo mode</strong>
+            <p>Demo flow stays separate from wallet-funded tasks.</p>
+            <button type="button" data-start-demo-flow>Start Demo Flow</button>
           </article>
         </aside>
       </section>
-      <section class="mobile-action">
+
+      <section class="mobile-action post-mobile-action">
+        <span>${state.taskForm.rewardAmount ? formatCurrency(state.taskForm.rewardAmount) : "Reward not set"}</span>
         <button id="fundTaskMobile" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
       </section>
     </section>
@@ -49265,6 +51072,58 @@ async function renderPostTaskPage() {
       if (id === "selectedAgentId") renderPostTaskPage();
     });
   });
+  document.getElementById("taskTemplateId")?.addEventListener("input", (event) => {
+    state.taskForm.templateId = event.target.value;
+    state.taskForm.templateFields = {};
+    state.taskForm.selectedServicePackage = null;
+    state.taskForm.templateMessage = event.target.value === "custom_task" ? "Custom Task selected. Write your own brief below." : "Fill the template fields, then generate an editable task brief.";
+    const template = getTaskBriefTemplate(event.target.value);
+    if (template?.category) state.taskForm.category = template.category;
+    renderPostTaskPage();
+  });
+  document.querySelectorAll("[data-template-card]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const templateId = node.dataset.templateCard;
+      state.taskForm.templateId = templateId;
+      state.taskForm.templateFields = {};
+      state.taskForm.selectedServicePackage = null;
+      state.taskForm.templateMessage = templateId === "custom_task" ? "Custom Task selected. Write your own brief below." : "Fill the template fields, then generate an editable task brief.";
+      const template = getTaskBriefTemplate(templateId);
+      if (template?.category) state.taskForm.category = template.category;
+      renderPostTaskPage();
+    });
+  });
+  document.querySelectorAll("[data-template-field]").forEach((node) => {
+    node.addEventListener("input", (event) => {
+      state.taskForm.templateFields = {
+        ...state.taskForm.templateFields || {},
+        [node.dataset.templateField]: event.target.value
+      };
+      state.taskForm.templateMessage = "";
+    });
+  });
+  document.getElementById("generateTaskBrief")?.addEventListener("click", () => {
+    const result = buildTaskTemplateBrief(state.taskForm.templateId, state.taskForm.templateFields || {});
+    if (result.isCustom) {
+      state.taskForm.templateMessage = "Custom Task selected. Write your own brief below.";
+      renderPostTaskPage();
+      return;
+    }
+    if (result.missingFields.length) {
+      state.taskForm.templateMessage = `Add required template fields first: ${result.missingFields.join(", ")}.`;
+      renderPostTaskPage();
+      return;
+    }
+    state.taskForm.description = result.brief;
+    if (!state.taskForm.title.trim()) {
+      state.taskForm.title = result.template.name;
+    }
+    if (result.template.category) {
+      state.taskForm.category = result.template.category;
+    }
+    state.taskForm.templateMessage = "Brief generated. Review and edit it before funding the task.";
+    renderPostTaskPage();
+  });
   document.querySelectorAll("[data-mode]").forEach((node) => {
     node.addEventListener("click", () => {
       state.taskForm.hiringMode = node.dataset.mode;
@@ -49284,6 +51143,17 @@ async function renderPostTaskPage() {
       state.taskForm.description = idea;
       renderPostTaskPage();
     });
+  });
+  document.getElementById("switchArcFromPost")?.addEventListener("click", async () => {
+    try {
+      updateStatus2("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
+      const snapshot = await chainClient.switchWalletToArcTestnet();
+      state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+      updateStatus2("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+      renderPostTaskPage();
+    } catch (error) {
+      updateStatus2("Network switch failed", statusMessage(error, "Could not switch to Arc Testnet."), "warn");
+    }
   });
   document.getElementById("addAttachment")?.addEventListener("click", () => {
     const title = document.getElementById("attachmentTitle").value.trim();
@@ -49355,7 +51225,41 @@ async function renderPostTaskPage() {
     }
   });
   [document.getElementById("fundTaskButton"), document.getElementById("fundTaskMobile")].filter(Boolean).forEach((node) => node.addEventListener("click", createTask));
+  document.querySelector("[data-start-demo-flow]")?.addEventListener("click", (event) => {
+    startDemoFlow(event.currentTarget);
+  });
   revealSections(el.appRoot);
+}
+async function startDemoFlow(trigger) {
+  try {
+    setButtonLoading(trigger, true, "Starting");
+    const payload = {
+      creatorWallet: state.wallet?.trim() || "demo_buyer_wallet"
+    };
+    const response = await sendJson2("/api/demo/thread-writer/start", "POST", payload);
+    await loadMarketData2();
+    updateStatus2("Demo task funded", response.message || "Thread Writer demo task is ready.", "success");
+    navigate(`/tasks/${response.task.taskId}`);
+  } catch (error) {
+    updateStatus2("Demo flow unavailable", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
+async function advanceDemoFlow(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Advancing");
+    const response = await sendJson2(`/api/demo/thread-writer/${taskId}/next`, "POST", {
+      actorWallet: state.wallet?.trim() || "demo_buyer_wallet"
+    });
+    await loadMarketData2();
+    updateStatus2("Demo advanced", response.message || "Demo task moved to the next lifecycle step.", "success");
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus2("Demo step failed", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
 }
 async function runTaskAction(taskId, action, trigger) {
   try {
@@ -49443,6 +51347,87 @@ async function runUserDecision(taskId, decision, trigger) {
     setButtonLoading(trigger, false);
   }
 }
+async function requestRevision(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Saving");
+    requireWallet2();
+    const changeRequest = document.getElementById("revisionChangeRequest")?.value?.trim() || "";
+    const missingDetails = document.getElementById("revisionMissingDetails")?.value?.trim() || "";
+    const extraInstruction = document.getElementById("revisionExtraInstruction")?.value?.trim() || "";
+    if (!changeRequest && !missingDetails) {
+      updateStatus2("Revision note needed", "Add what needs to change or what was missing before requesting a revision.", "warn");
+      return;
+    }
+    const existing = state.revisionRequests?.[taskId] || [];
+    const revisionRequest = {
+      id: `revision_${Date.now()}`,
+      taskId,
+      changeRequest,
+      missingDetails,
+      extraInstruction,
+      requestedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      requestedBy: state.wallet
+    };
+    state.revisionRequests = {
+      ...state.revisionRequests || {},
+      [taskId]: [revisionRequest, ...existing]
+    };
+    persistRevisionRequests();
+    updateStatus2(
+      "Revision requested",
+      "The request was saved locally. Payment remains funded and locked until the owner approves revised work.",
+      "success"
+    );
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus2("Revision request failed", statusMessage(error, "Revision request failed"), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
+async function openLocalDispute(taskId, trigger) {
+  try {
+    setButtonLoading(trigger, true, "Opening");
+    requireWallet2();
+    const reason = document.getElementById("disputeReason")?.value?.trim() || "";
+    const details = document.getElementById("disputeDetails")?.value?.trim() || "";
+    const requestedResolution = document.getElementById("disputeResolution")?.value?.trim() || "Request platform review";
+    if (!reason) {
+      updateStatus2("Dispute reason needed", "Choose a reason before opening a dispute.", "warn");
+      return;
+    }
+    if (!details) {
+      updateStatus2("Dispute details needed", "Add evidence or details so the dispute can be reviewed.", "warn");
+      return;
+    }
+    const existing = state.disputeRecords?.[taskId] || [];
+    const disputeRecord = {
+      id: `dispute_${Date.now()}`,
+      taskId,
+      reason,
+      details,
+      requestedResolution,
+      status: "under_review",
+      openedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      openedBy: state.wallet
+    };
+    state.disputeRecords = {
+      ...state.disputeRecords || {},
+      [taskId]: [disputeRecord, ...existing]
+    };
+    persistDisputeRecords();
+    updateStatus2(
+      "Dispute opened",
+      "The dispute was saved locally. Payment remains funded and locked; no refund, payout, or settlement transaction was created.",
+      "warn"
+    );
+    await renderTaskDetail(taskId);
+  } catch (error) {
+    updateStatus2("Dispute failed", statusMessage(error, "Dispute failed"), "warn");
+  } finally {
+    setButtonLoading(trigger, false);
+  }
+}
 async function runImproveAgain(taskId, trigger) {
   try {
     setButtonLoading(trigger, true, "Improving");
@@ -49465,12 +51450,16 @@ async function renderTaskDetail(taskId) {
   setChrome2(
     "Task Detail",
     "Task Detail",
-    "Execution, evaluation, and settlement in one page.",
-    "Status, deadline, participating agents, result state, review controls, and payout history stay legible in one view.",
+    "Funded execution, owner review, and settlement in one page.",
+    "Funding state, participating agents, submitted output, review controls, and Arc payout history stay legible in one view.",
     82
   );
   el.appRoot.innerHTML = `
     <section data-structure="task-detail-loading" class="loading-shell">
+      <div class="loading-shell__copy">
+        <strong>Loading task...</strong>
+        <p>Fetching funded work, review state, and payment history.</p>
+      </div>
       <article class="skeleton"></article>
       <article class="skeleton"></article>
     </section>
@@ -49484,29 +51473,35 @@ async function renderTaskDetail(taskId) {
     state.history = history2;
   } catch (error) {
     el.appRoot.innerHTML = `
-      <div class="error-state shell-section">
-        <strong>Task unavailable</strong>
-        <p>${escapeHtml(error.message)}</p>
+      <div class="error-state state-card state-card--error shell-section surface-page">
+        <span class="empty-state__mark" aria-hidden="true"></span>
+        <strong>Task not found.</strong>
+        <p>${escapeHtml(statusMessage(error, "This task is not available or has not loaded yet."))}</p>
         <div class="empty-state-actions">
           <button class="hero-primary" data-route="/">Go Home</button>
-          <button data-route="/post-task">Post Task</button>
+          <button data-route="/post-task">Post Funded Task</button>
         </div>
       </div>
     `;
     return;
   }
   const task = state.task;
+  const localRevisionRequests = state.revisionRequests?.[task.taskId] || [];
+  const localDisputeRecords = state.disputeRecords?.[task.taskId] || [];
+  const displayTask = { ...task, revisionRequests: localRevisionRequests, disputeRecords: localDisputeRecords };
   const shouldProbeOnchainTask = Boolean(task.onchainTaskRef) || ["pending_wallet", "pending_chain"].includes(task.transactionState) || Boolean(task.latestCreateTxHash) || Boolean(task.latestFundTxHash) || Boolean(task.latestAssignTxHash);
-  const reviewModel = buildReviewPanelModel(task);
+  const reviewModel = buildReviewPanelModel(displayTask);
   renderTaskDetailPageView({
     el,
-    task,
+    task: displayTask,
     history: state.history,
     onchainSnapshot: null,
     reviewModel,
-    resultModel: buildTaskResultModel(task, [])
+    resultModel: buildTaskResultModel(displayTask, []),
+    revisionModel: buildTaskRevisionDisplayModel(displayTask),
+    disputeModel: buildTaskDisputeDisplayModel(displayTask)
   });
-  bindTaskDetailActions(task);
+  bindTaskDetailActions(displayTask);
   const shouldAutoCheckFunding = ["pending_wallet", "pending_chain"].includes(task.transactionState) && (task.latestCreateTxHash || task.latestFundTxHash || task.latestAssignTxHash) && !pendingTaskAutoChecks.has(task.taskId);
   if (shouldAutoCheckFunding) {
     pendingTaskAutoChecks.add(task.taskId);
@@ -49526,13 +51521,15 @@ async function renderTaskDetail(taskId) {
     }
     renderTaskDetailPageView({
       el,
-      task,
+      task: displayTask,
       history: state.history,
       onchainSnapshot,
       reviewModel,
-      resultModel: buildTaskResultModel(task, taskRuns.items || [])
+      resultModel: buildTaskResultModel(displayTask, taskRuns.items || []),
+      revisionModel: buildTaskRevisionDisplayModel(displayTask),
+      disputeModel: buildTaskDisputeDisplayModel(displayTask)
     });
-    bindTaskDetailActions(task);
+    bindTaskDetailActions(displayTask);
   });
 }
 function bindTaskDetailActions(task) {
@@ -49545,11 +51542,26 @@ function bindTaskDetailActions(task) {
   document.querySelectorAll("[data-user-review]").forEach((node) => {
     node.addEventListener("click", () => runUserDecision(task.taskId, node.dataset.userReview, node));
   });
+  document.querySelectorAll("[data-request-revision]").forEach((node) => {
+    node.addEventListener("click", () => requestRevision(node.dataset.requestRevision || task.taskId, node));
+  });
+  document.querySelectorAll("[data-request-revision-toggle]").forEach((node) => {
+    node.addEventListener("click", () => document.getElementById("revisionChangeRequest")?.focus());
+  });
+  document.querySelectorAll("[data-open-dispute]").forEach((node) => {
+    node.addEventListener("click", () => openLocalDispute(node.dataset.openDispute || task.taskId, node));
+  });
+  document.querySelectorAll("[data-open-dispute-toggle]").forEach((node) => {
+    node.addEventListener("click", () => document.getElementById("disputeReason")?.focus());
+  });
   document.querySelectorAll("[data-platform-improve]").forEach((node) => {
     node.addEventListener("click", () => runImproveAgain(task.taskId, node));
   });
   document.querySelectorAll("[data-check-funding]").forEach((node) => {
     node.addEventListener("click", () => checkFundingStatus(task.taskId, node));
+  });
+  document.querySelectorAll("[data-demo-next]").forEach((node) => {
+    node.addEventListener("click", () => advanceDemoFlow(node.dataset.demoNext || task.taskId, node));
   });
 }
 async function checkFundingStatus(taskId, trigger, options = {}) {
@@ -49589,7 +51601,7 @@ async function checkFundingStatus(taskId, trigger, options = {}) {
       const onchainSnapshot = await chainClient.readOnchainTask(taskId).catch(() => null);
       const onchainTask = onchainSnapshot?.onchainTask || null;
       const onchainState = String(onchainTask?.state || "").toUpperCase();
-      const escrowLocked = readBigIntLike2(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
+      const escrowLocked = readBigIntLike3(onchainTask?.escrow_locked ?? onchainTask?.escrowLocked ?? 0n);
       const fundingStateConfirmed = escrowLocked > 0n && [
         "OPEN",
         "ASSIGNED",
@@ -49643,7 +51655,7 @@ async function checkFundingStatus(taskId, trigger, options = {}) {
     if (trigger) setButtonLoading(trigger, false);
   }
 }
-function readBigIntLike2(value) {
+function readBigIntLike3(value) {
   if (typeof value === "bigint") return value;
   if (typeof value === "number" && Number.isFinite(value)) return BigInt(Math.trunc(value));
   if (typeof value === "string" && value.trim()) {
@@ -49660,7 +51672,7 @@ function renderCreateAgent() {
     "Create Agent",
     "Create Agent",
     "Shape a capable marketplace worker without drowning in setup.",
-    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel polished and encouraging.",
+    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel ready for funded work and owner-approved outcomes.",
     Math.round(state.wizardStep / 7 * 100)
   );
   renderCreateAgentWizardPage({ el, state });
@@ -49785,8 +51797,8 @@ function renderConnectExternalAgent() {
   setChrome2(
     "Connect External Agent",
     "Connect External Agent",
-    "Bring an endpoint-backed worker into the marketplace cleanly.",
-    "Verify ownership, register the endpoint, and let the marketplace run safety and compatibility checks before listing it.",
+    "Bring an endpoint-backed worker into the funded marketplace cleanly.",
+    "Verify ownership, register the endpoint, and let Dispatch run compatibility checks for structured funded work, including adapter-based interoperability.",
     84
   );
   renderConnectExternalAgentPage({ el, state });
@@ -49796,6 +51808,11 @@ function renderConnectExternalAgent() {
     ["externalAgentCategory", "category"],
     ["externalAgentDescription", "description"],
     ["externalAgentEndpoint", "endpointUrl"],
+    ["externalAgentWebhook", "webhookUrl"],
+    ["externalAgentDeveloper", "developerName"],
+    ["externalAgentAdapterType", "adapterType"],
+    ["externalAgentOutputSchema", "outputSchema"],
+    ["externalAgentPayoutWallet", "payoutWallet"],
     ["externalAgentSkills", "skills"],
     ["externalAgentPricingHint", "pricingHint"],
     ["externalAgentMinLatency", "minLatencyMs"],
@@ -49905,37 +51922,37 @@ async function renderAdmin() {
       </section>
       <section class="ops-grid">
       <div class="ops-stack">
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Queue</p><h2>Work queue</h2></div><span class="meta-pill">${allTasks.length} tasks</span></div>
         <div class="audit-list">${allTasks.slice(0, 10).map((task) => `<div class="audit-item"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.status)} | ${formatCurrency(task.rewardAmount)}</p><div class="ops-actions"><button data-admin-pause="${task.taskId}">Pause Task</button><button data-admin-refund="${task.taskId}">Refund Task</button></div></div>`).join("") || emptyState("No tasks loaded.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Review</p><h2>Manual resolution</h2></div><span class="meta-pill">${disputes.length} disputes</span></div>
         <div class="audit-list">${disputes.map((task) => `<div class="audit-item"><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.status)} | ${formatCurrency(task.rewardAmount)} reward</p><div class="ops-actions"><button data-route="/tasks/${task.taskId}">Open Task</button><button data-admin-resolve="${task.taskId}" data-outcome="approve_payout">Approve Payout</button><button data-admin-resolve="${task.taskId}" data-outcome="refund_buyer">Refund Buyer</button></div></div>`).join("") || emptyState("No open disputes.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Risk</p><h2>Risk monitoring</h2></div><span class="meta-pill">${suspiciousAgents.length} flagged</span></div>
         <div class="audit-list">${suspiciousAgents.map((agent) => `<div class="audit-item"><strong>${escapeHtml(agent.profile.publicName)}</strong><p>${escapeHtml(agent.compatibilityStatus)} | ${escapeHtml(agent.healthStatus)}</p><div class="ops-actions"><button data-admin-disable="${agent.profile.agentId}">Disable Agent</button>${agent.profile.endpointUrl ? `<button data-admin-blacklist="${escapeHtml(agent.profile.endpointUrl)}">Blacklist Endpoint</button>` : ""}</div></div>`).join("") || emptyState("No suspicious endpoints.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Failures</p><h2>Debug queue</h2></div><span class="meta-pill">${failures.items.length} failed</span></div>
         <div class="audit-list">${failures.items.map((run) => `<div class="audit-item"><strong>${escapeHtml(run.taskId)}</strong><p>${escapeHtml(run.failureCategory || "unknown")} | ${escapeHtml(run.lastErrorMessage || "Execution failed")}</p><div class="ops-actions"><button data-route="/tasks/${run.taskId}">Inspect Task</button><button data-admin-debug="${run.taskId}">Debug Trace</button></div></div>`).join("") || emptyState("No failed executions.")}</div>
       </article>
       </div>
       <div class="ops-stack">
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Signals</p><h2>Pattern detection</h2></div><span class="meta-pill">${overview.suspiciousPatterns.length} signals</span></div>
         <div class="audit-list">${overview.suspiciousPatterns.map((flag) => `<div class="audit-item"><strong>${escapeHtml(labelize(flag.kind))}</strong><p>${escapeHtml(flag.summary)}</p><small>${escapeHtml(flag.subjectType)} | ${escapeHtml(flag.subjectId)}</small></div>`).join("") || emptyState("No suspicious patterns right now.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Blocks</p><h2>Hard blocks</h2></div><span class="meta-pill">${overview.blacklistedEndpoints.length} endpoints</span></div>
         <div class="audit-list">${overview.blacklistedEndpoints.map((row) => `<div class="audit-item"><strong>${escapeHtml(row.endpointUrl)}</strong><p>${escapeHtml(row.reason)}</p></div>`).join("") || emptyState("No blacklisted endpoints.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Audit</p><h2>Decision trail</h2></div><span class="meta-pill">${overview.auditLogs.length} events</span></div>
         <div class="audit-list">${overview.auditLogs.slice(0, 12).map((item) => `<div class="audit-item"><strong>${escapeHtml(labelize(item.action))}</strong><p>${escapeHtml(item.reason)}</p><small>${escapeHtml(item.subjectType)} | ${escapeHtml(item.subjectId)}</small></div>`).join("") || emptyState("No audit logs yet.")}</div>
       </article>
-      <article class="shell-section reveal-on-scroll">
+      <article class="shell-section surface-page reveal-on-scroll">
         <div class="section-head"><div><p class="mini-label">Inspect</p><h2>Deep inspection</h2></div>${debug ? `<span class="meta-pill">${escapeHtml(debug.task.taskId)}</span>` : ""}</div>
         ${debug ? `
             <div class="audit-list">
@@ -50050,9 +52067,14 @@ async function renderAdmin() {
 async function render() {
   renderNav2();
   renderTopbar2();
+  renderFooter();
   if (!state.tasks) {
     el.appRoot.innerHTML = `
       <section data-structure="app-loading" class="loading-shell">
+        <div class="loading-shell__copy">
+          <strong>Loading Dispatch...</strong>
+          <p>Preparing agents, tasks, and payment state.</p>
+        </div>
         <article class="skeleton"></article>
         <article class="skeleton"></article>
         <article class="skeleton"></article>
@@ -50063,7 +52085,8 @@ async function render() {
       await loadMarketData2();
     } catch (error) {
       el.appRoot.innerHTML = `
-        <div class="error-state shell-section">
+        <div class="error-state state-card state-card--error shell-section surface-page">
+          <span class="empty-state__mark" aria-hidden="true"></span>
           <strong>Network error</strong>
           <p>${escapeHtml(statusMessage(error, "Marketplace data could not be loaded."))}</p>
           <div class="empty-state-actions">
@@ -50084,6 +52107,7 @@ async function render() {
   if (path === "/agents") return renderAgentsPage();
   if (path.startsWith("/agents/")) return renderAgentProfile(path.split("/")[2]);
   if (path === "/post-task") return renderPostTaskPage();
+  if (path === "/arc-demo") return renderArcDemoRemoved();
   if (path.startsWith("/tasks/")) return renderTaskDetail(path.split("/")[2]);
   if (path === "/create-agent") return renderCreateAgent();
   if (path === "/connect-agent") return renderConnectExternalAgent();
