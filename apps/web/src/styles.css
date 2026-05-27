@@ -6960,3 +6960,398 @@ body::after {
     grid-template-columns: 1fr;
   }
 }
+
+/* UI Rebuild Pass 10: mobile full-site sweep */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+#appFrame,
+#appRoot,
+#appRoot > section[data-structure],
+.home-page,
+.marketplace-page,
+.agent-profile-page,
+.post-task-page,
+.task-detail-page,
+.builder-dashboard-page,
+.builder-onboarding-page,
+.wallet-sheet-panel,
+.mobile-drawer__panel {
+  min-width: 0;
+}
+
+.home-update-row,
+.home-agent-row,
+.market-agent-card,
+.agent-profile-hero,
+.profile-package-card,
+.post-task-composer,
+.post-funding-summary,
+.task-detail-hero,
+.task-result-panel,
+.task-payment-panel,
+.builder-agent-row,
+.builder-attention-row,
+.builder-earning-row,
+.builder-activity-row,
+.builder-form-panel,
+.builder-setup-panel {
+  overflow-wrap: anywhere;
+}
+
+.task-payment-rows strong,
+.task-next-rows strong,
+.post-summary-list strong,
+.builder-earning-row strong,
+.builder-activity-row strong,
+.builder-endpoint-list code,
+.builder-endpoint-list span,
+.wallet-flow-card p,
+.wallet-session-card p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mobile-drawer__panel,
+.wallet-sheet-panel {
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 900px) {
+  .desktop-nav {
+    display: none !important;
+  }
+
+  .mobile-nav-toggle {
+    display: inline-grid !important;
+  }
+
+  .app-footer__links button,
+  .mobile-drawer__nav a,
+  .wallet-action,
+  .hero-primary,
+  .hero-secondary,
+  .market-agent-actions button,
+  .agent-profile-actions button,
+  .profile-package-card > button,
+  .post-quiet-button,
+  .post-switch-button,
+  .task-decision-actions button,
+  .task-secondary-actions button,
+  .builder-dashboard-tabs button,
+  .builder-action-panel button {
+    min-height: 44px;
+  }
+
+  .wallet-sheet-panel {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 720px) {
+  #appFrame {
+    width: 100%;
+    padding: 16px 20px 72px;
+  }
+
+  #appRoot {
+    gap: 44px;
+  }
+
+  #appRoot > section[data-structure] {
+    gap: 44px;
+  }
+
+  #appRoot > section[data-structure]:not(.home-page) h1,
+  .post-task-header h1,
+  .task-detail-hero h1,
+  .builder-dashboard-header h1,
+  .builder-onboarding-header h1,
+  .marketplace-header h1,
+  .agent-profile-identity h1 {
+    max-width: 100%;
+    font-size: 32px !important;
+    line-height: 1.08;
+  }
+
+  #appRoot > section[data-structure]:not(.home-page) h2,
+  .home-section-header h2,
+  .home-builder-section h2,
+  .home-final-cta h2,
+  .profile-section-header h2,
+  .profile-final-cta h2,
+  .task-next-panel h2,
+  .task-decision-panel h2,
+  .task-payment-panel h2,
+  .task-result-panel h2,
+  .task-support-panel h2,
+  .task-history-panel h2,
+  .builder-section-head h2,
+  .builder-payment-activity h2,
+  .builder-readiness-panel h2 {
+    font-size: 24px !important;
+  }
+
+  .home-page,
+  .marketplace-page,
+  .agent-profile-page,
+  .post-task-page,
+  .task-detail-page,
+  .builder-dashboard-page,
+  .builder-onboarding-page {
+    width: 100%;
+    padding-inline: 0;
+  }
+
+  .home-hero.home-hero--approved,
+  .home-trust-strip,
+  .home-live-panel,
+  .home-agent-panel,
+  .home-builder-section,
+  .home-final-cta,
+  .marketplace-filter-panel,
+  .agent-profile-hero,
+  .profile-trust-strip,
+  .profile-readiness-section,
+  .profile-final-cta,
+  .post-task-flow,
+  .post-task-composer,
+  .post-funding-summary,
+  .task-detail-hero,
+  .task-lifecycle-strip,
+  .task-result-panel,
+  .task-decision-panel,
+  .task-payment-panel,
+  .task-support-panel,
+  .task-history-panel,
+  .builder-preview-note,
+  .builder-tab-panel,
+  .builder-readiness-panel,
+  .builder-payment-activity,
+  .builder-form-panel,
+  .builder-progress-panel,
+  .builder-setup-panel {
+    padding: 22px;
+    border-radius: 24px;
+  }
+
+  .home-hero__actions,
+  .home-final-cta .home-hero__actions,
+  .agent-profile-actions,
+  .profile-final-cta .agent-profile-actions,
+  .builder-action-panel .review-actions {
+    width: 100%;
+  }
+
+  .home-hero__actions > *,
+  .home-final-cta .home-hero__actions > *,
+  .agent-profile-actions > *,
+  .profile-final-cta .agent-profile-actions > *,
+  .builder-action-panel .review-actions > * {
+    width: 100%;
+  }
+
+  .market-agent-heading p,
+  .agent-profile-facts strong,
+  .profile-trust-strip strong,
+  .task-lifecycle-step strong {
+    white-space: normal;
+  }
+
+  .market-agent-trust,
+  .profile-trust-strip,
+  .task-result-meta,
+  .builder-agent-performance,
+  .builder-preview-facts,
+  .builder-earnings-summary,
+  .builder-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .market-agent-trust div:last-child {
+    grid-column: auto;
+  }
+
+  .agent-profile-facts div,
+  .task-next-rows > div,
+  .task-payment-rows > div,
+  .post-summary-list > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    padding-block: 10px;
+  }
+
+  .agent-profile-facts strong,
+  .task-next-rows strong,
+  .task-payment-rows strong,
+  .post-summary-list strong {
+    max-width: none;
+    text-align: left;
+  }
+
+  .profile-readiness-row,
+  .builder-activity-row,
+  .builder-earning-row,
+  .builder-attention-row {
+    gap: 12px;
+  }
+
+  .task-payment-links a,
+  .task-payment-links span,
+  .task-detail-badges span,
+  .profile-badge,
+  .market-agent-badge {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .builder-dashboard-tabs > div {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .builder-dashboard-tabs button {
+    flex: 1 0 auto;
+    padding-inline: 14px;
+  }
+
+  .builder-onboarding-page .wizard-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-onboarding-page .wizard-steps button {
+    justify-content: flex-start;
+    min-height: 44px;
+  }
+
+  .builder-endpoint-list div {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .mobile-action {
+    right: 20px;
+    left: 20px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  #appFrame {
+    padding-inline: 16px;
+  }
+
+  #appHeader {
+    gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .brand-copy strong {
+    font-size: 0.95rem;
+  }
+
+  #topbarActions .wallet-action {
+    min-width: 44px;
+    padding: 0;
+  }
+
+  #topbarActions .wallet-action__copy {
+    display: none;
+  }
+
+  .mobile-drawer__panel {
+    inset: 8px;
+    padding: 18px;
+  }
+
+  .home-hero--approved h1 {
+    font-size: 40px !important;
+  }
+
+  #appRoot > section[data-structure]:not(.home-page) h1,
+  .post-task-header h1,
+  .task-detail-hero h1,
+  .builder-dashboard-header h1,
+  .builder-onboarding-header h1,
+  .marketplace-header h1,
+  .agent-profile-identity h1 {
+    font-size: 30px !important;
+  }
+
+  .home-execution-card,
+  .home-update-row,
+  .home-agent-row,
+  .market-agent-package,
+  .post-package-summary {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+
+  .home-status-pill,
+  .home-update-row time,
+  .home-agent-price {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .market-agent-actions,
+  .profile-final-cta,
+  .home-final-cta,
+  .app-footer__inner {
+    grid-template-columns: 1fr;
+  }
+
+  .app-footer__links {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    justify-content: stretch;
+  }
+
+  .app-footer__links button {
+    min-height: 36px;
+    text-align: left;
+  }
+}
+
+@media (max-width: 380px) {
+  #appFrame {
+    padding-inline: 14px;
+  }
+
+  .home-hero.home-hero--approved,
+  .home-trust-strip,
+  .home-live-panel,
+  .home-agent-panel,
+  .home-builder-section,
+  .home-final-cta,
+  .market-agent-card,
+  .agent-profile-hero,
+  .profile-package-card,
+  .post-task-flow,
+  .post-task-composer,
+  .post-funding-summary,
+  .task-detail-hero,
+  .task-result-panel,
+  .task-decision-panel,
+  .task-payment-panel,
+  .task-support-panel,
+  .task-history-panel,
+  .builder-tab-panel,
+  .builder-form-panel,
+  .builder-setup-panel {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .mobile-action {
+    right: 14px;
+    left: 14px;
+  }
+}
