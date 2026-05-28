@@ -136,7 +136,7 @@ export function renderTaskDetailPageView({
             <div><span>Reward</span><strong>${formatCurrency(task.rewardAmount || 0)}</strong></div>
             <div><span>Assigned agent</span><strong>${agents.length ? escapeHtml(agents[0].displayName) : "Not assigned yet"}</strong></div>
           </div>
-          <button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>
+          <div class="task-next-status" role="status">${escapeHtml(taskStatus.primaryCtaText)}</div>
         </aside>
       </header>
 
@@ -188,7 +188,7 @@ export function renderTaskDetailPageView({
           ` : `
             <div class="task-empty-panel">
               <strong>No submitted work yet.</strong>
-              <p>The agent output will appear here once it is ready for owner review.</p>
+              <p>Payment stays locked until work is submitted and approved.</p>
             </div>
           `}
           ${(resultModel?.hasDraft || resultModel?.stageTimingsMs || onchainSnapshot?.onchainTask) ? `
@@ -213,7 +213,7 @@ export function renderTaskDetailPageView({
                 ` : ""}
                 ${onchainSnapshot?.onchainTask ? `
                   <section>
-                    <strong>Onchain trace</strong>
+                    <strong>Technical task record</strong>
                     <p>${escapeHtml(JSON.stringify(onchainSnapshot.onchainTask))}</p>
                   </section>
                 ` : ""}
@@ -226,10 +226,10 @@ export function renderTaskDetailPageView({
           <article class="task-decision-panel">
             <p class="task-detail-eyebrow">Review decision</p>
             <h2>${escapeHtml(reviewModel.headline || taskStatus.primaryCtaText)}</h2>
-            <p>Approve the work, request changes, or open a dispute if the result cannot be accepted.</p>
+            <p>Payment only moves after approval.</p>
             <div class="task-decision-actions">
               ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve work</button>' : ""}
-              ${reviewModel.primaryActions.includes("request_revision") ? '<button data-request-revision-toggle>Request revision</button>' : ""}
+              ${reviewModel.primaryActions.includes("request_revision") ? '<button data-request-revision-toggle>Ask for changes</button>' : ""}
               ${reviewModel.primaryActions.length === 0 && !reviewModel.primaryActions.includes("settle") ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
             <div class="task-secondary-actions">
@@ -254,8 +254,8 @@ export function renderTaskDetailPageView({
               <div><span>Settlement</span><strong>${escapeHtml(settlementLabel)}</strong></div>
             </div>
             <div class="task-payment-links">
-              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid funding tx link available</span>`}
-              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid release tx link available</span>`}
+              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid transaction link available.</span>`}
+              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid transaction link available.</span>`}
             </div>
             ${reviewModel.primaryActions.includes("settle")
               ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>`
@@ -273,13 +273,13 @@ export function renderTaskDetailPageView({
             </div>
             <span>${escapeHtml(revisionModel?.hasRevisionRequested ? "Payment locked" : "Quiet")}</span>
           </div>
-          <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
+          <p>${escapeHtml(revisionModel?.description || "Ask for changes if the work is not ready.")}</p>
           ${reviewModel.primaryActions.includes("request_revision") ? `
             <div class="task-form-panel" data-revision-form>
               <label><span>What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
               <label><span>What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
               <label><span>Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
-              <button data-request-revision="${task.taskId}">Save revision request</button>
+              <button data-request-revision="${task.taskId}">Send change request</button>
             </div>
           ` : ""}
           <div class="task-activity-list">
@@ -305,7 +305,7 @@ export function renderTaskDetailPageView({
             </div>
             <span>${escapeHtml(disputeModel?.hasOpenDispute ? "Under review" : "Closed")}</span>
           </div>
-          <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
+          <p>${escapeHtml(disputeModel?.description || "Disputes keep payment locked.")}</p>
           ${reviewModel.advancedActions.includes("dispute") ? `
             <div class="task-form-panel" data-dispute-form>
               <label>
@@ -328,7 +328,7 @@ export function renderTaskDetailPageView({
                   <option value="Request refund review">Request refund review</option>
                 </select>
               </label>
-              <button data-open-dispute="${task.taskId}">Save dispute</button>
+              <button data-open-dispute="${task.taskId}">Open dispute</button>
             </div>
           ` : ""}
           <div class="task-activity-list">
@@ -389,7 +389,7 @@ export function renderTaskDetailPageView({
           </div>
           ${browserTxHashes.length ? `
             <div class="task-browser-trace">
-              <strong>Browser transaction trace</strong>
+              <strong>Wallet transaction record</strong>
               <div class="task-payment-links">
                 ${browserTxHashes.map((item) => {
                   const href = arcTxLink(item.hash);
@@ -402,7 +402,7 @@ export function renderTaskDetailPageView({
               ${!fundingConfirmed ? `<button data-check-funding="${task.taskId}">Refresh execution status</button>` : ""}
             </div>
           ` : ""}
-          ${onchainTask ? `<p>Onchain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
+          ${onchainTask ? `<p>Chain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
         </aside>
       </section>
     </section>
@@ -489,7 +489,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
     `,
     `
       <label class="field-stack"><span class="muted">Sample task</span><textarea id="testRunTask" rows="5">${escapeHtml(state.agentDraft.testRun.sampleTask)}</textarea></label>
-      <button id="runTest">Run Test</button>
+      <button id="runTest">Run test</button>
       <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
         ${state.agentDraft.testRun.result
@@ -515,7 +515,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
         </div>
       </div>
       <div class="status-banner surface-alert ${draftStatusTone}" style="margin-top:16px;">
-        <strong>Backend draft status</strong>
+        <strong>Draft status</strong>
         <p>${escapeHtml(state.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
         ${state.agentDraftMeta?.draftId ? `<small>Draft ID: ${escapeHtml(state.agentDraftMeta.draftId)}</small>` : ""}
       </div>
@@ -555,7 +555,7 @@ export function renderCreateAgentWizardPage({ el, state }) {
             <article class="builder-action-panel">
               <div class="review-actions">
                 <button id="wizardPrev" ${state.wizardStep === 1 ? "disabled" : ""}>Back</button>
-                <button class="hero-primary" id="wizardNext">${state.wizardStep === 7 ? "Save Draft" : "Next"}</button>
+                <button class="hero-primary" id="wizardNext">${state.wizardStep === 7 ? "Save agent draft" : "Continue"}</button>
               </div>
             </article>
           </div>
@@ -708,9 +708,10 @@ export function renderConnectExternalAgentPage({ el, state }) {
 
             <article class="builder-action-panel">
               <div class="review-actions">
-                <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify Wallet Ownership"}</button>
-                <button class="hero-primary" id="connectExternalAgent">${verified ? "Connect Agent" : "Verify First"}</button>
+                <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify owner wallet"}</button>
+                <button class="hero-primary" id="connectExternalAgent" ${verified ? "" : "disabled"}>Connect agent</button>
               </div>
+              ${verified ? "" : `<p class="disabled-reason">Verify owner wallet to continue.</p>`}
             </article>
           </div>
 

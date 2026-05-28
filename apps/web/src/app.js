@@ -931,7 +931,7 @@ async function createTask() {
       }
       const walletUsdcBalance = walletSnapshot.usdcBalance == null ? null : Number(walletSnapshot.usdcBalance);
       if (walletUsdcBalance != null && walletUsdcBalance < Number(payload.rewardAmount || 0)) {
-        throw new Error(`Your ERC-20 testnet USDC balance is too low for this task reward. Required: ${payload.rewardAmount} USDC.`);
+        throw new Error(`Not enough USDC for this reward. Required: ${payload.rewardAmount} USDC.`);
       }
       if (payload.title.length < 3) throw new Error("Add a clearer task title.");
       if (payload.description.length < 20) throw new Error("Add a fuller task description so the agent can execute confidently.");
@@ -939,7 +939,7 @@ async function createTask() {
       if (!payload.deadline) throw new Error("Set a valid deadline before posting the task.");
       if (payload.hiringMode === "direct_hire" && !payload.selectedAgentId) throw new Error("Select an agent for direct hire.");
 
-    updateStatus("Draft created", "Creating the offchain task record before the Arc wallet write.", "neutral");
+    updateStatus("Task draft created", "Preparing the task before wallet funding.", "neutral");
     const draft = await sendJson("/api/task-market/tasks/draft", "POST", payload, validateTaskDraftCreateResponse);
     taskId = draft.task.taskId;
     const metadataHash = `task_meta_${taskId}`;
@@ -962,10 +962,10 @@ async function createTask() {
     state.taskForm.selectedAgentId = "";
     state.taskForm.maxParticipants = 3;
 
-    updateStatus("Funded task created", "Opening the new task page while Arc wallet confirmations continue.", "success");
+    updateStatus("Funded task created", "Opening the new task page while your wallet finishes the funding steps.", "success");
     navigate(`/tasks/${taskId}`);
 
-    updateStatus("Wallet ready", "Sending create_task and fund_task through the Arc adapter for funded task creation.", "neutral");
+    updateStatus("Wallet ready", "Sending task funding through your wallet.", "neutral");
     writeResult = await chainClient.createTaskLifecycle({
       taskId,
       rewardAmount: payload.rewardAmount,
@@ -985,8 +985,8 @@ async function createTask() {
         message: `${latestReceipt.status} receipt captured and offchain state synchronized.`,
       };
       updateStatus(
-        "Onchain task synced",
-        `${latestReceipt.status} receipt captured and offchain state synchronized.`,
+        "Task funding synced",
+        `${latestReceipt.status} receipt captured and task state updated.`,
         latestReceipt.finalized ? "success" : "neutral",
       );
     }
@@ -995,8 +995,8 @@ async function createTask() {
     navigate(`/tasks/${taskId}`);
   } catch (error) {
     let message = statusMessage(error, "Task creation failed");
-    if (typeof error?.message === "string" && /wallet balance is too low/i.test(error.message)) {
-      message = `${error.message} Fund the connected testnet wallet before posting this task.`;
+    if (typeof error?.message === "string" && /wallet balance is too low|not enough USDC/i.test(error.message)) {
+      message = `${error.message} Add testnet USDC before posting this task.`;
     }
     const partialWriteResult = error?.partialWriteResult || null;
     if (partialWriteResult) {
@@ -1008,18 +1008,18 @@ async function createTask() {
       };
       latestReceipt = partialWriteResult.latestReceipt || latestReceipt;
       if (partialWriteResult.createTxHash && !partialWriteResult.fundTxHash) {
-        message = "You confirmed create_task, but funding did not complete. The task draft was saved, but it is not funded onchain yet.";
+        message = "You approved task creation, but funding did not complete. The task draft was saved and is not funded yet.";
       } else if (partialWriteResult.fundTxHash && payload?.hiringMode === "direct_hire" && !partialWriteResult.assignTxHash) {
-        message = "Funding completed, but the direct-hire assignment step did not finish. The task may still need one more wallet confirmation.";
+        message = "Funding completed, but agent assignment did not finish. Your wallet may need one more approval.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "create_task") {
         writeResult.createTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent create_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
+        message = "Your wallet sent task creation, but Dispatch is still syncing the transaction.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "fund_task") {
         writeResult.fundTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent fund_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
+        message = "Your wallet sent funding, but Dispatch is still syncing the transaction.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "assign_task") {
         writeResult.assignTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent assign_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
+        message = "Your wallet sent agent assignment, but Dispatch is still syncing the transaction.";
       }
     }
     if (taskId) {
@@ -1092,25 +1092,25 @@ async function renderPostTaskPage() {
   const balanceTooLow = walletReady && walletOnArc && rewardAmountForBalance > 0 && usdcBalanceNumber != null && usdcBalanceNumber < rewardAmountForBalance;
   const fundingBlocked = !walletReady || !chainWritable || !walletOnArc || balanceTooLow;
   const primaryActionLabel = !walletReady
-    ? "Connect Wallet to Fund"
+    ? "Connect wallet"
     : !walletOnArc
       ? "Switch to Arc Testnet"
     : balanceTooLow
-      ? "Insufficient Testnet USDC"
+      ? "Not enough USDC"
     : state.taskForm.hiringMode === "direct_hire"
-      ? "Create, Fund, and Assign Task"
-      : "Create and Fund Task";
+      ? "Create and fund task"
+      : "Create and fund task";
   const fundingHint = !walletReady
     ? "Connect a wallet before funding a task."
     : !walletOnArc
       ? "Switch to Arc Testnet to fund tasks with testnet USDC."
     : balanceTooLow
-      ? `Your ERC-20 testnet USDC balance is lower than the ${state.taskForm.rewardAmount} USDC reward.`
+      ? `Not enough USDC for this reward.`
     : !chainWritable
-      ? "Arc writes are disabled in this environment. Switch to a writable chain mode to fund tasks."
-      : state.taskForm.hiringMode === "direct_hire"
-        ? "Direct hire usually takes 3 wallet confirmations on Arc: create, fund, and assign."
-        : "Open market usually takes 2 wallet confirmations on Arc: create and fund.";
+      ? "Funding is unavailable in this environment."
+    : state.taskForm.hiringMode === "direct_hire"
+        ? "Your wallet may ask you to approve each funding step."
+        : "Your wallet may ask you to approve task creation and funding.";
   const chainBanner = !walletReady
     ? {
         title: "Wallet required",
@@ -1120,7 +1120,7 @@ async function renderPostTaskPage() {
       : chainMode === "read_only"
       ? {
           title: "Read-only environment",
-          body: "Marketplace browsing works, but funding is disabled until Arc writes are enabled.",
+          body: "Marketplace browsing works, but funding is unavailable in this environment.",
           tone: "warning",
         }
       : chainMode === "unknown"
@@ -1131,11 +1131,11 @@ async function renderPostTaskPage() {
           }
         : chainStatus && !chainStatus.ok
           ? {
-              title: chainStatus.rpcReachable ? "Arc chain requires attention" : "Arc RPC unreachable",
+              title: chainStatus.rpcReachable ? "Arc Testnet requires attention" : "Arc Testnet unavailable",
               body: chainStatus.diagnostics[0]
                 || (chainStatus.rpcReachable
-                  ? `Dispatch expects Arc chain ID ${chainStatus.expectedChainId}${chainStatus.detectedChainId ? ` but the RPC reported ${chainStatus.detectedChainId}` : ""}.`
-                  : "The configured Arc RPC could not be reached from the router."),
+                  ? `Dispatch expected Arc Testnet${chainStatus.detectedChainId ? ` but detected network ${chainStatus.detectedChainId}` : ""}.`
+                  : "Arc Testnet is temporarily unavailable."),
               tone: "warning",
             }
         : null;
@@ -1223,7 +1223,7 @@ async function renderPostTaskPage() {
                       : `<label class="post-field"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><input data-template-field="${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.label)}" /></label>`;
                   }).join("")}
                 </div>
-                <button type="button" class="post-quiet-button" id="generateTaskBrief">Generate / Update Brief</button>
+                <button type="button" class="post-quiet-button" id="generateTaskBrief">Generate brief</button>
                 ${state.taskForm.templateMessage ? `<div class="post-task-alert post-task-alert--${templateResult.missingFields.length ? "warning" : "info"}"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
               `}
             </section>
@@ -1237,8 +1237,8 @@ async function renderPostTaskPage() {
               <div class="post-route-control">
                 <p class="post-task-eyebrow">Agent route</p>
                 <div class="segmented">
-                  <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Direct Hire</button>
-                  <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Open Market</button>
+                  <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Choose an agent</button>
+                  <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Post to marketplace</button>
                 </div>
               </div>
               ${state.taskForm.hiringMode === "direct_hire"
@@ -1246,7 +1246,7 @@ async function renderPostTaskPage() {
                   <label class="post-field post-field--wide"><strong>Selected agent</strong>
                     <select id="selectedAgentId">
                       <option value="">Choose an agent</option>
-                      ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} trust</option>`).join("")}
+                      ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} readiness</option>`).join("")}
                     </select>
                   </label>
                 `
@@ -1351,9 +1351,9 @@ async function renderPostTaskPage() {
           </article>
 
           <article class="post-demo-card reveal-on-scroll">
-            <strong>Arc Testnet demo mode</strong>
-            <p>Demo flow stays separate from wallet-funded tasks.</p>
-            <button type="button" data-start-demo-flow>Start Demo Flow</button>
+            <strong>Local demo only</strong>
+            <p>This stays separate from wallet-funded tasks.</p>
+            <button type="button" data-start-demo-flow>Start local demo</button>
           </article>
         </aside>
       </section>
@@ -1569,7 +1569,7 @@ async function startDemoFlow(trigger) {
     updateStatus("Demo task funded", response.message || "Thread Writer demo task is ready.", "success");
     navigate(`/tasks/${response.task.taskId}`);
   } catch (error) {
-    updateStatus("Demo flow unavailable", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+    updateStatus("Demo unavailable", statusMessage(error, "Local demo mode is unavailable."), "warn");
   } finally {
     setButtonLoading(trigger, false);
   }
@@ -1585,7 +1585,7 @@ async function advanceDemoFlow(taskId, trigger) {
     updateStatus("Demo advanced", response.message || "Demo task moved to the next lifecycle step.", "success");
     await renderTaskDetail(taskId);
   } catch (error) {
-    updateStatus("Demo step failed", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+    updateStatus("Demo step failed", statusMessage(error, "Local demo mode is unavailable."), "warn");
   } finally {
     setButtonLoading(trigger, false);
   }
@@ -1775,7 +1775,7 @@ async function runImproveAgain(taskId, trigger) {
   try {
     setButtonLoading(trigger, true, "Improving");
     requireWallet();
-    updateStatus("Improve Again running", "The platform agent is refining the last result with the stored quality trace.", "neutral");
+    updateStatus("Improve Again running", "The platform agent is refining the last result.", "neutral");
     await sendJson(`/api/task-market/tasks/${taskId}/improve-again`, "POST", {
       actorWallet: state.wallet,
     });
@@ -1999,7 +1999,7 @@ async function checkFundingStatus(taskId, trigger, options = {}) {
 
     if (sync.task.transactionState === "accepted") {
       if (!options.silent) {
-        updateStatus("Funding confirmed", `Arc receipt ${latestReceipt.status} was found and the task state was synchronized.`, "success");
+        updateStatus("Funding confirmed", `Arc receipt ${latestReceipt.status} was found and the task state was updated.`, "success");
       }
       return;
     }
@@ -2007,7 +2007,7 @@ async function checkFundingStatus(taskId, trigger, options = {}) {
     if (!options.silent) {
       updateStatus(
         "Funding still pending",
-        `Arc receipt ${latestReceipt.status} was found, but the task is not fully funded onchain yet.`,
+        `Arc receipt ${latestReceipt.status} was found, but funding is still updating.`,
         "warn",
       );
     }

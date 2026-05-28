@@ -2292,6 +2292,24 @@ button[data-open-dispute] {
   border-radius: 16px;
 }
 
+.task-next-status,
+.wallet-ready-status {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(150, 255, 240, 0.14);
+  background: rgba(150, 255, 240, 0.06);
+  color: #bffef6;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .task-lifecycle-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
@@ -3646,6 +3664,10 @@ button[data-open-dispute] {
   border-radius: 16px;
   font-size: 14px;
   font-weight: 700;
+}
+
+.wallet-ready-status {
+  margin-top: 0;
 }
 
 .wallet-flow-grid {

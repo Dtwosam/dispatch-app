@@ -366,7 +366,7 @@ test("builder dashboard summary uses real agent performance data only", () => {
   assert.equal(summary.activeAgents, 1);
   assert.equal(summary.paidTasksCompleted, 2);
   assert.equal(summary.paidEarningsDisplay, "30 USDC");
-  assert.match(summary.ownershipNote, /preview/i);
+  assert.equal(summary.ownershipNote, "Builder view for agents visible in this demo. Wallet-specific ownership is not fully enabled yet.");
 });
 
 test("builder agent rows expose packages and honest missing metric fallbacks", () => {

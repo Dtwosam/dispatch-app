@@ -46732,7 +46732,7 @@ function createInitialState() {
       verificationState: "idle",
       verificationMessage: "Verify wallet ownership before connecting an external agent.",
       registryAgentId: null,
-      compatibilityHeadline: "No checks have run yet.",
+      compatibilityHeadline: "Checks have not run yet.",
       compatibilityNotes: []
     },
     taskForm: {
@@ -46908,7 +46908,7 @@ function updateStatus(el2, title, body, tone = "neutral") {
 function statusMessage(error, fallback) {
   if (error instanceof Error) {
     if (error.name === "ContractValidationError") {
-      return `${error.message}. The client and server payloads are out of sync.`;
+      return `${error.message}. Dispatch could not prepare this action.`;
     }
     return error.message;
   }
@@ -47029,7 +47029,7 @@ function renderWalletSheet({
   const balanceLabel = walletNetwork.usdcBalance == null ? "Balance unavailable" : `${Number(walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} testnet USDC`;
   const connected = Boolean(state2.wallet.trim());
   const onArc = Boolean(walletNetwork.isArcTestnet);
-  const primaryAction = !connected ? `<button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>${walletAvailable ? `Connect ${escapeHtml(providerLabel)}` : "No injected wallet detected"}</button>` : !onArc ? `<button class="hero-primary" type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : `<button class="hero-primary" type="button" disabled>Ready to fund tasks</button>`;
+  const primaryAction = !connected ? `<button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>${walletAvailable ? "Connect wallet" : "No wallet detected"}</button>` : !onArc ? `<button class="hero-primary" type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : `<div class="wallet-ready-status" role="status"><span class="wallet-status-dot is-ready"></span><strong>Wallet ready</strong></div>`;
   const readinessLabel = !connected ? "Connect wallet to continue." : !onArc ? "Switch to Arc Testnet." : walletNetwork.usdcBalance == null ? "Balance unavailable." : "Wallet ready for Dispatch task funding.";
   el2.walletSheet.innerHTML = `
     <div class="wallet-sheet-backdrop" data-wallet="close"></div>
@@ -48117,7 +48117,7 @@ function buildAgentBuilderSummaryModel(agents = [], taskCollections = {}) {
     paidEarnings,
     paidEarningsDisplay: `${paidEarnings.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
     attentionCount,
-    ownershipNote: "Builder dashboard preview. Showing agents available in this Dispatch demo; wallet-specific ownership requires backend/account persistence."
+    ownershipNote: "Builder view for agents visible in this demo. Wallet-specific ownership is not fully enabled yet."
   };
 }
 function buildAgentBuilderDashboardModel(agents = [], taskCollections = {}) {
@@ -48336,7 +48336,7 @@ function renderHomeHero() {
           <button class="hero-primary" data-route="/post-task">Post Funded Task</button>
           <button class="hero-secondary" data-route="/agents">Explore Agents</button>
         </div>
-        <p class="home-trust-line">Built on Arc Testnet &middot; USDC flow &middot; Owner approval</p>
+        <p class="home-trust-line">Arc Testnet &middot; USDC locked before work &middot; You approve release</p>
       </div>
       <div class="home-execution-panel">
         <p class="home-panel-eyebrow">Execution preview</p>
@@ -48413,8 +48413,8 @@ function renderLiveUpdatesSection() {
   return `
     <section class="home-section home-live reveal-on-scroll">
       <div class="home-section-header">
-        <h2>Live updates</h2>
-        <p>Current Dispatch activity preview.</p>
+        <h2>Activity preview</h2>
+        <p>Demo-visible Dispatch activity.</p>
       </div>
       <div class="home-live-panel">
         ${updates.map(([event, helper, status, time]) => `
@@ -48576,7 +48576,7 @@ function renderAgentCard(agent) {
 
       <footer class="market-agent-actions">
         <button class="market-agent-primary" data-route="/agents/${agent.profile.slug}">View Agent</button>
-        <button class="market-agent-secondary" data-direct="${agent.profile.agentId}">Start Task</button>
+        <button class="market-agent-secondary" data-direct="${agent.profile.agentId}">Create task</button>
       </footer>
     </article>
   `;
@@ -49094,7 +49094,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                       <span>${escapeHtml(item.paymentState)}</span>
                       <span>${escapeHtml(item.settlementState)}</span>
                       <small>${escapeHtml(item.dateLabel)}</small>
-                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em class="tx-fallback">No valid tx link available</em>`}
+                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em class="tx-fallback">No valid transaction link available.</em>`}
                     </article>
                   `).join("") || `
                     <article class="builder-empty-state">
@@ -49133,8 +49133,8 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                       <div><span>Approval</span><strong>${escapeHtml(row.approvalRateDisplay)}</strong></div>
                     </div>
                     <footer>
-                      <button data-route="/agents/${row.slug}">View Profile</button>
-                      ${row.firstPackageId ? `<button class="hero-primary" data-dashboard-package-agent="${row.agentId}" data-dashboard-package="${row.firstPackageId}">Start Package</button>` : `<button data-direct="${row.agentId}">Create Task</button>`}
+                      <button class="hero-primary" data-route="/agents/${row.slug}">View Profile</button>
+                      ${row.firstPackageId ? `<button class="hero-secondary" data-dashboard-package-agent="${row.agentId}" data-dashboard-package="${row.firstPackageId}">Start Package</button>` : `<button class="hero-secondary" data-direct="${row.agentId}">Create Task</button>`}
                     </footer>
                   </article>
                 `).join("") || `
@@ -49299,7 +49299,7 @@ function renderTaskDetailPageView({
             <div><span>Reward</span><strong>${formatCurrency(task.rewardAmount || 0)}</strong></div>
             <div><span>Assigned agent</span><strong>${agents.length ? escapeHtml(agents[0].displayName) : "Not assigned yet"}</strong></div>
           </div>
-          <button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>
+          <div class="task-next-status" role="status">${escapeHtml(taskStatus.primaryCtaText)}</div>
         </aside>
       </header>
 
@@ -49351,7 +49351,7 @@ function renderTaskDetailPageView({
           ` : `
             <div class="task-empty-panel">
               <strong>No submitted work yet.</strong>
-              <p>The agent output will appear here once it is ready for owner review.</p>
+              <p>Payment stays locked until work is submitted and approved.</p>
             </div>
           `}
           ${resultModel?.hasDraft || resultModel?.stageTimingsMs || onchainSnapshot?.onchainTask ? `
@@ -49376,7 +49376,7 @@ function renderTaskDetailPageView({
                 ` : ""}
                 ${onchainSnapshot?.onchainTask ? `
                   <section>
-                    <strong>Onchain trace</strong>
+                    <strong>Technical task record</strong>
                     <p>${escapeHtml(JSON.stringify(onchainSnapshot.onchainTask))}</p>
                   </section>
                 ` : ""}
@@ -49389,10 +49389,10 @@ function renderTaskDetailPageView({
           <article class="task-decision-panel">
             <p class="task-detail-eyebrow">Review decision</p>
             <h2>${escapeHtml(reviewModel.headline || taskStatus.primaryCtaText)}</h2>
-            <p>Approve the work, request changes, or open a dispute if the result cannot be accepted.</p>
+            <p>Payment only moves after approval.</p>
             <div class="task-decision-actions">
               ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve work</button>' : ""}
-              ${reviewModel.primaryActions.includes("request_revision") ? "<button data-request-revision-toggle>Request revision</button>" : ""}
+              ${reviewModel.primaryActions.includes("request_revision") ? "<button data-request-revision-toggle>Ask for changes</button>" : ""}
               ${reviewModel.primaryActions.length === 0 && !reviewModel.primaryActions.includes("settle") ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
             </div>
             <div class="task-secondary-actions">
@@ -49417,8 +49417,8 @@ function renderTaskDetailPageView({
               <div><span>Settlement</span><strong>${escapeHtml(settlementLabel)}</strong></div>
             </div>
             <div class="task-payment-links">
-              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid funding tx link available</span>`}
-              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid release tx link available</span>`}
+              ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid transaction link available.</span>`}
+              ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid transaction link available.</span>`}
             </div>
             ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>` : `<small class="disabled-reason">${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
           </article>
@@ -49434,13 +49434,13 @@ function renderTaskDetailPageView({
             </div>
             <span>${escapeHtml(revisionModel?.hasRevisionRequested ? "Payment locked" : "Quiet")}</span>
           </div>
-          <p>${escapeHtml(revisionModel?.description || "Revision history will appear here after changes are requested.")}</p>
+          <p>${escapeHtml(revisionModel?.description || "Ask for changes if the work is not ready.")}</p>
           ${reviewModel.primaryActions.includes("request_revision") ? `
             <div class="task-form-panel" data-revision-form>
               <label><span>What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
               <label><span>What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
               <label><span>Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
-              <button data-request-revision="${task.taskId}">Save revision request</button>
+              <button data-request-revision="${task.taskId}">Send change request</button>
             </div>
           ` : ""}
           <div class="task-activity-list">
@@ -49466,7 +49466,7 @@ function renderTaskDetailPageView({
             </div>
             <span>${escapeHtml(disputeModel?.hasOpenDispute ? "Under review" : "Closed")}</span>
           </div>
-          <p>${escapeHtml(disputeModel?.description || "Dispute details will appear here if the owner opens a dispute.")}</p>
+          <p>${escapeHtml(disputeModel?.description || "Disputes keep payment locked.")}</p>
           ${reviewModel.advancedActions.includes("dispute") ? `
             <div class="task-form-panel" data-dispute-form>
               <label>
@@ -49489,7 +49489,7 @@ function renderTaskDetailPageView({
                   <option value="Request refund review">Request refund review</option>
                 </select>
               </label>
-              <button data-open-dispute="${task.taskId}">Save dispute</button>
+              <button data-open-dispute="${task.taskId}">Open dispute</button>
             </div>
           ` : ""}
           <div class="task-activity-list">
@@ -49550,7 +49550,7 @@ function renderTaskDetailPageView({
           </div>
           ${browserTxHashes.length ? `
             <div class="task-browser-trace">
-              <strong>Browser transaction trace</strong>
+              <strong>Wallet transaction record</strong>
               <div class="task-payment-links">
                 ${browserTxHashes.map((item) => {
     const href = arcTxLink(item.hash);
@@ -49561,7 +49561,7 @@ function renderTaskDetailPageView({
               ${!fundingConfirmed ? `<button data-check-funding="${task.taskId}">Refresh execution status</button>` : ""}
             </div>
           ` : ""}
-          ${onchainTask ? `<p>Onchain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
+          ${onchainTask ? `<p>Chain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
         </aside>
       </section>
     </section>
@@ -49639,7 +49639,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
     `,
     `
       <label class="field-stack"><span class="muted">Sample task</span><textarea id="testRunTask" rows="5">${escapeHtml(state2.agentDraft.testRun.sampleTask)}</textarea></label>
-      <button id="runTest">Run Test</button>
+      <button id="runTest">Run test</button>
       <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
         ${state2.agentDraft.testRun.result ? `<p class="muted">${escapeHtml(state2.agentDraft.testRun.result)}</p>` : emptyState("Run a test before publishing.", {
@@ -49663,7 +49663,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
         </div>
       </div>
       <div class="status-banner surface-alert ${draftStatusTone}" style="margin-top:16px;">
-        <strong>Backend draft status</strong>
+        <strong>Draft status</strong>
         <p>${escapeHtml(state2.agentDraftMeta?.syncMessage || "Not saved to the backend yet.")}</p>
         ${state2.agentDraftMeta?.draftId ? `<small>Draft ID: ${escapeHtml(state2.agentDraftMeta.draftId)}</small>` : ""}
       </div>
@@ -49702,7 +49702,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
             <article class="builder-action-panel">
               <div class="review-actions">
                 <button id="wizardPrev" ${state2.wizardStep === 1 ? "disabled" : ""}>Back</button>
-                <button class="hero-primary" id="wizardNext">${state2.wizardStep === 7 ? "Save Draft" : "Next"}</button>
+                <button class="hero-primary" id="wizardNext">${state2.wizardStep === 7 ? "Save agent draft" : "Continue"}</button>
               </div>
             </article>
           </div>
@@ -49852,9 +49852,10 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
 
             <article class="builder-action-panel">
               <div class="review-actions">
-                <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify Wallet Ownership"}</button>
-                <button class="hero-primary" id="connectExternalAgent">${verified ? "Connect Agent" : "Verify First"}</button>
+                <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify owner wallet"}</button>
+                <button class="hero-primary" id="connectExternalAgent" ${verified ? "" : "disabled"}>Connect agent</button>
               </div>
+              ${verified ? "" : `<p class="disabled-reason">Verify owner wallet to continue.</p>`}
             </article>
           </div>
 
@@ -50666,14 +50667,14 @@ async function createTask() {
     }
     const walletUsdcBalance = walletSnapshot.usdcBalance == null ? null : Number(walletSnapshot.usdcBalance);
     if (walletUsdcBalance != null && walletUsdcBalance < Number(payload.rewardAmount || 0)) {
-      throw new Error(`Your ERC-20 testnet USDC balance is too low for this task reward. Required: ${payload.rewardAmount} USDC.`);
+      throw new Error(`Not enough USDC for this reward. Required: ${payload.rewardAmount} USDC.`);
     }
     if (payload.title.length < 3) throw new Error("Add a clearer task title.");
     if (payload.description.length < 20) throw new Error("Add a fuller task description so the agent can execute confidently.");
     if (!Number.isFinite(payload.rewardAmount) || payload.rewardAmount <= 0) throw new Error("Set a reward before posting the task.");
     if (!payload.deadline) throw new Error("Set a valid deadline before posting the task.");
     if (payload.hiringMode === "direct_hire" && !payload.selectedAgentId) throw new Error("Select an agent for direct hire.");
-    updateStatus2("Draft created", "Creating the offchain task record before the Arc wallet write.", "neutral");
+    updateStatus2("Task draft created", "Preparing the task before wallet funding.", "neutral");
     const draft = await sendJson2("/api/task-market/tasks/draft", "POST", payload, validateTaskDraftCreateResponse);
     taskId = draft.task.taskId;
     const metadataHash = `task_meta_${taskId}`;
@@ -50692,9 +50693,9 @@ async function createTask() {
     state.taskForm.deadline = "";
     state.taskForm.selectedAgentId = "";
     state.taskForm.maxParticipants = 3;
-    updateStatus2("Funded task created", "Opening the new task page while Arc wallet confirmations continue.", "success");
+    updateStatus2("Funded task created", "Opening the new task page while your wallet finishes the funding steps.", "success");
     navigate(`/tasks/${taskId}`);
-    updateStatus2("Wallet ready", "Sending create_task and fund_task through the Arc adapter for funded task creation.", "neutral");
+    updateStatus2("Wallet ready", "Sending task funding through your wallet.", "neutral");
     writeResult = await chainClient.createTaskLifecycle({
       taskId,
       rewardAmount: payload.rewardAmount,
@@ -50713,8 +50714,8 @@ async function createTask() {
         message: `${latestReceipt.status} receipt captured and offchain state synchronized.`
       };
       updateStatus2(
-        "Onchain task synced",
-        `${latestReceipt.status} receipt captured and offchain state synchronized.`,
+        "Task funding synced",
+        `${latestReceipt.status} receipt captured and task state updated.`,
         latestReceipt.finalized ? "success" : "neutral"
       );
     }
@@ -50723,8 +50724,8 @@ async function createTask() {
     navigate(`/tasks/${taskId}`);
   } catch (error) {
     let message = statusMessage(error, "Task creation failed");
-    if (typeof error?.message === "string" && /wallet balance is too low/i.test(error.message)) {
-      message = `${error.message} Fund the connected testnet wallet before posting this task.`;
+    if (typeof error?.message === "string" && /wallet balance is too low|not enough USDC/i.test(error.message)) {
+      message = `${error.message} Add testnet USDC before posting this task.`;
     }
     const partialWriteResult = error?.partialWriteResult || null;
     if (partialWriteResult) {
@@ -50736,18 +50737,18 @@ async function createTask() {
       };
       latestReceipt = partialWriteResult.latestReceipt || latestReceipt;
       if (partialWriteResult.createTxHash && !partialWriteResult.fundTxHash) {
-        message = "You confirmed create_task, but funding did not complete. The task draft was saved, but it is not funded onchain yet.";
+        message = "You approved task creation, but funding did not complete. The task draft was saved and is not funded yet.";
       } else if (partialWriteResult.fundTxHash && payload?.hiringMode === "direct_hire" && !partialWriteResult.assignTxHash) {
-        message = "Funding completed, but the direct-hire assignment step did not finish. The task may still need one more wallet confirmation.";
+        message = "Funding completed, but agent assignment did not finish. Your wallet may need one more approval.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "create_task") {
         writeResult.createTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent create_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
+        message = "Your wallet sent task creation, but Dispatch is still syncing the transaction.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "fund_task") {
         writeResult.fundTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent fund_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
+        message = "Your wallet sent funding, but Dispatch is still syncing the transaction.";
       } else if (partialWriteResult.pendingBrowserTxHash && partialWriteResult.pendingStep === "assign_task") {
         writeResult.assignTxHash = partialWriteResult.pendingBrowserTxHash;
-        message = "The wallet sent assign_task, but the app could not fully recover the transaction yet. The task is being tracked as pending onchain.";
+        message = "Your wallet sent agent assignment, but Dispatch is still syncing the transaction.";
       }
     }
     if (taskId) {
@@ -50817,23 +50818,23 @@ async function renderPostTaskPage() {
   const usdcBalanceNumber = state.walletNetwork?.usdcBalance == null ? null : Number(state.walletNetwork.usdcBalance);
   const balanceTooLow = walletReady && walletOnArc && rewardAmountForBalance > 0 && usdcBalanceNumber != null && usdcBalanceNumber < rewardAmountForBalance;
   const fundingBlocked = !walletReady || !chainWritable || !walletOnArc || balanceTooLow;
-  const primaryActionLabel = !walletReady ? "Connect Wallet to Fund" : !walletOnArc ? "Switch to Arc Testnet" : balanceTooLow ? "Insufficient Testnet USDC" : state.taskForm.hiringMode === "direct_hire" ? "Create, Fund, and Assign Task" : "Create and Fund Task";
-  const fundingHint = !walletReady ? "Connect a wallet before funding a task." : !walletOnArc ? "Switch to Arc Testnet to fund tasks with testnet USDC." : balanceTooLow ? `Your ERC-20 testnet USDC balance is lower than the ${state.taskForm.rewardAmount} USDC reward.` : !chainWritable ? "Arc writes are disabled in this environment. Switch to a writable chain mode to fund tasks." : state.taskForm.hiringMode === "direct_hire" ? "Direct hire usually takes 3 wallet confirmations on Arc: create, fund, and assign." : "Open market usually takes 2 wallet confirmations on Arc: create and fund.";
+  const primaryActionLabel = !walletReady ? "Connect wallet" : !walletOnArc ? "Switch to Arc Testnet" : balanceTooLow ? "Not enough USDC" : state.taskForm.hiringMode === "direct_hire" ? "Create and fund task" : "Create and fund task";
+  const fundingHint = !walletReady ? "Connect a wallet before funding a task." : !walletOnArc ? "Switch to Arc Testnet to fund tasks with testnet USDC." : balanceTooLow ? `Not enough USDC for this reward.` : !chainWritable ? "Funding is unavailable in this environment." : state.taskForm.hiringMode === "direct_hire" ? "Your wallet may ask you to approve each funding step." : "Your wallet may ask you to approve task creation and funding.";
   const chainBanner = !walletReady ? {
     title: "Wallet required",
     body: "Connect a wallet to sign and fund the task from this workspace.",
     tone: "warning"
   } : chainMode === "read_only" ? {
     title: "Read-only environment",
-    body: "Marketplace browsing works, but funding is disabled until Arc writes are enabled.",
+    body: "Marketplace browsing works, but funding is unavailable in this environment.",
     tone: "warning"
   } : chainMode === "unknown" ? {
     title: "Chain status unavailable",
     body: state.chainStatusError || "Dispatch could not reach the Arc chain status endpoint.",
     tone: "info"
   } : chainStatus && !chainStatus.ok ? {
-    title: chainStatus.rpcReachable ? "Arc chain requires attention" : "Arc RPC unreachable",
-    body: chainStatus.diagnostics[0] || (chainStatus.rpcReachable ? `Dispatch expects Arc chain ID ${chainStatus.expectedChainId}${chainStatus.detectedChainId ? ` but the RPC reported ${chainStatus.detectedChainId}` : ""}.` : "The configured Arc RPC could not be reached from the router."),
+    title: chainStatus.rpcReachable ? "Arc Testnet requires attention" : "Arc Testnet unavailable",
+    body: chainStatus.diagnostics[0] || (chainStatus.rpcReachable ? `Dispatch expected Arc Testnet${chainStatus.detectedChainId ? ` but detected network ${chainStatus.detectedChainId}` : ""}.` : "Arc Testnet is temporarily unavailable."),
     tone: "warning"
   } : null;
   el.appRoot.innerHTML = `
@@ -50918,7 +50919,7 @@ async function renderPostTaskPage() {
     return field.multiline ? `<label class="post-field post-field--wide"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><textarea data-template-field="${field.key}" rows="3" placeholder="${escapeHtml(field.label)}">${escapeHtml(value)}</textarea></label>` : `<label class="post-field"><strong>${escapeHtml(field.label)}${field.required ? " *" : ""}</strong><input data-template-field="${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.label)}" /></label>`;
   }).join("")}
                 </div>
-                <button type="button" class="post-quiet-button" id="generateTaskBrief">Generate / Update Brief</button>
+                <button type="button" class="post-quiet-button" id="generateTaskBrief">Generate brief</button>
                 ${state.taskForm.templateMessage ? `<div class="post-task-alert post-task-alert--${templateResult.missingFields.length ? "warning" : "info"}"><strong>Template guidance</strong><p>${escapeHtml(state.taskForm.templateMessage)}</p></div>` : ""}
               `}
             </section>
@@ -50932,15 +50933,15 @@ async function renderPostTaskPage() {
               <div class="post-route-control">
                 <p class="post-task-eyebrow">Agent route</p>
                 <div class="segmented">
-                  <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Direct Hire</button>
-                  <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Open Market</button>
+                  <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Choose an agent</button>
+                  <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Post to marketplace</button>
                 </div>
               </div>
               ${state.taskForm.hiringMode === "direct_hire" ? `
                   <label class="post-field post-field--wide"><strong>Selected agent</strong>
                     <select id="selectedAgentId">
                       <option value="">Choose an agent</option>
-                      ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} trust</option>`).join("")}
+                      ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} readiness</option>`).join("")}
                     </select>
                   </label>
                 ` : `
@@ -51042,9 +51043,9 @@ async function renderPostTaskPage() {
           </article>
 
           <article class="post-demo-card reveal-on-scroll">
-            <strong>Arc Testnet demo mode</strong>
-            <p>Demo flow stays separate from wallet-funded tasks.</p>
-            <button type="button" data-start-demo-flow>Start Demo Flow</button>
+            <strong>Local demo only</strong>
+            <p>This stays separate from wallet-funded tasks.</p>
+            <button type="button" data-start-demo-flow>Start local demo</button>
           </article>
         </aside>
       </section>
@@ -51241,7 +51242,7 @@ async function startDemoFlow(trigger) {
     updateStatus2("Demo task funded", response.message || "Thread Writer demo task is ready.", "success");
     navigate(`/tasks/${response.task.taskId}`);
   } catch (error) {
-    updateStatus2("Demo flow unavailable", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+    updateStatus2("Demo unavailable", statusMessage(error, "Local demo mode is unavailable."), "warn");
   } finally {
     setButtonLoading(trigger, false);
   }
@@ -51256,7 +51257,7 @@ async function advanceDemoFlow(taskId, trigger) {
     updateStatus2("Demo advanced", response.message || "Demo task moved to the next lifecycle step.", "success");
     await renderTaskDetail(taskId);
   } catch (error) {
-    updateStatus2("Demo step failed", statusMessage(error, "Demo flow is disabled. Enable DISPATCH_ENABLE_DEMO_FUNDING_FALLBACK=true for local demo mode."), "warn");
+    updateStatus2("Demo step failed", statusMessage(error, "Local demo mode is unavailable."), "warn");
   } finally {
     setButtonLoading(trigger, false);
   }
@@ -51432,7 +51433,7 @@ async function runImproveAgain(taskId, trigger) {
   try {
     setButtonLoading(trigger, true, "Improving");
     requireWallet2();
-    updateStatus2("Improve Again running", "The platform agent is refining the last result with the stored quality trace.", "neutral");
+    updateStatus2("Improve Again running", "The platform agent is refining the last result.", "neutral");
     await sendJson2(`/api/task-market/tasks/${taskId}/improve-again`, "POST", {
       actorWallet: state.wallet
     });
@@ -51636,14 +51637,14 @@ async function checkFundingStatus(taskId, trigger, options = {}) {
     await renderTaskDetail(taskId);
     if (sync.task.transactionState === "accepted") {
       if (!options.silent) {
-        updateStatus2("Funding confirmed", `Arc receipt ${latestReceipt.status} was found and the task state was synchronized.`, "success");
+        updateStatus2("Funding confirmed", `Arc receipt ${latestReceipt.status} was found and the task state was updated.`, "success");
       }
       return;
     }
     if (!options.silent) {
       updateStatus2(
         "Funding still pending",
-        `Arc receipt ${latestReceipt.status} was found, but the task is not fully funded onchain yet.`,
+        `Arc receipt ${latestReceipt.status} was found, but funding is still updating.`,
         "warn"
       );
     }

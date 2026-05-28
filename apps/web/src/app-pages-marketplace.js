@@ -31,7 +31,7 @@ function renderHomeHero() {
           <button class="hero-primary" data-route="/post-task">Post Funded Task</button>
           <button class="hero-secondary" data-route="/agents">Explore Agents</button>
         </div>
-        <p class="home-trust-line">Built on Arc Testnet &middot; USDC flow &middot; Owner approval</p>
+        <p class="home-trust-line">Arc Testnet &middot; USDC locked before work &middot; You approve release</p>
       </div>
       <div class="home-execution-panel">
         <p class="home-panel-eyebrow">Execution preview</p>
@@ -111,8 +111,8 @@ function renderLiveUpdatesSection() {
   return `
     <section class="home-section home-live reveal-on-scroll">
       <div class="home-section-header">
-        <h2>Live updates</h2>
-        <p>Current Dispatch activity preview.</p>
+        <h2>Activity preview</h2>
+        <p>Demo-visible Dispatch activity.</p>
       </div>
       <div class="home-live-panel">
         ${updates.map(([event, helper, status, time]) => `
@@ -279,7 +279,7 @@ function renderAgentCard(agent) {
 
       <footer class="market-agent-actions">
         <button class="market-agent-primary" data-route="/agents/${agent.profile.slug}">View Agent</button>
-        <button class="market-agent-secondary" data-direct="${agent.profile.agentId}">Start Task</button>
+        <button class="market-agent-secondary" data-direct="${agent.profile.agentId}">Create task</button>
       </footer>
     </article>
   `;
@@ -874,7 +874,7 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
                       <span>${escapeHtml(item.paymentState)}</span>
                       <span>${escapeHtml(item.settlementState)}</span>
                       <small>${escapeHtml(item.dateLabel)}</small>
-                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em class="tx-fallback">No valid tx link available</em>`}
+                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em class="tx-fallback">No valid transaction link available.</em>`}
                     </article>
                   `).join("") || `
                     <article class="builder-empty-state">
@@ -914,8 +914,8 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
                       <div><span>Approval</span><strong>${escapeHtml(row.approvalRateDisplay)}</strong></div>
                     </div>
                     <footer>
-                      <button data-route="/agents/${row.slug}">View Profile</button>
-                      ${row.firstPackageId ? `<button class="hero-primary" data-dashboard-package-agent="${row.agentId}" data-dashboard-package="${row.firstPackageId}">Start Package</button>` : `<button data-direct="${row.agentId}">Create Task</button>`}
+                      <button class="hero-primary" data-route="/agents/${row.slug}">View Profile</button>
+                      ${row.firstPackageId ? `<button class="hero-secondary" data-dashboard-package-agent="${row.agentId}" data-dashboard-package="${row.firstPackageId}">Start Package</button>` : `<button class="hero-secondary" data-direct="${row.agentId}">Create Task</button>`}
                     </footer>
                   </article>
                 `).join("") || `

@@ -60,7 +60,7 @@ export function updateStatus(el, title, body, tone = "neutral") {
 export function statusMessage(error, fallback) {
   if (error instanceof Error) {
     if (error.name === "ContractValidationError") {
-      return `${error.message}. The client and server payloads are out of sync.`;
+      return `${error.message}. Dispatch could not prepare this action.`;
     }
     return error.message;
   }
@@ -216,10 +216,10 @@ export function renderWalletSheet({
   const connected = Boolean(state.wallet.trim());
   const onArc = Boolean(walletNetwork.isArcTestnet);
   const primaryAction = !connected
-    ? `<button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>${walletAvailable ? `Connect ${escapeHtml(providerLabel)}` : "No injected wallet detected"}</button>`
+    ? `<button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>${walletAvailable ? "Connect wallet" : "No wallet detected"}</button>`
     : !onArc
       ? `<button class="hero-primary" type="button" id="switchArcNetwork">Switch to Arc Testnet</button>`
-      : `<button class="hero-primary" type="button" disabled>Ready to fund tasks</button>`;
+      : `<div class="wallet-ready-status" role="status"><span class="wallet-status-dot is-ready"></span><strong>Wallet ready</strong></div>`;
   const readinessLabel = !connected
     ? "Connect wallet to continue."
     : !onArc

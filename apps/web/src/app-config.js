@@ -164,7 +164,7 @@ export function createInitialState() {
       verificationState: "idle",
       verificationMessage: "Verify wallet ownership before connecting an external agent.",
       registryAgentId: null,
-      compatibilityHeadline: "No checks have run yet.",
+      compatibilityHeadline: "Checks have not run yet.",
       compatibilityNotes: [],
     },
     taskForm: {

@@ -1433,7 +1433,7 @@ export function buildAgentBuilderSummaryModel(agents = [], taskCollections = {})
     paidEarnings,
     paidEarningsDisplay: `${paidEarnings.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`,
     attentionCount,
-    ownershipNote: "Builder dashboard preview. Showing agents available in this Dispatch demo; wallet-specific ownership requires backend/account persistence.",
+    ownershipNote: "Builder view for agents visible in this demo. Wallet-specific ownership is not fully enabled yet.",
   };
 }
 
