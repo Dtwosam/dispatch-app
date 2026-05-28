@@ -1817,6 +1817,7 @@ button[data-open-dispute] {
 .post-package-summary span,
 .post-package-summary p,
 .post-helper,
+.post-checkout-note,
 .post-funding-hint {
   margin: 0;
   color: #9bb1c5;
@@ -2017,9 +2018,9 @@ button[data-open-dispute] {
 .post-demo-card,
 .post-advanced {
   padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.045);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.018);
 }
 
 .post-route-summary,
@@ -2082,7 +2083,25 @@ button[data-open-dispute] {
 }
 
 .post-demo-card {
-  border-color: rgba(142, 255, 240, 0.08);
+  padding: 16px 18px;
+  border-color: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.post-demo-card summary {
+  cursor: pointer;
+  color: #9bb1c5;
+  font-size: 0.82rem;
+  font-weight: 650;
+  list-style: none;
+}
+
+.post-demo-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.post-demo-card[open] {
+  gap: 10px;
 }
 
 .post-demo-card strong {

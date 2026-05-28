@@ -50724,6 +50724,9 @@ async function createTask() {
     navigate(`/tasks/${taskId}`);
   } catch (error) {
     let message = statusMessage(error, "Task creation failed");
+    if (/Arc writes are disabled|configured Arc RPC|router|RPC/i.test(message)) {
+      message = "Funding is unavailable in this environment.";
+    }
     if (typeof error?.message === "string" && /wallet balance is too low|not enough USDC/i.test(error.message)) {
       message = `${error.message} Add testnet USDC before posting this task.`;
     }
@@ -50818,19 +50821,29 @@ async function renderPostTaskPage() {
   const usdcBalanceNumber = state.walletNetwork?.usdcBalance == null ? null : Number(state.walletNetwork.usdcBalance);
   const balanceTooLow = walletReady && walletOnArc && rewardAmountForBalance > 0 && usdcBalanceNumber != null && usdcBalanceNumber < rewardAmountForBalance;
   const fundingBlocked = !walletReady || !chainWritable || !walletOnArc || balanceTooLow;
-  const primaryActionLabel = !walletReady ? "Connect wallet" : !walletOnArc ? "Switch to Arc Testnet" : balanceTooLow ? "Not enough USDC" : state.taskForm.hiringMode === "direct_hire" ? "Create and fund task" : "Create and fund task";
-  const fundingHint = !walletReady ? "Connect a wallet before funding a task." : !walletOnArc ? "Switch to Arc Testnet to fund tasks with testnet USDC." : balanceTooLow ? `Not enough USDC for this reward.` : !chainWritable ? "Funding is unavailable in this environment." : state.taskForm.hiringMode === "direct_hire" ? "Your wallet may ask you to approve each funding step." : "Your wallet may ask you to approve task creation and funding.";
+  const primaryActionLabel = !walletReady ? "Connect wallet" : !walletOnArc ? "Switch to Arc Testnet" : balanceTooLow ? "Not enough USDC" : !chainWritable ? "Funding unavailable" : state.taskForm.hiringMode === "direct_hire" ? "Create and fund task" : "Create and fund task";
+  const fundingHint = !walletReady ? "Connect wallet to continue." : !walletOnArc ? "Switch to Arc Testnet." : balanceTooLow ? `Not enough USDC for this reward.` : !chainWritable ? "Funding is unavailable in this environment." : state.taskForm.hiringMode === "direct_hire" ? "Your wallet may ask you to approve each funding step." : "Your wallet may ask you to approve task creation and funding.";
+  const routeChoiceHelper = state.taskForm.hiringMode === "direct_hire" ? "Send this task to the selected agent." : "Let available agents pick up the task.";
+  const routeChoiceLabel = state.taskForm.hiringMode === "direct_hire" ? "Choose an agent" : "Post to marketplace";
+  const templateShortLabels = {
+    write_x_thread: "X thread",
+    summarize_article: "Summary",
+    debug_code: "Code fix",
+    research_project: "Research",
+    rewrite_content: "Rewrite",
+    custom_task: "Custom"
+  };
   const chainBanner = !walletReady ? {
     title: "Wallet required",
-    body: "Connect a wallet to sign and fund the task from this workspace.",
+    body: "Connect wallet to fund this task.",
     tone: "warning"
   } : chainMode === "read_only" ? {
     title: "Read-only environment",
     body: "Marketplace browsing works, but funding is unavailable in this environment.",
     tone: "warning"
   } : chainMode === "unknown" ? {
-    title: "Chain status unavailable",
-    body: state.chainStatusError || "Dispatch could not reach the Arc chain status endpoint.",
+    title: "Arc Testnet unavailable",
+    body: "Arc Testnet is temporarily unavailable.",
     tone: "info"
   } : chainStatus && !chainStatus.ok ? {
     title: chainStatus.rpcReachable ? "Arc Testnet requires attention" : "Arc Testnet unavailable",
@@ -50842,16 +50855,16 @@ async function renderPostTaskPage() {
       <header class="post-task-header reveal-on-scroll is-visible">
         <p class="post-task-eyebrow">Post funded task</p>
         <h1>Create funded work for an AI agent.</h1>
-        <p>Set the brief, choose an agent, and fund the task in USDC.</p>
-        <span>Arc Testnet | USDC payment flow | Owner approval</span>
+        <p>Describe the work, choose who should do it, and fund the reward in USDC.</p>
+        <span>USDC stays locked until you approve the work.</span>
       </header>
 
       <section class="post-task-flow reveal-on-scroll">
         ${[
-    ["01", "Brief", "Write or generate the task brief"],
-    ["02", "Agent", "Choose a package or route"],
+    ["01", "Brief", "Describe the work"],
+    ["02", "Agent", "Choose who should do it"],
     ["03", "Fund", "Lock USDC before work starts"],
-    ["04", "Review", "Approve before payment release"]
+    ["04", "Review", "Approve before payment moves"]
   ].map(([number, title, helper]) => `
           <article>
             <strong>${number}</strong>
@@ -50875,11 +50888,11 @@ async function renderPostTaskPage() {
               <div>
                 <p class="post-task-eyebrow">Task brief</p>
                 <h2>Describe the outcome.</h2>
-                <p>Describe the outcome the agent should deliver.</p>
+                <p>Tell the agent what outcome you want.</p>
               </div>
               <div class="post-task-meta">
                 <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
-                <span>${state.taskForm.hiringMode === "direct_hire" ? "Direct hire" : "Open market"}</span>
+                <span>${escapeHtml(routeChoiceLabel)}</span>
               </div>
             </div>
 
@@ -50888,7 +50901,7 @@ async function renderPostTaskPage() {
                 <div>
                   <span>Selected package</span>
                   <strong>${escapeHtml(state.taskForm.selectedServicePackage.tier)}: ${escapeHtml(state.taskForm.selectedServicePackage.name)}</strong>
-                  <p>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Agent selected from package"} | You can edit the brief before funding.</p>
+                  <p>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Agent selected from package"} | This package prefills the task. You can edit the brief before funding.</p>
                 </div>
                 <strong>${escapeHtml(Number(state.taskForm.selectedServicePackage.priceUsdc || 0).toLocaleString(void 0, { maximumFractionDigits: 6 }))} USDC</strong>
               </div>
@@ -50898,20 +50911,20 @@ async function renderPostTaskPage() {
               <div class="post-task-section-head post-task-section-head--compact">
                 <div>
                   <p class="post-task-eyebrow">Template</p>
-                  <h3>Start from a task shape.</h3>
+                  <h3>Pick a starting point.</h3>
                 </div>
                 <span>${escapeHtml(selectedTemplate.name)}</span>
               </div>
               <div class="post-template-grid">
                 ${taskBriefTemplates.map((template) => `
                   <button type="button" data-template-card="${template.id}" class="${selectedTemplate.id === template.id ? "is-selected" : ""}">
-                    <strong>${escapeHtml(template.name)}</strong>
+                    <strong>${escapeHtml(templateShortLabels[template.id] || template.name)}</strong>
                     <span>${escapeHtml(template.category ? labelize(template.category) : "Custom brief")}</span>
                   </button>
                 `).join("")}
               </div>
               ${selectedTemplate.id === "custom_task" ? `
-                <p class="post-helper">Custom Task keeps the blank composer. Write directly below.</p>
+                <p class="post-helper">Write your own brief below.</p>
               ` : `
                 <div class="post-template-fields">
                   ${selectedTemplate.fields.map((field) => {
@@ -50936,6 +50949,7 @@ async function renderPostTaskPage() {
                   <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Choose an agent</button>
                   <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Post to marketplace</button>
                 </div>
+                <p class="post-helper">${escapeHtml(routeChoiceHelper)}</p>
               </div>
               ${state.taskForm.hiringMode === "direct_hire" ? `
                   <label class="post-field post-field--wide"><strong>Selected agent</strong>
@@ -50995,10 +51009,10 @@ async function renderPostTaskPage() {
             <div class="post-summary-list">
               <div><span>Reward</span><strong>${state.taskForm.rewardAmount ? formatCurrency(state.taskForm.rewardAmount) : "Not set"}</strong></div>
               <div><span>Network</span><strong>Arc Testnet</strong></div>
-              <div><span>Payment token</span><strong>USDC</strong></div>
+              <div><span>Token</span><strong>USDC</strong></div>
               <div><span>Wallet</span><strong>${walletReady ? shortWallet(state.wallet) : "Required"}</strong></div>
               <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
-              <div><span>Agent route</span><strong>${state.taskForm.hiringMode === "direct_hire" ? selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose agent" : "Open market"}</strong></div>
+              <div><span>Agent route</span><strong>${state.taskForm.hiringMode === "direct_hire" ? selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose agent" : "Post to marketplace"}</strong></div>
               <div><span>Package</span><strong>${state.taskForm.selectedServicePackage ? escapeHtml(state.taskForm.selectedServicePackage.name) : "Custom task"}</strong></div>
             </div>
             ${!walletOnArc && walletReady ? `<button type="button" class="hero-secondary post-switch-button" id="switchArcFromPost">Switch to Arc Testnet</button>` : ""}
@@ -51009,13 +51023,14 @@ async function renderPostTaskPage() {
               </div>
             ` : ""}
             <button class="hero-primary" id="fundTaskButton" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
+            <p class="post-checkout-note">USDC stays locked until you approve the work.</p>
             <p class="post-funding-hint disabled-reason">${escapeHtml(fundingHint)}</p>
           </article>
 
           <article class="post-route-summary reveal-on-scroll">
             <p class="post-task-eyebrow">Agent route</p>
-            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose an agent or open market"}</h3>
-            <p>${selectedAgent ? escapeHtml(selectedAgent.profile.description) : "Choose an agent directly or post to available agents."}</p>
+            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : escapeHtml(routeChoiceLabel)}</h3>
+            <p>${selectedAgent ? escapeHtml(selectedAgent.profile.description) : escapeHtml(routeChoiceHelper)}</p>
             ${selectedAgent ? `
               <div class="post-route-tags">
                 ${selectedAgentBestFor.slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
@@ -51042,11 +51057,11 @@ async function renderPostTaskPage() {
             </div>
           </article>
 
-          <article class="post-demo-card reveal-on-scroll">
-            <strong>Local demo only</strong>
-            <p>This stays separate from wallet-funded tasks.</p>
-            <button type="button" data-start-demo-flow>Start local demo</button>
-          </article>
+          <details class="post-demo-card reveal-on-scroll">
+            <summary>Local test flow</summary>
+            <p>Use only for local testing when wallet funding is unavailable.</p>
+            <button type="button" data-start-demo-flow>Start local test</button>
+          </details>
         </aside>
       </section>
 
@@ -51077,7 +51092,7 @@ async function renderPostTaskPage() {
     state.taskForm.templateId = event.target.value;
     state.taskForm.templateFields = {};
     state.taskForm.selectedServicePackage = null;
-    state.taskForm.templateMessage = event.target.value === "custom_task" ? "Custom Task selected. Write your own brief below." : "Fill the template fields, then generate an editable task brief.";
+    state.taskForm.templateMessage = event.target.value === "custom_task" ? "Custom selected. Write your own brief below." : "Fill the fields, then generate a brief.";
     const template = getTaskBriefTemplate(event.target.value);
     if (template?.category) state.taskForm.category = template.category;
     renderPostTaskPage();
@@ -51088,7 +51103,7 @@ async function renderPostTaskPage() {
       state.taskForm.templateId = templateId;
       state.taskForm.templateFields = {};
       state.taskForm.selectedServicePackage = null;
-      state.taskForm.templateMessage = templateId === "custom_task" ? "Custom Task selected. Write your own brief below." : "Fill the template fields, then generate an editable task brief.";
+      state.taskForm.templateMessage = templateId === "custom_task" ? "Custom selected. Write your own brief below." : "Fill the fields, then generate a brief.";
       const template = getTaskBriefTemplate(templateId);
       if (template?.category) state.taskForm.category = template.category;
       renderPostTaskPage();
@@ -51106,7 +51121,7 @@ async function renderPostTaskPage() {
   document.getElementById("generateTaskBrief")?.addEventListener("click", () => {
     const result = buildTaskTemplateBrief(state.taskForm.templateId, state.taskForm.templateFields || {});
     if (result.isCustom) {
-      state.taskForm.templateMessage = "Custom Task selected. Write your own brief below.";
+      state.taskForm.templateMessage = "Custom selected. Write your own brief below.";
       renderPostTaskPage();
       return;
     }
