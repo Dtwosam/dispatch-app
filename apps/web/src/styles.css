@@ -7613,3 +7613,210 @@ body {
     font-size: 21px;
   }
 }
+
+/* UX Fix Pass 6: mobile decision tightening */
+@media (max-width: 720px) {
+  .hero-primary,
+  .hero-secondary,
+  .market-agent-primary,
+  .market-agent-secondary,
+  .post-quiet-button,
+  .task-decision-actions button,
+  .task-secondary-actions button,
+  .task-payment-panel button,
+  .builder-action-panel button,
+  .wallet-session-actions button {
+    min-height: 46px;
+    font-size: 0.9rem;
+  }
+
+  .hero-secondary,
+  .market-agent-secondary,
+  .task-secondary-actions button,
+  .builder-action-panel .review-actions button:not(.hero-primary),
+  .wallet-session-actions button:not(.hero-primary) {
+    border-color: rgba(142, 255, 240, 0.12);
+    background: rgba(255, 255, 255, 0.018);
+    color: #b7c6d6;
+  }
+
+  .post-mobile-action {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 18px;
+  }
+
+  .post-mobile-action span {
+    display: block;
+    overflow: hidden;
+    color: #9bb1c5;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .post-mobile-action button {
+    width: 100%;
+    min-height: 46px;
+    padding-inline: 12px;
+  }
+
+  .task-lifecycle-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .task-lifecycle-step {
+    gap: 8px;
+  }
+
+  .task-lifecycle-step strong {
+    font-size: 0.76rem;
+  }
+
+  .task-secondary-actions {
+    margin-top: 2px;
+  }
+
+  .task-detail-details,
+  .task-history-panel--technical,
+  .builder-details-panel {
+    border-color: rgba(255, 255, 255, 0.045);
+    background: rgba(255, 255, 255, 0.016);
+  }
+
+  .market-agent-skill-row span:nth-child(n+4):not(:last-child),
+  .agent-card .agent-tags .tag:nth-child(n+5),
+  .profile-package-details span:nth-child(n+5) {
+    display: none;
+  }
+
+  .market-agent-actions,
+  .builder-agent-row footer,
+  .wallet-session-actions {
+    gap: 8px;
+  }
+
+  .builder-dashboard-tabs {
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .builder-dashboard-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .builder-agent-performance div,
+  .builder-earning-row > div:not(:first-child),
+  .task-result-meta > div,
+  .profile-trust-strip div {
+    min-height: auto;
+    padding: 12px;
+  }
+
+  .mobile-drawer__status {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mobile-drawer__status .wallet-action,
+  .mobile-drawer__status .network-pill {
+    width: 100%;
+  }
+
+  .wallet-sheet-panel {
+    display: grid;
+    gap: 16px;
+  }
+
+  .wallet-readiness-grid,
+  .wallet-session-card {
+    gap: 10px;
+  }
+
+  .wallet-ready-status {
+    min-height: 44px;
+    margin-top: 0;
+  }
+
+  .empty-state,
+  .error-state,
+  .state-card,
+  .builder-empty-state,
+  .profile-empty-panel,
+  .marketplace-empty-state {
+    gap: 12px;
+    padding: 22px;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-update-row,
+  .home-agent-row,
+  .market-agent-card,
+  .market-agent-package,
+  .profile-work-row,
+  .builder-agent-row,
+  .builder-attention-row,
+  .builder-earning-row,
+  .builder-activity-row {
+    gap: 12px;
+  }
+
+  .profile-final-cta {
+    border-color: rgba(255, 255, 255, 0.055);
+    background: rgba(255, 255, 255, 0.018);
+  }
+
+  .profile-final-cta .agent-profile-actions .hero-secondary,
+  .home-final-cta .home-hero__actions .hero-secondary {
+    order: 2;
+  }
+
+  .task-support-grid,
+  .task-history-grid {
+    gap: 18px;
+  }
+
+  .builder-flow-strip article,
+  .post-task-flow article {
+    min-height: auto;
+  }
+
+  .builder-onboarding-page .wizard-steps button,
+  .builder-endpoint-list div,
+  .wallet-readiness-card {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 440px) {
+  .post-mobile-action {
+    grid-template-columns: minmax(0, 0.78fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .task-lifecycle-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.market-agent-heading,
+.market-agent-skill-row,
+.profile-work-row,
+.profile-readiness-row,
+.task-result-surface,
+.task-payment-links,
+.task-browser-trace,
+.builder-endpoint-list,
+.builder-note-list,
+.builder-activity-row,
+.wallet-readiness-card,
+.wallet-session-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
