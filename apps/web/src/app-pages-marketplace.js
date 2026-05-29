@@ -879,7 +879,7 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
                   `).join("") || `
                     <article class="builder-empty-state">
                       <strong>No payment activity yet.</strong>
-                      <p>Approved funded task payments will appear here.</p>
+                      <p>Released task payments will appear here.</p>
                     </article>
                   `}
                 </div>

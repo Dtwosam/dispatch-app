@@ -419,8 +419,8 @@ export function renderTaskDetailPageView({
                 <p>${escapeHtml(item.outcome)}</p>
                 ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
               </article>
-            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.", {
-              title: "No payout receipts yet.",
+            `).join("") || emptyState("No payment activity yet. Payment history appears after release or refund.", {
+              title: "No payment activity yet.",
               body: "Released or refunded payment receipts will appear here.",
             })}
           </div>

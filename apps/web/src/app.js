@@ -266,7 +266,7 @@ function renderWalletSheet(open) {
         updateStatus("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
         const snapshot = await chainClient.switchWalletToArcTestnet();
         state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
-        updateStatus("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+        updateStatus("Arc Testnet ready", "Wallet is connected to Arc Testnet.", "success");
         renderWalletSheet(true);
         safeRender("Wallet network switch render failed");
       } catch (error) {
@@ -927,7 +927,7 @@ async function createTask() {
       requireWallet();
       const walletSnapshot = await refreshWalletNetworkState();
       if (!walletSnapshot?.isArcTestnet) {
-        throw new Error("Switch to Arc Testnet to fund tasks with testnet USDC.");
+        throw new Error("Switch to Arc Testnet.");
       }
       const walletUsdcBalance = walletSnapshot.usdcBalance == null ? null : Number(walletSnapshot.usdcBalance);
       if (walletUsdcBalance != null && walletUsdcBalance < Number(payload.rewardAmount || 0)) {
@@ -996,10 +996,12 @@ async function createTask() {
   } catch (error) {
     let message = statusMessage(error, "Task creation failed");
     if (/Arc writes are disabled|configured Arc RPC|router|RPC/i.test(message)) {
-      message = "Funding is unavailable in this environment.";
+      message = /Arc writes are disabled/i.test(message)
+        ? "Funding is unavailable in this environment."
+        : "Arc Testnet is temporarily unavailable. Try again shortly.";
     }
     if (typeof error?.message === "string" && /wallet balance is too low|not enough USDC/i.test(error.message)) {
-      message = `${error.message} Add testnet USDC before posting this task.`;
+      message = `${error.message} Add USDC before funding this task.`;
     }
     const partialWriteResult = error?.partialWriteResult || null;
     if (partialWriteResult) {
@@ -1143,16 +1145,15 @@ async function renderPostTaskPage() {
       : chainMode === "unknown"
         ? {
             title: "Arc Testnet unavailable",
-            body: "Arc Testnet is temporarily unavailable.",
+            body: "Arc Testnet is temporarily unavailable. Try again shortly.",
             tone: "info",
           }
         : chainStatus && !chainStatus.ok
           ? {
               title: chainStatus.rpcReachable ? "Arc Testnet requires attention" : "Arc Testnet unavailable",
-              body: chainStatus.diagnostics[0]
-                || (chainStatus.rpcReachable
-                  ? `Dispatch expected Arc Testnet${chainStatus.detectedChainId ? ` but detected network ${chainStatus.detectedChainId}` : ""}.`
-                  : "Arc Testnet is temporarily unavailable."),
+              body: chainStatus.rpcReachable
+                ? "Switch to Arc Testnet."
+                : "Arc Testnet is temporarily unavailable. Try again shortly.",
               tone: "warning",
             }
         : null;
@@ -1323,7 +1324,7 @@ async function renderPostTaskPage() {
               <div><span>Network</span><strong>Arc Testnet</strong></div>
               <div><span>Token</span><strong>USDC</strong></div>
               <div><span>Wallet</span><strong>${walletReady ? shortWallet(state.wallet) : "Required"}</strong></div>
-              <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
+              <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Balance unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
               <div><span>Agent route</span><strong>${state.taskForm.hiringMode === "direct_hire" ? (selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose agent") : "Post to marketplace"}</strong></div>
               <div><span>Package</span><strong>${state.taskForm.selectedServicePackage ? escapeHtml(state.taskForm.selectedServicePackage.name) : "Custom task"}</strong></div>
             </div>
@@ -1490,7 +1491,7 @@ async function renderPostTaskPage() {
       updateStatus("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
       const snapshot = await chainClient.switchWalletToArcTestnet();
       state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
-      updateStatus("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+      updateStatus("Arc Testnet ready", "Wallet is connected to Arc Testnet.", "success");
       renderPostTaskPage();
     } catch (error) {
       updateStatus("Network switch failed", statusMessage(error, "Could not switch to Arc Testnet."), "warn");
@@ -1733,7 +1734,7 @@ async function requestRevision(taskId, trigger) {
 
     updateStatus(
       "Revision requested",
-      "The request was saved locally. Payment remains funded and locked until the owner approves revised work.",
+      "The request was saved locally. Payment remains locked until the work is approved.",
       "success",
     );
     await renderTaskDetail(taskId);
@@ -1779,7 +1780,7 @@ async function openLocalDispute(taskId, trigger) {
 
     updateStatus(
       "Dispute opened",
-      "The dispute was saved locally. Payment remains funded and locked; no refund, payout, or settlement transaction was created.",
+      "The dispute was saved locally. Payment remains locked during dispute.",
       "warn",
     );
     await renderTaskDetail(taskId);

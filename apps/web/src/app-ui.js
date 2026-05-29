@@ -69,7 +69,7 @@ export function statusMessage(error, fallback) {
 
 export function requireWallet(state) {
   if (!state.wallet.trim()) {
-    throw new Error("Connect a wallet before continuing.");
+    throw new Error("Connect wallet to continue.");
   }
 }
 
@@ -93,7 +93,7 @@ export function renderNav(el, routes, isActive, state) {
     ...secondaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]),
     ...routes.filter(([path]) => !primaryOrder.includes(path) && !secondaryOrder.includes(path)),
   ];
-  const walletLabel = state.wallet?.trim() ? "Wallet Connected" : "Connect Wallet";
+  const walletLabel = state.wallet?.trim() ? "Wallet connected" : "Connect wallet";
   el.routeList.innerHTML = `
     <div class="nav-shell">
       <nav class="desktop-nav" aria-label="Primary">
@@ -162,16 +162,16 @@ export function renderTopbar(el, state, shortWallet) {
     ? state.walletConnectionType === "injected"
       ? `${providerLabel} ${shortWallet(state.wallet)}`
       : shortWallet(state.wallet)
-    : "Connect Wallet";
+    : "Connect wallet";
   const chainMode = state.chainStatusError
-    ? "Chain Offline"
+    ? "Chain unavailable"
     : !state.chainConfig
-      ? "Checking Chain"
+      ? "Checking network"
     : state.chainConfig.chainMode === "browser_wallet"
-      ? "Browser Sign"
+      ? "Wallet funding"
       : state.chainConfig.chainMode === "server_signer_proxy"
-        ? "Server Signer"
-        : "Read Only";
+        ? "Server funding"
+        : "Read only";
   el.topbarActions.innerHTML = `
     <span class="network-pill"><span></span>Arc Testnet</span>
     <button class="wallet-action" data-wallet="open">
@@ -198,21 +198,21 @@ export function renderWalletSheet({
   const providerLabel = walletProviderLabel || "Rabby";
   const walletNetwork = state.walletNetwork || {};
   const chainMode = state.chainStatusError
-    ? "Chain status unavailable"
+    ? "Arc Testnet is temporarily unavailable"
     : !state.chainConfig
-      ? "Checking chain access"
+      ? "Checking Arc Testnet"
     : state.chainConfig.chainMode === "browser_wallet"
-      ? "Browser signing"
+      ? "Wallet funding"
       : state.chainConfig.chainMode === "server_signer_proxy"
-        ? "Server signer"
-        : "Read only";
+        ? "Server funding"
+        : "Funding unavailable";
   el.walletSheet.classList.toggle("open", true);
   const networkLabel = walletNetwork.chainId
     ? (walletNetwork.isArcTestnet ? "Arc Testnet" : `Wrong network (${walletNetwork.chainId})`)
     : "Network not checked";
   const balanceLabel = walletNetwork.usdcBalance == null
     ? "Balance unavailable"
-    : `${Number(walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} testnet USDC`;
+    : `${Number(walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`;
   const connected = Boolean(state.wallet.trim());
   const onArc = Boolean(walletNetwork.isArcTestnet);
   const primaryAction = !connected
@@ -223,10 +223,10 @@ export function renderWalletSheet({
   const readinessLabel = !connected
     ? "Connect wallet to continue."
     : !onArc
-      ? "Switch to Arc Testnet."
+      ? "Switch to Arc Testnet to continue."
       : walletNetwork.usdcBalance == null
-        ? "Balance unavailable."
-        : "Wallet ready for Dispatch task funding.";
+        ? "Try again after wallet connection updates."
+        : "Wallet ready.";
   el.walletSheet.innerHTML = `
     <div class="wallet-sheet-backdrop" data-wallet="close"></div>
     <div class="wallet-sheet-panel">
@@ -235,7 +235,7 @@ export function renderWalletSheet({
         <div>
           <p class="mini-label">Wallet</p>
           <h3>${connected ? "Wallet connected" : "Connect wallet"}</h3>
-          <p class="muted">Use Arc Testnet to fund tasks and release USDC after approval.</p>
+          <p class="muted">Use Arc Testnet to fund tasks and review USDC payments.</p>
         </div>
         <button class="wallet-sheet-close" type="button" data-wallet="close" aria-label="Close wallet panel">${icon("plus", 14)}</button>
       </div>
@@ -247,7 +247,7 @@ export function renderWalletSheet({
             <span>Wallet</span>
           </div>
           <strong>${connected ? "Connected" : "Not connected"}</strong>
-          <p>${connected ? `${escapeHtml(shortWallet(state.wallet))} via ${escapeHtml(providerLabel)}` : `Connect ${escapeHtml(providerLabel)} to start funded work.`}</p>
+          <p>${connected ? `${escapeHtml(shortWallet(state.wallet))} via ${escapeHtml(providerLabel)}` : "Connect wallet to continue."}</p>
         </article>
         <article class="wallet-readiness-card">
           <div class="wallet-readiness-card__head">
@@ -263,7 +263,7 @@ export function renderWalletSheet({
             <span>Funding</span>
           </div>
           <strong>${escapeHtml(balanceLabel)}</strong>
-          <p>${walletNetwork.nativeGasBalance == null ? "Arc Testnet balance appears here when available." : `Gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}`}</p>
+          <p>${walletNetwork.usdcBalance == null ? "Try again after wallet connection updates." : walletNetwork.nativeGasBalance == null ? "Arc Testnet gas balance unavailable." : `Gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}`}</p>
         </article>
       </div>
 
@@ -278,7 +278,7 @@ export function renderWalletSheet({
       </article>
       <div class="wallet-sheet-note">
         <span class="live-dot"></span>
-        <p>Arc Testnet is used for Dispatch task funding and payment review flows. Testnet USDC has no financial value.</p>
+        <p>Arc Testnet is used for Dispatch task funding and payment review flows.</p>
       </div>
     </div>
   `;

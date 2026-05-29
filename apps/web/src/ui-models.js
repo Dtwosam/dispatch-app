@@ -132,7 +132,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
               ? "Settlement pending"
               : "Funding required";
   const currentLabel = settled
-    ? "Payment Released"
+    ? "Payment released"
     : completed
       ? "Completed"
       : refunded || cancelled
@@ -169,15 +169,15 @@ export function buildTaskLifecycleModel(task, options = {}) {
       : settlementSummary?.settlementReadinessLabel
         ? settlementSummary.settlementReadinessLabel
         : settlementReady
-          ? "Approved. USDC release is ready."
+          ? "Approval is complete. You can release payment."
           : needsRevision
-            ? "Revision requested before payout."
-            : rejected
-              ? "Rejected. Payout not recommended."
+            ? "Revision requested before release."
+          : rejected
+              ? "Rejected. Payment remains locked."
               : disputed
-                ? "Disputed. Payout stays paused."
+                ? "Disputed. Payment remains locked."
                 : unresolved
-                  ? "Review unresolved. Payout stays paused."
+                  ? "Review unresolved. Payment remains locked."
                   : underReview
                     ? "Under evaluator review."
                     : submitted
@@ -188,7 +188,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
                           ? "Funding is still being confirmed."
                           : fundingConfirmed
                             ? "Task is funded and waiting for the next step."
-                            : "Awaiting onchain funding.";
+                            : "Funding required.";
   const amountDisplay = Number.isFinite(Number(task?.rewardAmount))
     ? `${Number(task.rewardAmount).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`
     : "Not available yet";
@@ -200,15 +200,15 @@ export function buildTaskLifecycleModel(task, options = {}) {
     : refunded
       ? "Reward refunded"
       : disputed
-        ? "Payment locked"
+        ? "Payment locked during dispute"
       : settlementReady
-        ? "Payment ready"
+        ? "Ready to release"
         : refundReady
           ? "Refund ready"
           : fundingConfirmed
-            ? "USDC funded"
+            ? "Payment locked"
             : fundingPending
-              ? "Funding syncing"
+              ? "Funding pending"
               : "Funding required";
   const reviewStateLabel = approved
     ? "Owner approved"
@@ -232,7 +232,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
       : disputed || unresolved
         ? { label: "View Dispute", kind: "dispute", disabled: false }
         : settlementReady
-          ? { label: "Release Payment", kind: "settle", disabled: false }
+          ? { label: "Release payment", kind: "settle", disabled: false }
           : revisionRequested
             ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true }
             : rejected
@@ -250,7 +250,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
                       : { label: "Fund Task", kind: "fund", disabled: false };
   const statusDisplay = {
     label: settled
-      ? "Payment Released"
+      ? "Payment released"
       : completed
         ? "Completed"
         : refunded || cancelled
@@ -283,11 +283,11 @@ export function buildTaskLifecycleModel(task, options = {}) {
         : refunded || cancelled
           ? "The task is closed and no normal payment release is available."
           : disputed || unresolved
-            ? "The task needs dispute or appeal handling before payment can move."
+            ? "Payment remains locked during dispute."
             : settlementReady || approved
-              ? "The owner approval step is complete and payment release is the next major action."
+              ? "Approval is complete. You can release payment."
               : revisionRequested || rejected
-                ? "The owner requested changes. Payment remains funded and locked until approved."
+                ? "Payment remains locked until the work is approved."
                 : underReview
                   ? "A submitted result is being reviewed. AI guidance is advisory; the owner decides."
                   : submitted
@@ -297,7 +297,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
                       : assigned
                         ? "An agent is assigned and execution is the next step."
                         : fundingPending
-                          ? "Funding was started and Dispatch is waiting for Arc Testnet confirmation."
+                          ? "Waiting for payment update."
                           : fundingConfirmed
                             ? "The task is funded and ready for assignment or execution."
                             : hasAnyRawStatus
@@ -362,70 +362,72 @@ export function buildTaskLifecycleModel(task, options = {}) {
         : disputed || unresolved
           ? "Disputed"
           : releasePending
-            ? "Release Pending"
+            ? "Release pending"
             : settlementReady
-              ? "Ready to Release"
+              ? "Ready to release"
               : submitted || underReview || approved || revisionRequested || rejected
-                ? "Locked Until Approval"
+                ? revisionRequested || rejected
+                  ? "Waiting for changes"
+                  : "Payment locked"
                 : fundingConfirmed
-                  ? "Funded"
+                  ? "Payment locked"
                   : fundingPending
-                    ? "Funding Pending"
+                    ? "Waiting for payment update"
                     : fundingFailed
-                      ? "Unknown"
+                      ? "Waiting for payment update"
                       : task
-                        ? "Not Funded"
-                        : "Unknown",
+                        ? "Payment not funded"
+                        : "Waiting for payment update",
     description: settled
-      ? "Payment has been released to the agent after owner approval."
+      ? "USDC payment has been released."
       : refunded
         ? "The task reward has been refunded instead of released."
         : disputed
-          ? "Payment remains funded and locked while the dispute is under review."
+          ? "Payment remains locked during dispute."
           : unresolved
-            ? "Payment is paused while the task is unresolved."
+            ? "Waiting for payment update."
           : releasePending
-            ? "Transaction submitted. Waiting for confirmation."
+            ? "Waiting for payment update."
             : settlementReady
-              ? "Work has been approved. Payment is ready to release."
+              ? "Approval is complete. You can release payment."
               : revisionRequested || rejected
-                ? "Payment is funded and locked while the requested changes are pending. Approval is still required before release."
+                ? "Payment remains locked until the work is approved."
                 : submitted || underReview
-                ? "Payment is funded but locked. The owner must review the submitted work before release."
+                ? "Payment only moves after approval."
                 : approved
-                  ? "Owner approval is recorded. Payment can move to release."
+                  ? "Approval is complete. You can release payment."
                   : fundingConfirmed
-                    ? "Payment is funded but not released yet."
+                    ? "USDC stays locked until approval."
                     : fundingPending
-                      ? "Funding transaction is being confirmed on Arc Testnet."
+                      ? "Waiting for payment update."
                       : fundingFailed
-                        ? "Funding status is unclear after a failed wallet or chain update."
+                        ? "Waiting for payment update."
                         : task
-                          ? "This task has not been funded yet."
-                          : "Payment state is not available yet.",
+                          ? "Fund the task before work starts."
+                          : "Waiting for payment update.",
     nextPaymentAction: settled
       ? "No payment action needed."
       : refunded
         ? "No release action is available after refund."
         : disputed
-          ? "Wait for dispute review before payment can move."
+          ? "Payment remains locked during dispute."
           : unresolved
-            ? "Resolve the review state before payment can move."
+            ? "Waiting for payment update."
           : releasePending
-            ? "Wait for Arc Testnet confirmation."
+            ? "Waiting for payment update."
             : settlementReady
               ? "Release payment."
               : revisionRequested || rejected
-                ? "Wait for revised output before approval."
+                ? "Waiting for updated work."
                 : submitted || underReview
                 ? "Review the submitted work."
                 : approved
-                  ? "Prepare payment release."
+                  ? "Release becomes available after approval."
                   : fundingConfirmed
-                    ? "Wait for output and owner approval."
+                    ? "Waiting for agent submission."
                     : fundingPending
-                      ? "Wait for funding confirmation."
-                      : "Fund the task with testnet USDC.",
+                      ? "Waiting for payment update."
+                      : "Fund the task before work starts.",
     variant: settled
       ? "success"
       : refunded || disputed || unresolved || fundingFailed
@@ -446,7 +448,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
   };
   const nextActor = statusDisplay.whoActsNext;
   const nextActionHelper = settled
-    ? "The task is complete. Review the delivered work and payout trail."
+    ? "The task is complete. Review the delivered work and payment record."
     : completed
       ? "The task is complete. View the delivered work and final status."
     : refunded
@@ -454,22 +456,22 @@ export function buildTaskLifecycleModel(task, options = {}) {
       : cancelled
         ? "The task is closed and no normal marketplace action is available."
         : disputed || unresolved
-          ? "Open the dispute or appeal view before payment can move."
+          ? "Payment remains locked during dispute."
       : settlementReady
-        ? "Release USDC payment now that the output is approved."
+        ? "Approval is complete. You can release payment."
         : revisionRequested || rejected
-          ? "Waiting for revised output. Payment remains funded and locked until owner approval."
+          ? "Waiting for updated work. Payment remains locked until approval."
           : submitted || underReview
-            ? "Review the submitted output. AI review is guidance; owner approval controls payout."
+            ? "Review the submitted output. Owner approval controls payment release."
             : executing
               ? "The agent is working. Wait for the submitted output before reviewing."
               : assigned
                 ? "An agent is assigned. Execution will produce a submitted output next."
                 : fundingConfirmed
-                  ? "The task is funded. Dispatch can route it to an agent for execution."
+                  ? "The task is funded. USDC stays locked until approval."
                   : fundingPending
-                    ? "Wallet activity was captured. Wait for Arc Testnet confirmation."
-                    : "Fund the task with testnet USDC before assignment or execution can begin.";
+                    ? "Waiting for payment update."
+                    : "Fund the task before assignment or execution can begin.";
   const reputationLabel = settled
     ? "Reputation updated"
     : refunded
@@ -500,8 +502,8 @@ export function buildTaskLifecycleModel(task, options = {}) {
         : fundingFailed
           ? "The latest wallet or chain funding action failed."
           : fundingPending
-            ? "Wallet signatures were captured and Arc Testnet funding confirmation is still syncing."
-            : "The task needs onchain funding before assignment and execution.",
+            ? "Waiting for payment update."
+            : "The task needs funding before assignment and execution.",
       timestamp: timelineByKind.get("escrow_funded") || null,
     },
     {
@@ -544,9 +546,9 @@ export function buildTaskLifecycleModel(task, options = {}) {
         : revisionRequested || rejected
           ? "The owner requested changes. Payment stays locked until approval."
           : disputed
-            ? "A dispute paused payout."
+            ? "Payment remains locked during dispute."
             : unresolved
-              ? "Manual escalation is needed before payout can move."
+              ? "Payment remains locked until review is resolved."
               : underReview
                 ? "AI review is guidance. The task owner makes the final approval decision."
                 : submitted
@@ -559,7 +561,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
       label: "Approved",
       status: approved || settled ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : submitted || underReview ? "pending" : "pending",
       helper: approved || settled
-        ? "Owner approval is recorded and payment can move."
+        ? "Approval is complete. You can release payment."
         : revisionRequested || rejected
           ? "Approval is still required before payment can be released."
           : "Owner approval happens after reviewing a submitted output.",
@@ -567,7 +569,7 @@ export function buildTaskLifecycleModel(task, options = {}) {
     },
     {
       key: "payment",
-      label: "Payment Released",
+      label: "Payment released",
       status: settled || refunded ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : settlementReady ? "current" : "pending",
       helper: settlementMessage,
       timestamp: task?.latestSettlement?.settlementTimestamp || timelineByKind.get("settled") || timelineByKind.get("refund_completed") || null,
@@ -579,8 +581,8 @@ export function buildTaskLifecycleModel(task, options = {}) {
       helper: settled
         ? "Agent reputation can now reflect a paid, owner-approved funded outcome."
         : refunded
-          ? "The task is closed and payout reputation stays unchanged or neutral."
-          : "Reputation updates after owner approval and a terminal payout state.",
+          ? "The task is closed and payment reputation stays unchanged or neutral."
+          : "Reputation updates after owner approval and a terminal payment state.",
       timestamp: task?.latestSettlement?.settlementTimestamp || null,
     },
   ];
@@ -653,7 +655,7 @@ export function buildTaskRevisionDisplayModel(task, options = {}) {
       ? "Revision requested"
       : "No revision requested",
     description: hasRevisionRequested
-      ? "Payment remains funded and locked until the owner approves revised work."
+      ? "Payment remains locked until the work is approved."
       : "Revision history will appear here after changes are requested.",
     emptyMessage: "No revision requested. Review actions appear after the agent submits work.",
   };
@@ -696,7 +698,7 @@ export function buildTaskDisputeDisplayModel(task, options = {}) {
       ? "Dispute under review"
       : "No dispute open",
     description: hasOpenDispute
-      ? "Payment remains funded and locked while the dispute is reviewed. No refund or payout is created by this local dispute record."
+      ? "Payment remains locked during dispute. No refund or release happens from this action."
       : "Dispute details will appear here if the owner opens a dispute.",
     emptyMessage: "No dispute open. Use disputes only when approval or revision cannot safely resolve the task.",
   };
@@ -1052,7 +1054,7 @@ function readTaskReward(task) {
 
 function isTaskFundedForEarnings(task) {
   const lifecycle = buildTaskLifecycleModel(task);
-  return !["Not Funded", "Funding Pending", "Unknown"].includes(lifecycle.paymentDisplay.label);
+  return !["Payment not funded", "Waiting for payment update", "Unknown"].includes(lifecycle.paymentDisplay.label);
 }
 
 function isTaskSettledForEarnings(task) {
@@ -1626,13 +1628,13 @@ export function buildReviewPanelModel(task) {
     headline: settlementReady
       ? "This task is ready for Arc Testnet USDC settlement."
         : disputeOpen || finalOutcome === "disputed"
-        ? "A dispute paused payout and opened an escalation path."
+        ? "Payment remains locked during dispute."
         : finalOutcome === "unresolved" || task?.status === "UNRESOLVED"
           ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths."
         : revisionRequested
           ? "The owner requested changes. Payment stays funded and locked until revised work is approved."
           : canReviewSubmittedResult
-            ? (hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether USDC payout moves.")
+            ? (hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether payment can be released.")
         : "Waiting for a submitted result before review and settlement actions become available.",
   };
 }

@@ -46916,7 +46916,7 @@ function statusMessage(error, fallback) {
 }
 function requireWallet(state2) {
   if (!state2.wallet.trim()) {
-    throw new Error("Connect a wallet before continuing.");
+    throw new Error("Connect wallet to continue.");
   }
 }
 function setChrome(el2, eyebrow, title, sidebarTitle, sidebarLead, progress) {
@@ -46938,7 +46938,7 @@ function renderNav(el2, routes2, isActive2, state2) {
     ...secondaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]),
     ...routes2.filter(([path]) => !primaryOrder.includes(path) && !secondaryOrder.includes(path))
   ];
-  const walletLabel = state2.wallet?.trim() ? "Wallet Connected" : "Connect Wallet";
+  const walletLabel = state2.wallet?.trim() ? "Wallet connected" : "Connect wallet";
   el2.routeList.innerHTML = `
     <div class="nav-shell">
       <nav class="desktop-nav" aria-label="Primary">
@@ -46997,8 +46997,8 @@ function renderAppFooter(el2, routes2) {
 }
 function renderTopbar(el2, state2, shortWallet2) {
   const providerLabel = state2.walletProviderLabel || "Wallet";
-  const walletLabel = state2.wallet.trim() ? state2.walletConnectionType === "injected" ? `${providerLabel} ${shortWallet2(state2.wallet)}` : shortWallet2(state2.wallet) : "Connect Wallet";
-  const chainMode = state2.chainStatusError ? "Chain Offline" : !state2.chainConfig ? "Checking Chain" : state2.chainConfig.chainMode === "browser_wallet" ? "Browser Sign" : state2.chainConfig.chainMode === "server_signer_proxy" ? "Server Signer" : "Read Only";
+  const walletLabel = state2.wallet.trim() ? state2.walletConnectionType === "injected" ? `${providerLabel} ${shortWallet2(state2.wallet)}` : shortWallet2(state2.wallet) : "Connect wallet";
+  const chainMode = state2.chainStatusError ? "Chain unavailable" : !state2.chainConfig ? "Checking network" : state2.chainConfig.chainMode === "browser_wallet" ? "Wallet funding" : state2.chainConfig.chainMode === "server_signer_proxy" ? "Server funding" : "Read only";
   el2.topbarActions.innerHTML = `
     <span class="network-pill"><span></span>Arc Testnet</span>
     <button class="wallet-action" data-wallet="open">
@@ -47023,14 +47023,14 @@ function renderWalletSheet({
 }) {
   const providerLabel = walletProviderLabel || "Rabby";
   const walletNetwork = state2.walletNetwork || {};
-  const chainMode = state2.chainStatusError ? "Chain status unavailable" : !state2.chainConfig ? "Checking chain access" : state2.chainConfig.chainMode === "browser_wallet" ? "Browser signing" : state2.chainConfig.chainMode === "server_signer_proxy" ? "Server signer" : "Read only";
+  const chainMode = state2.chainStatusError ? "Arc Testnet is temporarily unavailable" : !state2.chainConfig ? "Checking Arc Testnet" : state2.chainConfig.chainMode === "browser_wallet" ? "Wallet funding" : state2.chainConfig.chainMode === "server_signer_proxy" ? "Server funding" : "Funding unavailable";
   el2.walletSheet.classList.toggle("open", true);
   const networkLabel = walletNetwork.chainId ? walletNetwork.isArcTestnet ? "Arc Testnet" : `Wrong network (${walletNetwork.chainId})` : "Network not checked";
-  const balanceLabel = walletNetwork.usdcBalance == null ? "Balance unavailable" : `${Number(walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} testnet USDC`;
+  const balanceLabel = walletNetwork.usdcBalance == null ? "Balance unavailable" : `${Number(walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`;
   const connected = Boolean(state2.wallet.trim());
   const onArc = Boolean(walletNetwork.isArcTestnet);
   const primaryAction = !connected ? `<button class="hero-primary" type="button" id="connectInjectedWallet" ${walletAvailable ? "" : "disabled"}>${walletAvailable ? "Connect wallet" : "No wallet detected"}</button>` : !onArc ? `<button class="hero-primary" type="button" id="switchArcNetwork">Switch to Arc Testnet</button>` : `<div class="wallet-ready-status" role="status"><span class="wallet-status-dot is-ready"></span><strong>Wallet ready</strong></div>`;
-  const readinessLabel = !connected ? "Connect wallet to continue." : !onArc ? "Switch to Arc Testnet." : walletNetwork.usdcBalance == null ? "Balance unavailable." : "Wallet ready for Dispatch task funding.";
+  const readinessLabel = !connected ? "Connect wallet to continue." : !onArc ? "Switch to Arc Testnet to continue." : walletNetwork.usdcBalance == null ? "Try again after wallet connection updates." : "Wallet ready.";
   el2.walletSheet.innerHTML = `
     <div class="wallet-sheet-backdrop" data-wallet="close"></div>
     <div class="wallet-sheet-panel">
@@ -47039,7 +47039,7 @@ function renderWalletSheet({
         <div>
           <p class="mini-label">Wallet</p>
           <h3>${connected ? "Wallet connected" : "Connect wallet"}</h3>
-          <p class="muted">Use Arc Testnet to fund tasks and release USDC after approval.</p>
+          <p class="muted">Use Arc Testnet to fund tasks and review USDC payments.</p>
         </div>
         <button class="wallet-sheet-close" type="button" data-wallet="close" aria-label="Close wallet panel">${icon("plus", 14)}</button>
       </div>
@@ -47051,7 +47051,7 @@ function renderWalletSheet({
             <span>Wallet</span>
           </div>
           <strong>${connected ? "Connected" : "Not connected"}</strong>
-          <p>${connected ? `${escapeHtml(shortWallet2(state2.wallet))} via ${escapeHtml(providerLabel)}` : `Connect ${escapeHtml(providerLabel)} to start funded work.`}</p>
+          <p>${connected ? `${escapeHtml(shortWallet2(state2.wallet))} via ${escapeHtml(providerLabel)}` : "Connect wallet to continue."}</p>
         </article>
         <article class="wallet-readiness-card">
           <div class="wallet-readiness-card__head">
@@ -47067,7 +47067,7 @@ function renderWalletSheet({
             <span>Funding</span>
           </div>
           <strong>${escapeHtml(balanceLabel)}</strong>
-          <p>${walletNetwork.nativeGasBalance == null ? "Arc Testnet balance appears here when available." : `Gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(void 0, { maximumFractionDigits: 6 }))}`}</p>
+          <p>${walletNetwork.usdcBalance == null ? "Try again after wallet connection updates." : walletNetwork.nativeGasBalance == null ? "Arc Testnet gas balance unavailable." : `Gas: ${escapeHtml(Number(walletNetwork.nativeGasBalance).toLocaleString(void 0, { maximumFractionDigits: 6 }))}`}</p>
         </article>
       </div>
 
@@ -47082,7 +47082,7 @@ function renderWalletSheet({
       </article>
       <div class="wallet-sheet-note">
         <span class="live-dot"></span>
-        <p>Arc Testnet is used for Dispatch task funding and payment review flows. Testnet USDC has no financial value.</p>
+        <p>Arc Testnet is used for Dispatch task funding and payment review flows.</p>
       </div>
     </div>
   `;
@@ -47296,18 +47296,18 @@ function buildTaskLifecycleModel(task, options = {}) {
   const fundingLabel = fundingConfirmed ? "Funded" : fundingPending ? "Funding pending" : fundingFailed ? "Funding failed" : "Awaiting funding";
   const evaluationLabel = settled ? "Approved" : refunded ? "Closed" : disputed ? "Disputed" : unresolved ? "Unresolved" : revisionRequested ? "Revision requested" : rejected ? "Rejected" : approved ? "Approved" : underReview ? "Under review" : submitted ? "Submitted" : executing ? "In progress" : "Awaiting output";
   const settlementLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Settlement paused" : unresolved ? "Review unresolved" : settlementReady ? "Ready for settlement" : refundReady ? "Refund available" : fundingConfirmed ? "Settlement pending" : "Funding required";
-  const currentLabel = settled ? "Payment Released" : completed ? "Completed" : refunded || cancelled ? "Cancelled" : disputed || unresolved ? "Disputed" : settlementReady ? "Approved" : approved ? "Approved" : revisionRequested ? "Revision Requested" : rejected ? "Revision Requested" : underReview ? "In Review" : submitted ? "Submitted" : executing ? "In Progress" : assigned ? "Agent Assigned" : fundingPending ? "Waiting for Funding" : fundingConfirmed ? "Funded" : hasAnyRawStatus ? "Draft" : "Unknown";
-  const settlementMessage = settled ? "Payment released." : refunded ? "Reward refunded." : settlementSummary?.settlementReadinessLabel ? settlementSummary.settlementReadinessLabel : settlementReady ? "Approved. USDC release is ready." : needsRevision ? "Revision requested before payout." : rejected ? "Rejected. Payout not recommended." : disputed ? "Disputed. Payout stays paused." : unresolved ? "Review unresolved. Payout stays paused." : underReview ? "Under evaluator review." : submitted ? "Output submitted and waiting for review." : executing ? "Agent is executing now." : fundingPending ? "Funding is still being confirmed." : fundingConfirmed ? "Task is funded and waiting for the next step." : "Awaiting onchain funding.";
+  const currentLabel = settled ? "Payment released" : completed ? "Completed" : refunded || cancelled ? "Cancelled" : disputed || unresolved ? "Disputed" : settlementReady ? "Approved" : approved ? "Approved" : revisionRequested ? "Revision Requested" : rejected ? "Revision Requested" : underReview ? "In Review" : submitted ? "Submitted" : executing ? "In Progress" : assigned ? "Agent Assigned" : fundingPending ? "Waiting for Funding" : fundingConfirmed ? "Funded" : hasAnyRawStatus ? "Draft" : "Unknown";
+  const settlementMessage = settled ? "Payment released." : refunded ? "Reward refunded." : settlementSummary?.settlementReadinessLabel ? settlementSummary.settlementReadinessLabel : settlementReady ? "Approval is complete. You can release payment." : needsRevision ? "Revision requested before release." : rejected ? "Rejected. Payment remains locked." : disputed ? "Disputed. Payment remains locked." : unresolved ? "Review unresolved. Payment remains locked." : underReview ? "Under evaluator review." : submitted ? "Output submitted and waiting for review." : executing ? "Agent is executing now." : fundingPending ? "Funding is still being confirmed." : fundingConfirmed ? "Task is funded and waiting for the next step." : "Funding required.";
   const amountDisplay = Number.isFinite(Number(task?.rewardAmount)) ? `${Number(task.rewardAmount).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC` : "Not available yet";
   const fundingTxLink = buildArcTransactionLink(task?.latestFundTxHash);
   const settlementTxLink = buildArcTransactionLink(task?.latestSettlement?.txReference);
   const releasePending = Boolean(settlementTxLink) && !settled && !refunded;
-  const paymentStateLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Payment locked" : settlementReady ? "Payment ready" : refundReady ? "Refund ready" : fundingConfirmed ? "USDC funded" : fundingPending ? "Funding syncing" : "Funding required";
+  const paymentStateLabel = settled ? "Payment released" : refunded ? "Reward refunded" : disputed ? "Payment locked during dispute" : settlementReady ? "Ready to release" : refundReady ? "Refund ready" : fundingConfirmed ? "Payment locked" : fundingPending ? "Funding pending" : "Funding required";
   const reviewStateLabel = approved ? "Owner approved" : revisionRequested ? "Revision requested" : rejected ? "Owner rejected" : disputed ? "Disputed" : underReview ? "AI guidance attached" : submitted ? "Needs owner review" : noSubmission ? "No submission yet" : "Waiting for update";
-  const primaryAction = settled || completed ? { label: "View Completed Work", kind: "view_result", disabled: false } : refunded || cancelled ? { label: "View Task", kind: "view_result", disabled: false } : disputed || unresolved ? { label: "View Dispute", kind: "dispute", disabled: false } : settlementReady ? { label: "Release Payment", kind: "settle", disabled: false } : revisionRequested ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : rejected ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : submitted || underReview ? { label: "Review Submission", kind: "review", disabled: false } : executing ? { label: "Waiting for Agent", kind: "wait", disabled: true } : assigned ? { label: "Waiting for Agent", kind: "wait", disabled: true } : fundingConfirmed ? { label: "Assign Agent", kind: "assign", disabled: false } : fundingPending ? { label: "Waiting for Funding", kind: "funding", disabled: true } : { label: "Fund Task", kind: "fund", disabled: false };
+  const primaryAction = settled || completed ? { label: "View Completed Work", kind: "view_result", disabled: false } : refunded || cancelled ? { label: "View Task", kind: "view_result", disabled: false } : disputed || unresolved ? { label: "View Dispute", kind: "dispute", disabled: false } : settlementReady ? { label: "Release payment", kind: "settle", disabled: false } : revisionRequested ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : rejected ? { label: "Waiting for Revision", kind: "wait_revision", disabled: true } : submitted || underReview ? { label: "Review Submission", kind: "review", disabled: false } : executing ? { label: "Waiting for Agent", kind: "wait", disabled: true } : assigned ? { label: "Waiting for Agent", kind: "wait", disabled: true } : fundingConfirmed ? { label: "Assign Agent", kind: "assign", disabled: false } : fundingPending ? { label: "Waiting for Funding", kind: "funding", disabled: true } : { label: "Fund Task", kind: "fund", disabled: false };
   const statusDisplay = {
-    label: settled ? "Payment Released" : completed ? "Completed" : refunded || cancelled ? "Cancelled" : disputed || unresolved ? "Disputed" : settlementReady || approved ? "Approved" : revisionRequested || rejected ? "Revision Requested" : underReview ? "In Review" : submitted ? "Submitted" : executing ? "In Progress" : assigned ? "Agent Assigned" : fundingPending ? "Waiting for Funding" : fundingConfirmed ? "Funded" : hasAnyRawStatus ? "Draft" : "Unknown",
-    description: settled ? "Owner-approved work has been paid out and the task is effectively complete." : completed ? "The task is complete and ready to view as finished work." : refunded || cancelled ? "The task is closed and no normal payment release is available." : disputed || unresolved ? "The task needs dispute or appeal handling before payment can move." : settlementReady || approved ? "The owner approval step is complete and payment release is the next major action." : revisionRequested || rejected ? "The owner requested changes. Payment remains funded and locked until approved." : underReview ? "A submitted result is being reviewed. AI guidance is advisory; the owner decides." : submitted ? "The agent submitted output and the owner needs to review it." : executing ? "The assigned agent is actively working on the funded task." : assigned ? "An agent is assigned and execution is the next step." : fundingPending ? "Funding was started and Dispatch is waiting for Arc Testnet confirmation." : fundingConfirmed ? "The task is funded and ready for assignment or execution." : hasAnyRawStatus ? "The task exists but needs funding before marketplace execution." : "Dispatch cannot determine the current task state yet.",
+    label: settled ? "Payment released" : completed ? "Completed" : refunded || cancelled ? "Cancelled" : disputed || unresolved ? "Disputed" : settlementReady || approved ? "Approved" : revisionRequested || rejected ? "Revision Requested" : underReview ? "In Review" : submitted ? "Submitted" : executing ? "In Progress" : assigned ? "Agent Assigned" : fundingPending ? "Waiting for Funding" : fundingConfirmed ? "Funded" : hasAnyRawStatus ? "Draft" : "Unknown",
+    description: settled ? "Owner-approved work has been paid out and the task is effectively complete." : completed ? "The task is complete and ready to view as finished work." : refunded || cancelled ? "The task is closed and no normal payment release is available." : disputed || unresolved ? "Payment remains locked during dispute." : settlementReady || approved ? "Approval is complete. You can release payment." : revisionRequested || rejected ? "Payment remains locked until the work is approved." : underReview ? "A submitted result is being reviewed. AI guidance is advisory; the owner decides." : submitted ? "The agent submitted output and the owner needs to review it." : executing ? "The assigned agent is actively working on the funded task." : assigned ? "An agent is assigned and execution is the next step." : fundingPending ? "Waiting for payment update." : fundingConfirmed ? "The task is funded and ready for assignment or execution." : hasAnyRawStatus ? "The task exists but needs funding before marketplace execution." : "Dispatch cannot determine the current task state yet.",
     nextActionText: primaryAction.label,
     whoActsNext: settled || completed || refunded || cancelled ? "No action needed" : revisionRequested || rejected ? "Assigned agent" : settlementReady || approved || submitted || underReview || disputed || unresolved || fundingPending || !fundingConfirmed ? "Task owner" : executing || assigned ? "Assigned agent" : "Marketplace",
     primaryCtaText: primaryAction.label,
@@ -47322,9 +47322,9 @@ function buildTaskLifecycleModel(task, options = {}) {
     }
   };
   const paymentDisplay = {
-    label: settled ? "Released" : refunded ? "Refunded" : disputed || unresolved ? "Disputed" : releasePending ? "Release Pending" : settlementReady ? "Ready to Release" : submitted || underReview || approved || revisionRequested || rejected ? "Locked Until Approval" : fundingConfirmed ? "Funded" : fundingPending ? "Funding Pending" : fundingFailed ? "Unknown" : task ? "Not Funded" : "Unknown",
-    description: settled ? "Payment has been released to the agent after owner approval." : refunded ? "The task reward has been refunded instead of released." : disputed ? "Payment remains funded and locked while the dispute is under review." : unresolved ? "Payment is paused while the task is unresolved." : releasePending ? "Transaction submitted. Waiting for confirmation." : settlementReady ? "Work has been approved. Payment is ready to release." : revisionRequested || rejected ? "Payment is funded and locked while the requested changes are pending. Approval is still required before release." : submitted || underReview ? "Payment is funded but locked. The owner must review the submitted work before release." : approved ? "Owner approval is recorded. Payment can move to release." : fundingConfirmed ? "Payment is funded but not released yet." : fundingPending ? "Funding transaction is being confirmed on Arc Testnet." : fundingFailed ? "Funding status is unclear after a failed wallet or chain update." : task ? "This task has not been funded yet." : "Payment state is not available yet.",
-    nextPaymentAction: settled ? "No payment action needed." : refunded ? "No release action is available after refund." : disputed ? "Wait for dispute review before payment can move." : unresolved ? "Resolve the review state before payment can move." : releasePending ? "Wait for Arc Testnet confirmation." : settlementReady ? "Release payment." : revisionRequested || rejected ? "Wait for revised output before approval." : submitted || underReview ? "Review the submitted work." : approved ? "Prepare payment release." : fundingConfirmed ? "Wait for output and owner approval." : fundingPending ? "Wait for funding confirmation." : "Fund the task with testnet USDC.",
+    label: settled ? "Released" : refunded ? "Refunded" : disputed || unresolved ? "Disputed" : releasePending ? "Release pending" : settlementReady ? "Ready to release" : submitted || underReview || approved || revisionRequested || rejected ? revisionRequested || rejected ? "Waiting for changes" : "Payment locked" : fundingConfirmed ? "Payment locked" : fundingPending ? "Waiting for payment update" : fundingFailed ? "Waiting for payment update" : task ? "Payment not funded" : "Waiting for payment update",
+    description: settled ? "USDC payment has been released." : refunded ? "The task reward has been refunded instead of released." : disputed ? "Payment remains locked during dispute." : unresolved ? "Waiting for payment update." : releasePending ? "Waiting for payment update." : settlementReady ? "Approval is complete. You can release payment." : revisionRequested || rejected ? "Payment remains locked until the work is approved." : submitted || underReview ? "Payment only moves after approval." : approved ? "Approval is complete. You can release payment." : fundingConfirmed ? "USDC stays locked until approval." : fundingPending ? "Waiting for payment update." : fundingFailed ? "Waiting for payment update." : task ? "Fund the task before work starts." : "Waiting for payment update.",
+    nextPaymentAction: settled ? "No payment action needed." : refunded ? "No release action is available after refund." : disputed ? "Payment remains locked during dispute." : unresolved ? "Waiting for payment update." : releasePending ? "Waiting for payment update." : settlementReady ? "Release payment." : revisionRequested || rejected ? "Waiting for updated work." : submitted || underReview ? "Review the submitted work." : approved ? "Release becomes available after approval." : fundingConfirmed ? "Waiting for agent submission." : fundingPending ? "Waiting for payment update." : "Fund the task before work starts.",
     variant: settled ? "success" : refunded || disputed || unresolved || fundingFailed ? "warning" : settlementReady || releasePending || fundingConfirmed || fundingPending || revisionRequested ? "info" : "neutral",
     amountDisplay,
     networkDisplay: "Arc Testnet",
@@ -47338,7 +47338,7 @@ function buildTaskLifecycleModel(task, options = {}) {
     ].filter(Boolean)
   };
   const nextActor = statusDisplay.whoActsNext;
-  const nextActionHelper = settled ? "The task is complete. Review the delivered work and payout trail." : completed ? "The task is complete. View the delivered work and final status." : refunded ? "The task is closed and the reward has been refunded." : cancelled ? "The task is closed and no normal marketplace action is available." : disputed || unresolved ? "Open the dispute or appeal view before payment can move." : settlementReady ? "Release USDC payment now that the output is approved." : revisionRequested || rejected ? "Waiting for revised output. Payment remains funded and locked until owner approval." : submitted || underReview ? "Review the submitted output. AI review is guidance; owner approval controls payout." : executing ? "The agent is working. Wait for the submitted output before reviewing." : assigned ? "An agent is assigned. Execution will produce a submitted output next." : fundingConfirmed ? "The task is funded. Dispatch can route it to an agent for execution." : fundingPending ? "Wallet activity was captured. Wait for Arc Testnet confirmation." : "Fund the task with testnet USDC before assignment or execution can begin.";
+  const nextActionHelper = settled ? "The task is complete. Review the delivered work and payment record." : completed ? "The task is complete. View the delivered work and final status." : refunded ? "The task is closed and the reward has been refunded." : cancelled ? "The task is closed and no normal marketplace action is available." : disputed || unresolved ? "Payment remains locked during dispute." : settlementReady ? "Approval is complete. You can release payment." : revisionRequested || rejected ? "Waiting for updated work. Payment remains locked until approval." : submitted || underReview ? "Review the submitted output. Owner approval controls payment release." : executing ? "The agent is working. Wait for the submitted output before reviewing." : assigned ? "An agent is assigned. Execution will produce a submitted output next." : fundingConfirmed ? "The task is funded. USDC stays locked until approval." : fundingPending ? "Waiting for payment update." : "Fund the task before assignment or execution can begin.";
   const reputationLabel = settled ? "Reputation updated" : refunded ? "Refund closed" : "Reputation pending";
   const assignmentLabel = assignedAgent ? `${assignedAgent.displayName} (${assignedAgent.originType === "external" ? "External agent" : "Platform agent"})` : task?.selectedAgentId ? "Assigned agent selected" : participatingAgentIds.length ? `${participatingAgentIds.length} participating agent${participatingAgentIds.length === 1 ? "" : "s"}` : "No agent assigned yet";
   const steps = [
@@ -47353,7 +47353,7 @@ function buildTaskLifecycleModel(task, options = {}) {
       key: "funding",
       label: "Funded",
       status: fundingConfirmed ? "complete" : fundingFailed ? "failed" : fundingPending ? "current" : "pending",
-      helper: fundingConfirmed ? "Funding is confirmed and the task can move through the marketplace." : fundingFailed ? "The latest wallet or chain funding action failed." : fundingPending ? "Wallet signatures were captured and Arc Testnet funding confirmation is still syncing." : "The task needs onchain funding before assignment and execution.",
+      helper: fundingConfirmed ? "Funding is confirmed and the task can move through the marketplace." : fundingFailed ? "The latest wallet or chain funding action failed." : fundingPending ? "Waiting for payment update." : "The task needs funding before assignment and execution.",
       timestamp: timelineByKind.get("escrow_funded") || null
     },
     {
@@ -47381,19 +47381,19 @@ function buildTaskLifecycleModel(task, options = {}) {
       key: "review",
       label: "Review",
       status: approved ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : underReview || submitted ? "current" : "pending",
-      helper: approved ? "The task owner approved the output for settlement." : revisionRequested || rejected ? "The owner requested changes. Payment stays locked until approval." : disputed ? "A dispute paused payout." : unresolved ? "Manual escalation is needed before payout can move." : underReview ? "AI review is guidance. The task owner makes the final approval decision." : submitted ? "The output is waiting for owner review." : "Review starts after submission.",
+      helper: approved ? "The task owner approved the output for settlement." : revisionRequested || rejected ? "The owner requested changes. Payment stays locked until approval." : disputed ? "Payment remains locked during dispute." : unresolved ? "Payment remains locked until review is resolved." : underReview ? "AI review is guidance. The task owner makes the final approval decision." : submitted ? "The output is waiting for owner review." : "Review starts after submission.",
       timestamp: timelineByKind.get("review_started") || timelineByKind.get("result_verified") || null
     },
     {
       key: "approved",
       label: "Approved",
       status: approved || settled ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : submitted || underReview ? "pending" : "pending",
-      helper: approved || settled ? "Owner approval is recorded and payment can move." : revisionRequested || rejected ? "Approval is still required before payment can be released." : "Owner approval happens after reviewing a submitted output.",
+      helper: approved || settled ? "Approval is complete. You can release payment." : revisionRequested || rejected ? "Approval is still required before payment can be released." : "Owner approval happens after reviewing a submitted output.",
       timestamp: timelineByKind.get("approved") || timelineByKind.get("result_verified") || null
     },
     {
       key: "payment",
-      label: "Payment Released",
+      label: "Payment released",
       status: settled || refunded ? "complete" : revisionRequested || rejected || disputed || unresolved ? "warning" : settlementReady ? "current" : "pending",
       helper: settlementMessage,
       timestamp: task?.latestSettlement?.settlementTimestamp || timelineByKind.get("settled") || timelineByKind.get("refund_completed") || null
@@ -47402,7 +47402,7 @@ function buildTaskLifecycleModel(task, options = {}) {
       key: "reputation",
       label: "Completed",
       status: settled || refunded ? "complete" : "pending",
-      helper: settled ? "Agent reputation can now reflect a paid, owner-approved funded outcome." : refunded ? "The task is closed and payout reputation stays unchanged or neutral." : "Reputation updates after owner approval and a terminal payout state.",
+      helper: settled ? "Agent reputation can now reflect a paid, owner-approved funded outcome." : refunded ? "The task is closed and payment reputation stays unchanged or neutral." : "Reputation updates after owner approval and a terminal payment state.",
       timestamp: task?.latestSettlement?.settlementTimestamp || null
     }
   ];
@@ -47456,7 +47456,7 @@ function buildTaskRevisionDisplayModel(task, options = {}) {
     items: normalizedItems,
     latestRequest: normalizedItems[0] || null,
     headline: hasRevisionRequested ? "Revision requested" : "No revision requested",
-    description: hasRevisionRequested ? "Payment remains funded and locked until the owner approves revised work." : "Revision history will appear here after changes are requested.",
+    description: hasRevisionRequested ? "Payment remains locked until the work is approved." : "Revision history will appear here after changes are requested.",
     emptyMessage: "No revision requested. Review actions appear after the agent submits work."
   };
 }
@@ -47488,7 +47488,7 @@ function buildTaskDisputeDisplayModel(task, options = {}) {
     items: normalizedItems,
     latestDispute: normalizedItems[0] || null,
     headline: hasOpenDispute ? "Dispute under review" : "No dispute open",
-    description: hasOpenDispute ? "Payment remains funded and locked while the dispute is reviewed. No refund or payout is created by this local dispute record." : "Dispute details will appear here if the owner opens a dispute.",
+    description: hasOpenDispute ? "Payment remains locked during dispute. No refund or release happens from this action." : "Dispute details will appear here if the owner opens a dispute.",
     emptyMessage: "No dispute open. Use disputes only when approval or revision cannot safely resolve the task."
   };
 }
@@ -47791,7 +47791,7 @@ function readTaskReward(task) {
 }
 function isTaskFundedForEarnings(task) {
   const lifecycle = buildTaskLifecycleModel(task);
-  return !["Not Funded", "Funding Pending", "Unknown"].includes(lifecycle.paymentDisplay.label);
+  return !["Payment not funded", "Waiting for payment update", "Unknown"].includes(lifecycle.paymentDisplay.label);
 }
 function isTaskSettledForEarnings(task) {
   const status = String(task?.status || "").toUpperCase();
@@ -48270,7 +48270,7 @@ function buildReviewPanelModel(task) {
       ...canDispute ? ["dispute"] : [],
       ...canAppeal ? ["appeal"] : []
     ],
-    headline: settlementReady ? "This task is ready for Arc Testnet USDC settlement." : disputeOpen || finalOutcome === "disputed" ? "A dispute paused payout and opened an escalation path." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths." : revisionRequested ? "The owner requested changes. Payment stays funded and locked until revised work is approved." : canReviewSubmittedResult ? hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether USDC payout moves." : "Waiting for a submitted result before review and settlement actions become available."
+    headline: settlementReady ? "This task is ready for Arc Testnet USDC settlement." : disputeOpen || finalOutcome === "disputed" ? "Payment remains locked during dispute." : finalOutcome === "unresolved" || task?.status === "UNRESOLVED" ? "Review is paused for escalation. AI review is guidance; unresolved states should only come from dispute or appeal paths." : revisionRequested ? "The owner requested changes. Payment stays funded and locked until revised work is approved." : canReviewSubmittedResult ? hasEvaluation ? "AI review is attached as guidance. You decide whether to approve or request changes." : "Review the submitted output and decide whether payment can be released." : "Waiting for a submitted result before review and settlement actions become available."
   };
 }
 function buildTaskResultModel(task, executionRuns = []) {
@@ -49099,7 +49099,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                   `).join("") || `
                     <article class="builder-empty-state">
                       <strong>No payment activity yet.</strong>
-                      <p>Approved funded task payments will appear here.</p>
+                      <p>Released task payments will appear here.</p>
                     </article>
                   `}
                 </div>
@@ -49558,8 +49558,8 @@ function renderTaskDetailPageView({
                 <p>${escapeHtml(item.outcome)}</p>
                 ${arcTxLink(item.txReference) ? `<p><a href="${arcTxLink(item.txReference)}" target="_blank" rel="noreferrer">View transaction</a></p>` : ""}
               </article>
-            `).join("") || emptyState("No payout receipts yet. Payment history appears after release or refund.", {
-    title: "No payout receipts yet.",
+            `).join("") || emptyState("No payment activity yet. Payment history appears after release or refund.", {
+    title: "No payment activity yet.",
     body: "Released or refunded payment receipts will appear here."
   })}
           </div>
@@ -50099,7 +50099,7 @@ function renderWalletSheet2(open) {
         updateStatus2("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
         const snapshot = await chainClient.switchWalletToArcTestnet();
         state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
-        updateStatus2("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+        updateStatus2("Arc Testnet ready", "Wallet is connected to Arc Testnet.", "success");
         renderWalletSheet2(true);
         safeRender("Wallet network switch render failed");
       } catch (error) {
@@ -50678,7 +50678,7 @@ async function createTask() {
     requireWallet2();
     const walletSnapshot = await refreshWalletNetworkState();
     if (!walletSnapshot?.isArcTestnet) {
-      throw new Error("Switch to Arc Testnet to fund tasks with testnet USDC.");
+      throw new Error("Switch to Arc Testnet.");
     }
     const walletUsdcBalance = walletSnapshot.usdcBalance == null ? null : Number(walletSnapshot.usdcBalance);
     if (walletUsdcBalance != null && walletUsdcBalance < Number(payload.rewardAmount || 0)) {
@@ -50740,10 +50740,10 @@ async function createTask() {
   } catch (error) {
     let message = statusMessage(error, "Task creation failed");
     if (/Arc writes are disabled|configured Arc RPC|router|RPC/i.test(message)) {
-      message = "Funding is unavailable in this environment.";
+      message = /Arc writes are disabled/i.test(message) ? "Funding is unavailable in this environment." : "Arc Testnet is temporarily unavailable. Try again shortly.";
     }
     if (typeof error?.message === "string" && /wallet balance is too low|not enough USDC/i.test(error.message)) {
-      message = `${error.message} Add testnet USDC before posting this task.`;
+      message = `${error.message} Add USDC before funding this task.`;
     }
     const partialWriteResult = error?.partialWriteResult || null;
     if (partialWriteResult) {
@@ -50858,11 +50858,11 @@ async function renderPostTaskPage() {
     tone: "warning"
   } : chainMode === "unknown" ? {
     title: "Arc Testnet unavailable",
-    body: "Arc Testnet is temporarily unavailable.",
+    body: "Arc Testnet is temporarily unavailable. Try again shortly.",
     tone: "info"
   } : chainStatus && !chainStatus.ok ? {
     title: chainStatus.rpcReachable ? "Arc Testnet requires attention" : "Arc Testnet unavailable",
-    body: chainStatus.diagnostics[0] || (chainStatus.rpcReachable ? `Dispatch expected Arc Testnet${chainStatus.detectedChainId ? ` but detected network ${chainStatus.detectedChainId}` : ""}.` : "Arc Testnet is temporarily unavailable."),
+    body: chainStatus.rpcReachable ? "Switch to Arc Testnet." : "Arc Testnet is temporarily unavailable. Try again shortly.",
     tone: "warning"
   } : null;
   el.appRoot.innerHTML = `
@@ -51026,7 +51026,7 @@ async function renderPostTaskPage() {
               <div><span>Network</span><strong>Arc Testnet</strong></div>
               <div><span>Token</span><strong>USDC</strong></div>
               <div><span>Wallet</span><strong>${walletReady ? shortWallet(state.wallet) : "Required"}</strong></div>
-              <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
+              <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Balance unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
               <div><span>Agent route</span><strong>${state.taskForm.hiringMode === "direct_hire" ? selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose agent" : "Post to marketplace"}</strong></div>
               <div><span>Package</span><strong>${state.taskForm.selectedServicePackage ? escapeHtml(state.taskForm.selectedServicePackage.name) : "Custom task"}</strong></div>
             </div>
@@ -51180,7 +51180,7 @@ async function renderPostTaskPage() {
       updateStatus2("Switching network", "Requesting Arc Testnet in your wallet.", "neutral");
       const snapshot = await chainClient.switchWalletToArcTestnet();
       state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
-      updateStatus2("Arc Testnet ready", "Wallet is connected to Arc Testnet for testnet USDC funding.", "success");
+      updateStatus2("Arc Testnet ready", "Wallet is connected to Arc Testnet.", "success");
       renderPostTaskPage();
     } catch (error) {
       updateStatus2("Network switch failed", statusMessage(error, "Could not switch to Arc Testnet."), "warn");
@@ -51406,7 +51406,7 @@ async function requestRevision(taskId, trigger) {
     persistRevisionRequests();
     updateStatus2(
       "Revision requested",
-      "The request was saved locally. Payment remains funded and locked until the owner approves revised work.",
+      "The request was saved locally. Payment remains locked until the work is approved.",
       "success"
     );
     await renderTaskDetail(taskId);
@@ -51449,7 +51449,7 @@ async function openLocalDispute(taskId, trigger) {
     persistDisputeRecords();
     updateStatus2(
       "Dispute opened",
-      "The dispute was saved locally. Payment remains funded and locked; no refund, payout, or settlement transaction was created.",
+      "The dispute was saved locally. Payment remains locked during dispute.",
       "warn"
     );
     await renderTaskDetail(taskId);

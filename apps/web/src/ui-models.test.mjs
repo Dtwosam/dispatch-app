@@ -559,9 +559,9 @@ test("task lifecycle marks approved funded work as settlement ready before payou
   assert.equal(model.fundingLabel, "Funded");
   assert.equal(model.evaluationLabel, "Approved");
   assert.equal(model.settlementLabel, "Ready for settlement");
-  assert.equal(model.settlementMessage, "Approved. USDC release is ready.");
-  assert.equal(model.paymentStateLabel, "Payment ready");
-  assert.equal(model.primaryAction.label, "Release Payment");
+  assert.equal(model.settlementMessage, "Approval is complete. You can release payment.");
+  assert.equal(model.paymentStateLabel, "Ready to release");
+  assert.equal(model.primaryAction.label, "Release payment");
   assert.equal(model.nextActor, "Task owner");
 });
 
@@ -639,12 +639,12 @@ test("task status display maps raw lifecycle states into user-facing labels", ()
     [
       "approved",
       { taskId: "approved", status: "APPROVED", resultStatus: "approved", transactionState: "accepted", settlementState: "pending_settlement", onchainTaskRef: "0xescrow:approved", reviewActions: ["settle"], timeline: [] },
-      { label: "Approved", cta: "Release Payment", actor: "Task owner", step: "approved" },
+      { label: "Approved", cta: "Release payment", actor: "Task owner", step: "approved" },
     ],
     [
       "released",
       { taskId: "paid", status: "SETTLED", resultStatus: "settled", transactionState: "accepted", settlementState: "settled", onchainTaskRef: "0xescrow:paid", latestSettlement: { outcome: "paid", txReference: null }, reviewActions: [], timeline: [] },
-      { label: "Payment Released", cta: "View Completed Work", actor: "No action needed", step: "payment" },
+      { label: "Payment released", cta: "View Completed Work", actor: "No action needed", step: "payment" },
     ],
     [
       "disputed",
@@ -689,7 +689,7 @@ test("task status display prefers terminal payment evidence over incomplete raw 
     timeline: [],
   });
 
-  assert.equal(model.label, "Payment Released");
+  assert.equal(model.label, "Payment released");
   assert.equal(model.primaryCtaText, "View Completed Work");
   assert.equal(model.actionableBy, "none");
 });
@@ -800,7 +800,7 @@ test("task lifecycle exposes clear owner review action for submitted work", () =
   });
 
   assert.equal(model.reviewStateLabel, "Needs owner review");
-  assert.equal(model.paymentStateLabel, "USDC funded");
+  assert.equal(model.paymentStateLabel, "Payment locked");
   assert.equal(model.primaryAction.label, "Review Submission");
   assert.equal(model.nextActor, "Task owner");
 });
@@ -853,8 +853,8 @@ test("revision requested keeps payment locked and shifts action back to the agen
   assert.equal(lifecycle.reviewStateLabel, "Revision requested");
   assert.equal(lifecycle.primaryAction.label, "Waiting for Revision");
   assert.equal(lifecycle.nextActor, "Assigned agent");
-  assert.equal(payment.label, "Locked Until Approval");
-  assert.match(payment.description, /Approval is still required/);
+  assert.equal(payment.label, "Waiting for changes");
+  assert.equal(payment.description, "Payment remains locked until the work is approved.");
   assert.equal(payment.settlementTxLink, null);
   assert.equal(revisionModel.hasRevisionRequested, true);
   assert.equal(revisionModel.items[0].changeRequest, revision.changeRequest);
@@ -901,10 +901,10 @@ test("local dispute maps task status and payment into locked under-review state"
   const reviewModel = buildReviewPanelModel(task);
 
   assert.equal(lifecycle.statusDisplay.label, "Disputed");
-  assert.equal(lifecycle.paymentStateLabel, "Payment locked");
+  assert.equal(lifecycle.paymentStateLabel, "Payment locked during dispute");
   assert.equal(lifecycle.primaryAction.label, "View Dispute");
   assert.equal(payment.label, "Disputed");
-  assert.match(payment.description, /locked while the dispute is under review/);
+  assert.equal(payment.description, "Payment remains locked during dispute.");
   assert.equal(payment.fundingTxLink, null);
   assert.equal(payment.settlementTxLink, null);
   assert.equal(disputeModel.hasOpenDispute, true);
@@ -959,7 +959,7 @@ test("payment display marks an unfunded task without inventing transaction links
     timeline: [],
   });
 
-  assert.equal(model.label, "Funding Pending");
+  assert.equal(model.label, "Waiting for payment update");
   assert.equal(model.amountDisplay, "10 USDC");
   assert.equal(model.networkDisplay, "Arc Testnet");
   assert.equal(model.fundingTxLink, null);
@@ -979,9 +979,9 @@ test("payment display shows funded work locked until output approval", () => {
     timeline: [],
   });
 
-  assert.equal(model.label, "Funded");
-  assert.equal(model.description, "Payment is funded but not released yet.");
-  assert.equal(model.nextPaymentAction, "Wait for output and owner approval.");
+  assert.equal(model.label, "Payment locked");
+  assert.equal(model.description, "USDC stays locked until approval.");
+  assert.equal(model.nextPaymentAction, "Waiting for agent submission.");
 });
 
 test("payment display shows submitted funded work waiting on owner review", () => {
@@ -997,8 +997,8 @@ test("payment display shows submitted funded work waiting on owner review", () =
     timeline: [],
   });
 
-  assert.equal(model.label, "Locked Until Approval");
-  assert.match(model.description, /owner must review/);
+  assert.equal(model.label, "Payment locked");
+  assert.equal(model.description, "Payment only moves after approval.");
   assert.equal(model.nextPaymentAction, "Review the submitted work.");
 });
 
@@ -1015,8 +1015,8 @@ test("payment display shows approved funded work ready to release", () => {
     timeline: [],
   });
 
-  assert.equal(model.label, "Ready to Release");
-  assert.equal(model.description, "Work has been approved. Payment is ready to release.");
+  assert.equal(model.label, "Ready to release");
+  assert.equal(model.description, "Approval is complete. You can release payment.");
   assert.equal(model.nextPaymentAction, "Release payment.");
 });
 
@@ -1054,9 +1054,9 @@ test("payment display uses safe fallback when amount and state are unknown", () 
     timeline: [],
   });
 
-  assert.equal(model.label, "Not Funded");
+  assert.equal(model.label, "Payment not funded");
   assert.equal(model.amountDisplay, "Not available yet");
-  assert.equal(model.description, "This task has not been funded yet.");
+  assert.equal(model.description, "Fund the task before work starts.");
 });
 
 test("Arc transaction links are only generated for valid hashes", () => {
