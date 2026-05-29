@@ -638,14 +638,14 @@ async function ensureAgentDraftSaved() {
   }
 
   if (!state.agentDraftMeta.draftId) {
-    setAgentDraftSyncState("saving", "Creating a real backend draft for this agent.");
+    setAgentDraftSyncState("saving", "Saving an agent draft.");
     const created = await sendJson("/api/agent-builder/drafts", "POST", payload);
     state.agentDraftMeta.draftId = created.draftId;
-    setAgentDraftSyncState("synced", "Backend draft created and ready for test previews.");
+  setAgentDraftSyncState("synced", "Agent draft saved and ready for testing.");
     return created;
   }
 
-  setAgentDraftSyncState("saving", "Syncing the latest draft changes to the backend.");
+  setAgentDraftSyncState("saving", "Saving the latest draft changes.");
   const updated = await sendJson(`/api/agent-builder/drafts/${encodeURIComponent(state.agentDraftMeta.draftId)}`, "PATCH", {
     currentStep: state.wizardStep,
     identity: payload.identity,
@@ -654,7 +654,7 @@ async function ensureAgentDraftSaved() {
     knowledge: payload.knowledge,
     schemaDefinition: payload.schemaDefinition,
   });
-  setAgentDraftSyncState("synced", "Backend draft updated.");
+  setAgentDraftSyncState("synced", "Agent draft updated.");
   return updated;
 }
 
@@ -666,7 +666,7 @@ async function runAgentDraftTestPreview() {
 
   state.agentDraft.testRun.sampleTask = sampleTask;
   await ensureAgentDraftSaved();
-  setAgentDraftSyncState("testing", "Running a real backend preview for this draft.");
+  setAgentDraftSyncState("testing", "Running a test preview for this draft.");
   const result = await sendJson(`/api/agent-builder/drafts/${encodeURIComponent(state.agentDraftMeta.draftId)}/test-run`, "POST", {
     sampleTask,
     sampleInput: parseOutputExample(state.agentDraft.schema.outputExample),
@@ -679,8 +679,8 @@ async function runAgentDraftTestPreview() {
   setAgentDraftSyncState(
     "synced",
     result.parseValid
-      ? "Backend preview completed successfully."
-      : "Backend preview finished, but the output schema still needs work.",
+      ? "Test completed successfully."
+      : "Test finished, but the output shape still needs work.",
   );
   return result;
 }
@@ -728,7 +728,7 @@ function buildExternalAgentRegistrationPayload() {
 async function verifyExternalAgentOwnerProof() {
   requireWallet();
   state.externalAgentMeta.verificationState = "verifying";
-  state.externalAgentMeta.verificationMessage = "Requesting an ownership challenge from the marketplace.";
+  state.externalAgentMeta.verificationMessage = "Requesting owner wallet verification.";
   const challenge = await sendJson("/api/agent-registry/owner-proof/challenge", "POST", {
     walletAddress: state.wallet,
   });
@@ -755,7 +755,7 @@ async function verifyExternalAgentOwnerProof() {
   }
 
   if (!verification.verified || !verification.proofId) {
-    throw new Error("Wallet ownership could not be verified for this external agent.");
+    throw new Error("Verify owner wallet to continue.");
   }
 
   state.externalAgentMeta.ownerProofId = verification.proofId;
@@ -763,26 +763,26 @@ async function verifyExternalAgentOwnerProof() {
   state.externalAgentMeta.verificationState = "verified";
   state.externalAgentMeta.verificationMessage =
     verification.mode === "development"
-      ? "Wallet ownership verified in development mode for local testing."
-      : "Wallet ownership verified. You can now connect the external agent.";
+      ? "Owner wallet verified in development mode for local testing."
+      : "Owner wallet verified. You can now connect the agent.";
   return verification;
 }
 
 async function connectExternalAgent() {
   requireWallet();
   if (!state.externalAgentMeta.ownerProofId) {
-    throw new Error("Verify wallet ownership before connecting an external agent.");
+    throw new Error("Verify owner wallet to continue.");
   }
   const payload = buildExternalAgentRegistrationPayload();
   if (payload.publicName.length < 2 || payload.description.length < 10) {
     throw new Error("Add a clearer external agent name and description before connecting it.");
   }
   if (!payload.endpointUrl) {
-    throw new Error("Add the external agent endpoint URL before connecting it.");
+    throw new Error("Add endpoint URL to continue.");
   }
 
-  state.externalAgentMeta.compatibilityHeadline = "Registering endpoint and running marketplace checks.";
-  state.externalAgentMeta.compatibilityNotes = ["Submitting the external agent to the registry."];
+  state.externalAgentMeta.compatibilityHeadline = "Connecting agent.";
+  state.externalAgentMeta.compatibilityNotes = ["Submitting the agent endpoint."];
 
   const registryAgent = await sendJson("/api/agent-registry/agents/register", "POST", payload);
   state.externalAgentMeta.registryAgentId = registryAgent.profile.agentId;
@@ -810,13 +810,13 @@ async function connectExternalAgent() {
   });
 
   const notes = [
-    activatedAgent.compatibilityReport?.compatible ? "Compatibility checks passed." : "Compatibility report has open notes.",
-    activatedAgent.healthStatus ? `Health status: ${labelize(activatedAgent.healthStatus)}.` : null,
+    activatedAgent.compatibilityReport?.compatible ? "Compatible." : "Needs review.",
+    activatedAgent.healthStatus ? `Endpoint health: ${labelize(activatedAgent.healthStatus)}.` : null,
     ...(activatedAgent.compatibilityReport?.notes || []),
   ].filter(Boolean);
   state.externalAgentMeta.compatibilityHeadline = activatedAgent.compatibilityReport?.compatible
-    ? "External agent connected and ready for the marketplace."
-    : "External agent connected with follow-up notes.";
+    ? "Agent connected."
+    : "Agent connected with follow-up notes.";
   state.externalAgentMeta.compatibilityNotes = notes;
   await loadMarketData();
   return activatedAgent;
@@ -2058,7 +2058,7 @@ function renderCreateAgent() {
     "Create Agent",
     "Create Agent",
     "Shape a capable marketplace worker without drowning in setup.",
-    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel ready for funded work and owner-approved outcomes.",
+    "Identity, behavior, skills, tools, knowledge, schema, and test previews should feel ready for funded work and owner-approved outcomes.",
     Math.round((state.wizardStep / 7) * 100),
   );
   renderCreateAgentWizardPage({ el, state });
@@ -2126,15 +2126,15 @@ function renderCreateAgent() {
       if (state.wizardStep === 7) {
         burst("publish");
         updateStatus(
-          "Draft saved to backend",
-          "This agent draft now exists in the backend builder flow. Final publish still needs the owner proof and registry step.",
+          "Agent draft saved",
+          "This agent draft is saved. Final listing still needs owner proof and registry setup.",
           "success",
         );
         renderCreateAgent();
         return;
       }
       state.wizardStep += 1;
-      updateStatus("Draft synced", "This step is now saved to the backend draft.", "success");
+      updateStatus("Draft saved", "This step is now saved to the agent draft.", "success");
       renderCreateAgent();
     } catch (error) {
       setAgentDraftSyncState("error", statusMessage(error, "Could not save the agent draft."));
@@ -2170,13 +2170,13 @@ function renderCreateAgent() {
 
   document.getElementById("runTest")?.addEventListener("click", async (event) => {
     try {
-      setButtonLoading(event.currentTarget, true, "Running preview");
+      setButtonLoading(event.currentTarget, true, "Running test");
       const result = await runAgentDraftTestPreview();
       updateStatus(
-        "Backend preview complete",
+        "Test complete",
         result.parseValid
-          ? "The draft produced a valid backend preview."
-          : "The preview ran, but the schema still needs tightening before publish.",
+          ? "The draft produced a valid test result."
+          : "The test ran, but the output shape still needs work before publishing.",
         result.parseValid ? "success" : "warn",
       );
       renderCreateAgent();
@@ -2184,9 +2184,9 @@ function renderCreateAgent() {
       state.agentDraft.testRun.result = null;
       state.agentDraft.testRun.latencyMs = null;
       state.agentDraft.testRun.valid = false;
-      state.agentDraft.testRun.error = statusMessage(error, "The backend preview failed.");
+      state.agentDraft.testRun.error = statusMessage(error, "Test failed. Check the instructions and try again.");
       setAgentDraftSyncState("error", state.agentDraft.testRun.error);
-      updateStatus("Preview failed", state.agentDraft.testRun.error, "warn");
+      updateStatus("Test failed", state.agentDraft.testRun.error, "warn");
       renderCreateAgent();
     } finally {
       setButtonLoading(event.currentTarget, false);
@@ -2199,7 +2199,7 @@ function renderConnectExternalAgent() {
     "Connect External Agent",
     "Connect External Agent",
     "Bring an endpoint-backed worker into the funded marketplace cleanly.",
-    "Verify ownership, register the endpoint, and let Dispatch run compatibility checks for structured funded work, including adapter-based interoperability.",
+    "Describe the agent, add its endpoint, verify owner wallet, and connect it for funded work.",
     84,
   );
   renderConnectExternalAgentPage({ el, state });

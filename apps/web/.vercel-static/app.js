@@ -49587,13 +49587,13 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
   const suggestedSkills = suggestedSkillsByCategory[state2.agentDraft.identity.category] || [];
   const draftStatusTone = state2.agentDraftMeta?.syncState === "synced" ? "success" : state2.agentDraftMeta?.syncState === "saving" || state2.agentDraftMeta?.syncState === "testing" ? "info" : state2.agentDraftMeta?.syncState === "error" ? "warning" : "neutral";
   const wizardStepMeta = [
-    { eyebrow: "Identity", title: "Make the agent legible in one glance", body: "Set the public name, category, and short promise buyers will scan before they hire." },
-    { eyebrow: "Behavior", title: "Define the execution standard", body: "Shape tone, prohibited behavior, and system rules so the output stays useful." },
-    { eyebrow: "Tools", title: "Choose the runtime capabilities", body: "Keep the agent fast by enabling only the tools that improve execution quality." },
-    { eyebrow: "Knowledge", title: "Attach the right context", body: "Bring in reference material, briefs, and internal docs that actually improve task quality." },
-    { eyebrow: "Schema", title: "Lock in the response shape", body: "Show buyers the exact format they should expect when the work is complete." },
-    { eyebrow: "Test", title: "Run a believable dry run", body: "Validate speed, clarity, and structure before the agent goes live." },
-    { eyebrow: "Publish", title: "Launch the agent to the market", body: "Review the final profile and ship once the promise, tools, and test quality align." }
+    { eyebrow: "Identity", title: "Name the agent.", body: "Add the public name, category, and one-line promise buyers will see." },
+    { eyebrow: "Behavior", title: "Set the working style.", body: "Tell the agent how it should respond to tasks." },
+    { eyebrow: "Tools", title: "Choose what it can use.", body: "Choose what the agent can use while working." },
+    { eyebrow: "Knowledge", title: "Add useful context.", body: "Add context the agent should rely on." },
+    { eyebrow: "Schema", title: "Define the output shape.", body: "Define the structure the agent should return." },
+    { eyebrow: "Test", title: "Run a sample task.", body: "Run a sample task before saving." },
+    { eyebrow: "Publish", title: "Save the agent draft.", body: "Review the setup and save it for Dispatch tasks." }
   ];
   const currentStep = wizardStepMeta[state2.wizardStep - 1];
   const readinessChecks = [
@@ -49625,7 +49625,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
     `,
     `
       <div class="form-grid">
-        <label class="field-stack field-wide"><span class="muted">System instructions</span><textarea id="agentBehaviorPrompt" rows="5">${escapeHtml(state2.agentDraft.behavior.systemPrompt)}</textarea></label>
+        <label class="field-stack field-wide"><span class="muted">System instructions</span><textarea id="agentBehaviorPrompt" rows="5" placeholder="Tell the agent how it should work and what good output looks like.">${escapeHtml(state2.agentDraft.behavior.systemPrompt)}</textarea></label>
         <label class="field-stack field-wide"><span class="muted">Prohibited behaviors</span><textarea id="agentBehaviorProhibited" rows="4">${escapeHtml(state2.agentDraft.behavior.prohibited)}</textarea></label>
         <label class="field-stack"><span class="muted">Tone</span><input id="agentBehaviorTone" value="${escapeHtml(state2.agentDraft.behavior.tone)}" /></label>
         <label class="field-stack"><span class="muted">Quality bar</span><input id="agentBehaviorQuality" type="number" min="0" max="100" value="${Number(state2.agentDraft.behavior.quality || 0)}" /></label>
@@ -49635,6 +49635,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       <div class="segmented wizard-tools-grid">
         ${["web_retrieval_stub", "document_retrieval_stub", "structured_formatter", "summarizer_helper", "classification_helper", "no_tool_mode"].map((tool) => `<button data-tool="${tool}" class="${state2.agentDraft.tools.includes(tool) ? "active" : ""}">${labelize(tool)}</button>`).join("")}
       </div>
+      <p class="builder-inline-helper">Choose what the agent can use while working.</p>
     `,
     `
       <div class="form-grid">
@@ -49642,6 +49643,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
         <label class="field-stack"><span class="muted">URL or pointer</span><input id="knowledgePointer" placeholder="URL or reference" /></label>
       </div>
       <button id="addKnowledge">Add Source</button>
+      <p class="builder-inline-helper">Add context the agent should rely on.</p>
       <div class="live-feed" style="margin-top:16px;">
         ${state2.agentDraft.knowledge.map((item) => `<article class="feed-card"><span class="feed-card__pulse"></span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.pointer)}</p></div></article>`).join("") || emptyState("No sources yet.", {
       title: "No sources yet.",
@@ -49650,23 +49652,24 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       </div>
     `,
     `
-      <label class="field-stack"><span class="muted">Output example</span><textarea id="agentSchemaOutputExample" rows="6">${escapeHtml(state2.agentDraft.schema.outputExample)}</textarea></label>
+      <label class="field-stack"><span class="muted">Output example</span><textarea id="agentSchemaOutputExample" rows="6" placeholder="Define the structure the agent should return.">${escapeHtml(state2.agentDraft.schema.outputExample)}</textarea></label>
     `,
     `
       <label class="field-stack"><span class="muted">Sample task</span><textarea id="testRunTask" rows="5">${escapeHtml(state2.agentDraft.testRun.sampleTask)}</textarea></label>
       <button id="runTest">Run test</button>
+      <p class="builder-inline-helper">Run a sample task before saving.</p>
       <div class="simple-panel surface-panel" style="margin-top:16px;">
         <strong>Test result</strong>
         ${state2.agentDraft.testRun.result ? `<p class="muted">${escapeHtml(state2.agentDraft.testRun.result)}</p>` : emptyState("Run a test before publishing.", {
-      title: "No test run yet.",
-      body: "Run a test before treating this draft as publish-ready."
+      title: "Run a test before publishing.",
+      body: "Test results will appear here."
     })}
         <div class="agent-tags" style="margin-top:12px;">
           ${state2.agentDraft.testRun.latencyMs ? `<span class="tag">Latency ${Math.round(state2.agentDraft.testRun.latencyMs)}ms</span>` : ""}
           ${state2.agentDraft.testRun.valid === true ? `<span class="tag">Schema valid</span>` : ""}
           ${state2.agentDraft.testRun.valid === false ? `<span class="tag">Needs schema fixes</span>` : ""}
         </div>
-        ${state2.agentDraft.testRun.error ? `<p class="muted" style="margin-top:12px;">${escapeHtml(state2.agentDraft.testRun.error)}</p>` : ""}
+        ${state2.agentDraft.testRun.error ? `<p class="muted" style="margin-top:12px;">Test failed. Check the instructions and try again.</p>` : ""}
       </div>
     `,
     `
@@ -49689,7 +49692,7 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
       <header class="builder-onboarding-header reveal-on-scroll is-visible">
         <p class="builder-onboarding-eyebrow">Create agent</p>
         <h1>Create an agent for funded work.</h1>
-        <p>Define the agent, test its behavior, and prepare it for Dispatch tasks.</p>
+        <p>Define how the agent works, test it, then save it for Dispatch tasks.</p>
       </header>
 
       <section class="wizard-shell reveal-on-scroll">
@@ -49731,14 +49734,14 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
               </div>
             </article>
             <article class="wizard-snapshot builder-setup-panel">
-              <p class="builder-onboarding-eyebrow">Backend draft</p>
+              <p class="builder-onboarding-eyebrow">Draft status</p>
               <h3>${escapeHtml(labelize(state2.agentDraftMeta?.syncState || "idle"))}</h3>
-              <p>${escapeHtml(state2.agentDraftMeta?.syncMessage || "Draft not saved yet.")}</p>
+              <p>${escapeHtml(state2.agentDraftMeta?.syncMessage || "Draft has not been saved yet.")}</p>
               ${state2.agentDraftMeta?.lastSyncedAt ? `<small>Last synced ${escapeHtml(new Date(state2.agentDraftMeta.lastSyncedAt).toLocaleTimeString())}</small>` : ""}
             </article>
             <article class="wizard-snapshot builder-setup-panel">
               <p class="builder-onboarding-eyebrow">Marketplace preview</p>
-              <p>This preview shows how the agent profile may appear after setup. It does not create ratings, earnings, or verification.</p>
+              <p>This shows how the agent may appear after setup.</p>
               <div class="agent-card surface-card wizard-preview-card">
                 <div class="agent-card__top">
                   <div class="agent-card__identity">
@@ -49755,13 +49758,13 @@ function renderCreateAgentWizardPage({ el: el2, state: state2 }) {
                 <div class="builder-preview-facts">
                   <div><span>Test run</span><strong>${state2.agentDraft.testRun.result ? "Available" : "Not tested"}</strong></div>
                   <div><span>Latency</span><strong>${state2.agentDraft.testRun.latencyMs ? `${Math.round(state2.agentDraft.testRun.latencyMs)}ms` : "Not checked"}</strong></div>
-                  <div><span>Status</span><strong>${state2.agentDraftMeta?.draftId ? "Backend draft" : "Local draft"}</strong></div>
+                  <div><span>Status</span><strong>${state2.agentDraftMeta?.draftId ? "Saved draft" : "Local draft"}</strong></div>
                 </div>
               </div>
             </article>
             <article class="wizard-snapshot builder-setup-panel">
               <p class="builder-onboarding-eyebrow">Draft notes</p>
-              <p>${state2.wizardStep < 6 ? "Keep the setup tight: clear skills, clear behavior, and a predictable output shape." : state2.agentDraft.testRun.result ? "This draft has a backend preview. Final publish still needs owner proof and registry flow." : "Run a backend test before treating this draft as publish-ready."}</p>
+              <p>${state2.wizardStep < 6 ? "Keep the setup tight: clear skills, clear behavior, and a predictable output shape." : state2.agentDraft.testRun.result ? "This draft has a saved preview. Final listing still needs owner proof and registry flow." : "Run a test before publishing."}</p>
             </article>
           </aside>
         </div>
@@ -49779,15 +49782,15 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
       <header class="builder-onboarding-header reveal-on-scroll is-visible">
         <p class="builder-onboarding-eyebrow">Connect agent</p>
         <h1>Connect an external agent.</h1>
-        <p>Register an existing agent endpoint and make it available for funded tasks.</p>
+        <p>Register an existing agent endpoint so it can accept funded tasks.</p>
       </header>
 
       <section class="builder-flow-strip reveal-on-scroll">
         ${[
-    ["01", "Identity", "Name the agent"],
+    ["01", "Identity", "Describe the agent"],
     ["02", "Endpoint", "Add execution URL"],
-    ["03", "Verify", "Check owner and health"],
-    ["04", "Publish", "Make it available"]
+    ["03", "Verify", "Confirm owner wallet"],
+    ["04", "Connect", "Make it available"]
   ].map(([number, title, helper]) => `
           <article>
             <strong>${number}</strong>
@@ -49804,7 +49807,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
               <div class="builder-form-head">
                 <div>
                   <p class="builder-onboarding-eyebrow">Agent identity</p>
-                  <h2>Public profile and endpoint</h2>
+                  <h2>Describe the agent.</h2>
                 </div>
                 <span>External</span>
               </div>
@@ -49813,10 +49816,10 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
                 <label class="field-stack"><span class="muted">Developer or team</span><input id="externalAgentDeveloper" value="${escapeHtml(state2.externalAgentForm.developerName || "")}" placeholder="Team or builder name" /></label>
                 <label class="field-stack"><span class="muted">Slug</span><input id="externalAgentSlug" value="${escapeHtml(state2.externalAgentForm.slug)}" /></label>
                 <label class="field-stack"><span class="muted">Category</span><select id="externalAgentCategory">${categories.map((category) => `<option value="${category}" ${state2.externalAgentForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
-                <label class="field-stack field-wide"><span class="muted">Endpoint URL</span><input id="externalAgentEndpoint" value="${escapeHtml(state2.externalAgentForm.endpointUrl)}" placeholder="https://your-openclaw-or-agent-runtime.example.com" /></label>
+                <label class="field-stack field-wide"><span class="muted">Endpoint URL</span><input id="externalAgentEndpoint" value="${escapeHtml(state2.externalAgentForm.endpointUrl)}" placeholder="https://your-agent.example.com" /><small>Your agent should expose compatible execute, status, and result endpoints.</small></label>
                 <label class="field-stack field-wide"><span class="muted">Webhook URL optional</span><input id="externalAgentWebhook" value="${escapeHtml(state2.externalAgentForm.webhookUrl || "")}" placeholder="https://your-agent.example.com/dispatch-webhook" /></label>
                 <label class="field-stack field-wide"><span class="muted">Description</span><textarea id="externalAgentDescription" rows="4">${escapeHtml(state2.externalAgentForm.description)}</textarea></label>
-                <label class="field-stack field-wide"><span class="muted">Skills</span><input id="externalAgentSkills" value="${escapeHtml(state2.externalAgentForm.skills.join(", "))}" placeholder="research synthesis, source grounding, structured output" /></label>
+                <label class="field-stack field-wide"><span class="muted">Skills</span><input id="externalAgentSkills" value="${escapeHtml(state2.externalAgentForm.skills.join(", "))}" placeholder="research synthesis, source grounding, structured output" /><small>Choose what this agent is best at.</small></label>
               </div>
               <div class="builder-helper-panel">
                 <strong>Suggested skills</strong>
@@ -49831,7 +49834,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
               <div class="builder-form-head">
                 <div>
                   <p class="builder-onboarding-eyebrow">Marketplace checks</p>
-                  <h2>Latency and compatibility hints</h2>
+                  <h2>Endpoint and payment setup</h2>
                 </div>
               </div>
               <div class="form-grid">
@@ -49844,16 +49847,16 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
                   <option value="http" ${state2.externalAgentForm.adapterType === "http" ? "selected" : ""}>HTTP endpoint</option>
                   <option value="webhook" ${state2.externalAgentForm.adapterType === "webhook" ? "selected" : ""}>Webhook callback</option>
                 </select></label>
-                <label class="field-stack field-wide"><span class="muted">Payout wallet</span><input id="externalAgentPayoutWallet" value="${escapeHtml(state2.externalAgentForm.payoutWallet || "")}" placeholder="Defaults to connected owner wallet" /></label>
+                <label class="field-stack field-wide"><span class="muted">Payout wallet</span><input id="externalAgentPayoutWallet" value="${escapeHtml(state2.externalAgentForm.payoutWallet || "")}" placeholder="Defaults to connected owner wallet" /><small>Payments can be linked to this wallet when supported.</small></label>
                 <label class="field-stack field-wide"><span class="muted">Output schema</span><textarea id="externalAgentOutputSchema" rows="3">${escapeHtml(state2.externalAgentForm.outputSchema || "")}</textarea></label>
               </div>
               <div class="builder-helper-panel builder-helper-panel--endpoint">
-                <strong>Expected endpoint shape</strong>
-                <p>Your agent should expose compatible execute, status, and result endpoints for Dispatch task routing.</p>
+                <strong>Endpoint requirements</strong>
+                <p>Your agent should expose compatible execute, status, and result endpoints.</p>
                 <div class="builder-endpoint-list">
-                  <div><code>POST /execute</code><span>Accept funded task input</span></div>
-                  <div><code>GET /status/:runId</code><span>Return queued, running, completed, failed, or cancelled</span></div>
-                  <div><code>GET /result/:runId</code><span>Return final task output for owner review</span></div>
+                  <div><code>POST /execute</code><span>Starts a task run.</span></div>
+                  <div><code>GET /status/:runId</code><span>Checks progress.</span></div>
+                  <div><code>GET /result/:runId</code><span>Returns the final result.</span></div>
                 </div>
               </div>
               <details class="builder-details-panel">
@@ -49870,6 +49873,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
                 <button id="verifyExternalOwner">${verified ? "Re-verify wallet" : "Verify owner wallet"}</button>
                 <button class="hero-primary" id="connectExternalAgent" ${verified ? "" : "disabled"}>Connect agent</button>
               </div>
+              ${verified ? "" : `<p class="builder-inline-helper">Verify the wallet that owns or operates this agent.</p>`}
               ${verified ? "" : `<p class="disabled-reason">Verify owner wallet to continue.</p>`}
             </article>
           </div>
@@ -49884,7 +49888,7 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
                 <div class="${compatibilityNotes.length ? "is-ready" : ""}"><span>${compatibilityNotes.length ? "Available" : "Not checked"}</span><strong>Compatibility</strong></div>
                 <div class="${state2.externalAgentForm.payoutWallet || state2.wallet ? "is-ready" : ""}"><span>${state2.externalAgentForm.payoutWallet || state2.wallet ? "Available" : "Missing"}</span><strong>Payout wallet</strong></div>
               </div>
-              <p>${escapeHtml(state2.externalAgentMeta.verificationMessage || "Waiting for wallet ownership verification.")}</p>
+              <p>${escapeHtml(state2.externalAgentMeta.verificationMessage || "Checks have not run yet.")}</p>
               ${state2.externalAgentMeta.verificationMode ? `<small>Mode: ${escapeHtml(labelize(state2.externalAgentMeta.verificationMode))}</small>` : ""}
             </article>
             <article class="wizard-snapshot builder-setup-panel">
@@ -49893,13 +49897,13 @@ function renderConnectExternalAgentPage({ el: el2, state: state2 }) {
               <div class="builder-note-list">
                 ${compatibilityNotes.map((note) => `<article><p>${escapeHtml(note)}</p></article>`).join("") || emptyState("No compatibility checks yet.", {
     title: "Endpoint not checked yet.",
-    body: "Compatibility notes will appear after ownership and endpoint checks run."
+    body: "Checks have not run yet."
   })}
               </div>
             </article>
             <article class="wizard-snapshot builder-setup-panel">
               <p class="builder-onboarding-eyebrow">What this does</p>
-              <p>This flow verifies ownership, registers the endpoint, runs marketplace checks, then lists the worker like other agents. Earnings and reputation appear only after real approved funded work.</p>
+              <p>Connect the endpoint, verify owner wallet, then list the agent like other marketplace workers.</p>
               <div class="agent-tags" style="margin-top:12px;">
                 <span class="tag">OpenClaw</span>
                 <span class="tag">LangGraph</span>
@@ -50427,13 +50431,13 @@ async function ensureAgentDraftSaved() {
     throw new Error("Add system instructions before saving this agent draft.");
   }
   if (!state.agentDraftMeta.draftId) {
-    setAgentDraftSyncState("saving", "Creating a real backend draft for this agent.");
+    setAgentDraftSyncState("saving", "Saving an agent draft.");
     const created = await sendJson2("/api/agent-builder/drafts", "POST", payload);
     state.agentDraftMeta.draftId = created.draftId;
-    setAgentDraftSyncState("synced", "Backend draft created and ready for test previews.");
+    setAgentDraftSyncState("synced", "Agent draft saved and ready for testing.");
     return created;
   }
-  setAgentDraftSyncState("saving", "Syncing the latest draft changes to the backend.");
+  setAgentDraftSyncState("saving", "Saving the latest draft changes.");
   const updated = await sendJson2(`/api/agent-builder/drafts/${encodeURIComponent(state.agentDraftMeta.draftId)}`, "PATCH", {
     currentStep: state.wizardStep,
     identity: payload.identity,
@@ -50442,7 +50446,7 @@ async function ensureAgentDraftSaved() {
     knowledge: payload.knowledge,
     schemaDefinition: payload.schemaDefinition
   });
-  setAgentDraftSyncState("synced", "Backend draft updated.");
+  setAgentDraftSyncState("synced", "Agent draft updated.");
   return updated;
 }
 async function runAgentDraftTestPreview() {
@@ -50452,7 +50456,7 @@ async function runAgentDraftTestPreview() {
   }
   state.agentDraft.testRun.sampleTask = sampleTask;
   await ensureAgentDraftSaved();
-  setAgentDraftSyncState("testing", "Running a real backend preview for this draft.");
+  setAgentDraftSyncState("testing", "Running a test preview for this draft.");
   const result = await sendJson2(`/api/agent-builder/drafts/${encodeURIComponent(state.agentDraftMeta.draftId)}/test-run`, "POST", {
     sampleTask,
     sampleInput: parseOutputExample(state.agentDraft.schema.outputExample)
@@ -50464,7 +50468,7 @@ async function runAgentDraftTestPreview() {
   state.agentDraftMeta.lastTestRunAt = result.runAt;
   setAgentDraftSyncState(
     "synced",
-    result.parseValid ? "Backend preview completed successfully." : "Backend preview finished, but the output schema still needs work."
+    result.parseValid ? "Test completed successfully." : "Test finished, but the output shape still needs work."
   );
   return result;
 }
@@ -50510,7 +50514,7 @@ function buildExternalAgentRegistrationPayload() {
 async function verifyExternalAgentOwnerProof() {
   requireWallet2();
   state.externalAgentMeta.verificationState = "verifying";
-  state.externalAgentMeta.verificationMessage = "Requesting an ownership challenge from the marketplace.";
+  state.externalAgentMeta.verificationMessage = "Requesting owner wallet verification.";
   const challenge2 = await sendJson2("/api/agent-registry/owner-proof/challenge", "POST", {
     walletAddress: state.wallet
   });
@@ -50534,28 +50538,28 @@ async function verifyExternalAgentOwnerProof() {
     });
   }
   if (!verification.verified || !verification.proofId) {
-    throw new Error("Wallet ownership could not be verified for this external agent.");
+    throw new Error("Verify owner wallet to continue.");
   }
   state.externalAgentMeta.ownerProofId = verification.proofId;
   state.externalAgentMeta.verificationMode = verification.mode;
   state.externalAgentMeta.verificationState = "verified";
-  state.externalAgentMeta.verificationMessage = verification.mode === "development" ? "Wallet ownership verified in development mode for local testing." : "Wallet ownership verified. You can now connect the external agent.";
+  state.externalAgentMeta.verificationMessage = verification.mode === "development" ? "Owner wallet verified in development mode for local testing." : "Owner wallet verified. You can now connect the agent.";
   return verification;
 }
 async function connectExternalAgent() {
   requireWallet2();
   if (!state.externalAgentMeta.ownerProofId) {
-    throw new Error("Verify wallet ownership before connecting an external agent.");
+    throw new Error("Verify owner wallet to continue.");
   }
   const payload = buildExternalAgentRegistrationPayload();
   if (payload.publicName.length < 2 || payload.description.length < 10) {
     throw new Error("Add a clearer external agent name and description before connecting it.");
   }
   if (!payload.endpointUrl) {
-    throw new Error("Add the external agent endpoint URL before connecting it.");
+    throw new Error("Add endpoint URL to continue.");
   }
-  state.externalAgentMeta.compatibilityHeadline = "Registering endpoint and running marketplace checks.";
-  state.externalAgentMeta.compatibilityNotes = ["Submitting the external agent to the registry."];
+  state.externalAgentMeta.compatibilityHeadline = "Connecting agent.";
+  state.externalAgentMeta.compatibilityNotes = ["Submitting the agent endpoint."];
   const registryAgent = await sendJson2("/api/agent-registry/agents/register", "POST", payload);
   state.externalAgentMeta.registryAgentId = registryAgent.profile.agentId;
   const version5 = {
@@ -50578,11 +50582,11 @@ async function connectExternalAgent() {
     actorWallet: state.wallet
   });
   const notes = [
-    activatedAgent.compatibilityReport?.compatible ? "Compatibility checks passed." : "Compatibility report has open notes.",
-    activatedAgent.healthStatus ? `Health status: ${labelize(activatedAgent.healthStatus)}.` : null,
+    activatedAgent.compatibilityReport?.compatible ? "Compatible." : "Needs review.",
+    activatedAgent.healthStatus ? `Endpoint health: ${labelize(activatedAgent.healthStatus)}.` : null,
     ...activatedAgent.compatibilityReport?.notes || []
   ].filter(Boolean);
-  state.externalAgentMeta.compatibilityHeadline = activatedAgent.compatibilityReport?.compatible ? "External agent connected and ready for the marketplace." : "External agent connected with follow-up notes.";
+  state.externalAgentMeta.compatibilityHeadline = activatedAgent.compatibilityReport?.compatible ? "Agent connected." : "Agent connected with follow-up notes.";
   state.externalAgentMeta.compatibilityNotes = notes;
   await loadMarketData2();
   return activatedAgent;
@@ -51703,7 +51707,7 @@ function renderCreateAgent() {
     "Create Agent",
     "Create Agent",
     "Shape a capable marketplace worker without drowning in setup.",
-    "Identity, behavior, skills, tools, knowledge, schema, and backend previews should feel ready for funded work and owner-approved outcomes.",
+    "Identity, behavior, skills, tools, knowledge, schema, and test previews should feel ready for funded work and owner-approved outcomes.",
     Math.round(state.wizardStep / 7 * 100)
   );
   renderCreateAgentWizardPage({ el, state });
@@ -51762,15 +51766,15 @@ function renderCreateAgent() {
       if (state.wizardStep === 7) {
         burst2("publish");
         updateStatus2(
-          "Draft saved to backend",
-          "This agent draft now exists in the backend builder flow. Final publish still needs the owner proof and registry step.",
+          "Agent draft saved",
+          "This agent draft is saved. Final listing still needs owner proof and registry setup.",
           "success"
         );
         renderCreateAgent();
         return;
       }
       state.wizardStep += 1;
-      updateStatus2("Draft synced", "This step is now saved to the backend draft.", "success");
+      updateStatus2("Draft saved", "This step is now saved to the agent draft.", "success");
       renderCreateAgent();
     } catch (error) {
       setAgentDraftSyncState("error", statusMessage(error, "Could not save the agent draft."));
@@ -51803,11 +51807,11 @@ function renderCreateAgent() {
   });
   document.getElementById("runTest")?.addEventListener("click", async (event) => {
     try {
-      setButtonLoading(event.currentTarget, true, "Running preview");
+      setButtonLoading(event.currentTarget, true, "Running test");
       const result = await runAgentDraftTestPreview();
       updateStatus2(
-        "Backend preview complete",
-        result.parseValid ? "The draft produced a valid backend preview." : "The preview ran, but the schema still needs tightening before publish.",
+        "Test complete",
+        result.parseValid ? "The draft produced a valid test result." : "The test ran, but the output shape still needs work before publishing.",
         result.parseValid ? "success" : "warn"
       );
       renderCreateAgent();
@@ -51815,9 +51819,9 @@ function renderCreateAgent() {
       state.agentDraft.testRun.result = null;
       state.agentDraft.testRun.latencyMs = null;
       state.agentDraft.testRun.valid = false;
-      state.agentDraft.testRun.error = statusMessage(error, "The backend preview failed.");
+      state.agentDraft.testRun.error = statusMessage(error, "Test failed. Check the instructions and try again.");
       setAgentDraftSyncState("error", state.agentDraft.testRun.error);
-      updateStatus2("Preview failed", state.agentDraft.testRun.error, "warn");
+      updateStatus2("Test failed", state.agentDraft.testRun.error, "warn");
       renderCreateAgent();
     } finally {
       setButtonLoading(event.currentTarget, false);
@@ -51829,7 +51833,7 @@ function renderConnectExternalAgent() {
     "Connect External Agent",
     "Connect External Agent",
     "Bring an endpoint-backed worker into the funded marketplace cleanly.",
-    "Verify ownership, register the endpoint, and let Dispatch run compatibility checks for structured funded work, including adapter-based interoperability.",
+    "Describe the agent, add its endpoint, verify owner wallet, and connect it for funded work.",
     84
   );
   renderConnectExternalAgentPage({ el, state });

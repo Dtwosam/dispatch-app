@@ -3354,6 +3354,14 @@ button[data-open-dispute] {
   font-weight: 650;
 }
 
+.builder-onboarding-page .field-stack small,
+.builder-inline-helper {
+  margin: 0;
+  color: #9bb1c5;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .builder-onboarding-page input,
 .builder-onboarding-page select,
 .builder-onboarding-page textarea {
