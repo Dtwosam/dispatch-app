@@ -2417,6 +2417,12 @@ button[data-open-dispute] {
   background: rgba(9, 25, 42, 0.66);
 }
 
+.task-decision-panel.has-primary-action,
+.task-payment-panel.has-primary-action {
+  border-color: rgba(142, 255, 240, 0.16);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.18);
+}
+
 .task-section-head {
   display: flex;
   align-items: flex-start;
@@ -2436,6 +2442,14 @@ button[data-open-dispute] {
   font-size: 0.75rem;
   font-weight: 650;
   white-space: nowrap;
+}
+
+.task-section-head p:not(.task-detail-eyebrow) {
+  max-width: 420px;
+  margin: 8px 0 0;
+  color: #9bb1c5;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .task-result-meta {
@@ -2552,10 +2566,18 @@ button[data-open-dispute] {
 }
 
 .task-detail-details summary {
+  display: grid;
+  gap: 5px;
   cursor: pointer;
   color: #f4fbff;
   font-weight: 700;
   list-style: none;
+}
+
+.task-detail-details summary small {
+  color: #6f879d;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .task-detail-details summary::-webkit-details-marker {
@@ -2593,6 +2615,33 @@ button[data-open-dispute] {
   font-size: 0.8rem;
 }
 
+.task-review-status {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.task-review-status strong {
+  color: #f4fbff;
+  font-size: 0.92rem;
+}
+
+.task-review-status span,
+.task-action-helper,
+.task-payment-helper {
+  margin: 0;
+  color: #9bb1c5;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.task-payment-panel .task-payment-helper {
+  color: #bffef6;
+}
+
 .task-support-grid,
 .task-history-grid {
   display: grid;
@@ -2602,6 +2651,20 @@ button[data-open-dispute] {
 
 .task-support-panel--dispute {
   border-color: rgba(246, 196, 83, 0.12);
+}
+
+.task-support-panel.is-quiet {
+  border-color: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.task-support-panel.is-active {
+  border-color: rgba(246, 196, 83, 0.16);
+}
+
+.task-history-panel--technical {
+  border-color: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.018);
 }
 
 .task-form-panel {

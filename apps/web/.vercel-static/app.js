@@ -49276,6 +49276,16 @@ function renderTaskDetailPageView({
   const settlementLabel = fundingConfirmed ? labelize(task.settlementState || "reward_funded") : browserTxHashes.length ? "Funding Syncing" : "Awaiting Funding";
   const payment = lifecycle.paymentDisplay;
   const taskStatus = lifecycle.statusDisplay;
+  const hasSubmittedWork = Boolean(resultModel?.finalOutputText || resultModel?.sections?.length);
+  const canApproveWork = reviewModel.primaryActions.includes("approve");
+  const canAskForChanges = reviewModel.primaryActions.includes("request_revision");
+  const canReleasePayment = reviewModel.primaryActions.includes("settle");
+  const canOpenDispute = reviewModel.advancedActions.includes("dispute");
+  const reviewStatusText = hasSubmittedWork ? "Review the submitted work." : "Waiting for submission.";
+  const paymentDecisionHelper = canReleasePayment ? "Approval is complete. You can release payment." : disputeModel?.hasOpenDispute ? "Payment remains locked during dispute." : hasSubmittedWork ? "USDC stays locked until approval." : "Waiting for agent submission.";
+  const revisionDescription = revisionModel?.hasRevisionRequested ? "Revision requested. Payment remains locked until the work is approved." : revisionModel?.description || "Ask for changes if the work is not ready.";
+  const disputeDescription = disputeModel?.hasOpenDispute ? "Dispute open. Payment remains locked while the issue is reviewed." : disputeModel?.description || "Disputes keep payment locked.";
+  const nextActionDisplayText = canReleasePayment ? "Payment is ready to release." : canApproveWork ? "Review the submitted work." : disputeModel?.hasOpenDispute ? "Payment remains locked." : revisionModel?.hasRevisionRequested ? "Waiting for updated work." : !hasSubmittedWork && taskStatus.primaryCtaText.toLowerCase().includes("waiting") ? "Waiting for agent submission." : taskStatus.primaryCtaText;
   el2.appRoot.innerHTML = `
     <section data-structure="task-detail" class="task-detail-page">
       <header class="task-detail-hero reveal-on-scroll is-visible">
@@ -49292,14 +49302,14 @@ function renderTaskDetailPageView({
         </div>
         <aside class="task-next-panel">
           <p class="task-detail-eyebrow">Next action</p>
-          <h2>${escapeHtml(taskStatus.primaryCtaText)}</h2>
+          <h2>${escapeHtml(nextActionDisplayText)}</h2>
           <div class="task-next-rows">
             <div><span>Who acts next</span><strong>${escapeHtml(lifecycle.nextActor)}</strong></div>
             <div><span>Required action</span><strong>${escapeHtml(taskStatus.nextActionText)}</strong></div>
             <div><span>Reward</span><strong>${formatCurrency(task.rewardAmount || 0)}</strong></div>
             <div><span>Assigned agent</span><strong>${agents.length ? escapeHtml(agents[0].displayName) : "Not assigned yet"}</strong></div>
           </div>
-          <div class="task-next-status" role="status">${escapeHtml(taskStatus.primaryCtaText)}</div>
+          <div class="task-next-status" role="status">${escapeHtml(nextActionDisplayText)}</div>
         </aside>
       </header>
 
@@ -49325,11 +49335,11 @@ function renderTaskDetailPageView({
           <div class="task-section-head">
             <div>
               <p class="task-detail-eyebrow">Submitted work</p>
-              <h2>${resultModel?.finalOutputText || resultModel?.sections?.length ? "Review the delivered output." : "No submitted work yet."}</h2>
+              <h2>${hasSubmittedWork ? "Review the delivered output." : "No submitted work yet."}</h2>
             </div>
             <span>${escapeHtml(resultModel?.workerLabel || "Marketplace Agent")}</span>
           </div>
-          ${resultModel?.finalOutputText || resultModel?.sections?.length ? `
+          ${hasSubmittedWork ? `
             <div class="task-result-meta">
               <div><span>Quality score</span><strong>${resultModel?.qualityScore ?? "N/A"}</strong></div>
               <div><span>Confidence</span><strong>${escapeHtml(resultModel?.confidence ? labelize(resultModel.confidence) : "Unknown")}</strong></div>
@@ -49356,7 +49366,7 @@ function renderTaskDetailPageView({
           `}
           ${resultModel?.hasDraft || resultModel?.stageTimingsMs || onchainSnapshot?.onchainTask ? `
             <details class="task-detail-details">
-              <summary>More result details</summary>
+              <summary><span>Technical details</span><small>Transaction and timing details for debugging.</small></summary>
               <div>
                 ${resultModel?.hasDraft ? `
                   <section>
@@ -49386,30 +49396,31 @@ function renderTaskDetailPageView({
         </article>
 
         <aside class="task-review-side">
-          <article class="task-decision-panel">
+          <article class="task-decision-panel ${canApproveWork ? "has-primary-action" : ""}">
             <p class="task-detail-eyebrow">Review decision</p>
-            <h2>${escapeHtml(reviewModel.headline || taskStatus.primaryCtaText)}</h2>
+            <h2>${escapeHtml(hasSubmittedWork ? reviewModel.headline || taskStatus.primaryCtaText : reviewStatusText)}</h2>
             <p>Payment only moves after approval.</p>
             <div class="task-decision-actions">
-              ${reviewModel.primaryActions.includes("approve") ? '<button data-user-review="approve">Approve work</button>' : ""}
-              ${reviewModel.primaryActions.includes("request_revision") ? "<button data-request-revision-toggle>Ask for changes</button>" : ""}
-              ${reviewModel.primaryActions.length === 0 && !reviewModel.primaryActions.includes("settle") ? `<button disabled>${escapeHtml(taskStatus.primaryCtaText)}</button>` : ""}
+              ${canApproveWork ? '<button data-user-review="approve">Approve work</button>' : ""}
+              ${canAskForChanges ? '<button data-request-revision-toggle>Ask for changes</button><p class="task-action-helper">Ask for changes if the work is not ready.</p>' : ""}
+              ${reviewModel.primaryActions.length === 0 && !canReleasePayment ? `<div class="task-review-status" role="status"><strong>${escapeHtml(reviewStatusText)}</strong><span>No review action is available yet.</span></div>` : ""}
             </div>
             <div class="task-secondary-actions">
               ${resultModel?.canImproveAgain ? `<button data-platform-improve="${task.taskId}">Improve Again</button>` : ""}
               ${resultModel?.improveAgainUnavailableReason ? `<p class="disabled-reason">${escapeHtml(resultModel.improveAgainUnavailableReason)}</p>` : ""}
               ${reviewModel.advancedActions.includes("assisted") ? '<button data-eval="assisted">Assisted review</button>' : ""}
               ${reviewModel.advancedActions.includes("hybrid") ? '<button data-eval="hybrid">Hybrid review</button>' : ""}
-              ${reviewModel.advancedActions.includes("dispute") ? `<button data-open-dispute-toggle>Open dispute</button>` : ""}
+              ${canOpenDispute ? `<button data-open-dispute-toggle>Open dispute</button><p class="task-action-helper">Disputes keep payment locked.</p>` : ""}
               ${reviewModel.advancedActions.includes("appeal") ? `<button data-task-action="appeal" data-task-id="${task.taskId}">Appeal</button>` : ""}
               ${additionalReviewActions.map((action) => `<button data-task-action="${action}" data-task-id="${task.taskId}">${escapeHtml(labelize(action))}</button>`).join("")}
             </div>
           </article>
 
-          <article class="task-payment-panel">
+          <article class="task-payment-panel ${canReleasePayment ? "has-primary-action" : ""}">
             <p class="task-detail-eyebrow">USDC payment</p>
             <h2>${escapeHtml(payment.label)}</h2>
             <p>${escapeHtml(payment.description)}</p>
+            <p class="task-payment-helper">${escapeHtml(paymentDecisionHelper)}</p>
             <div class="task-payment-rows">
               <div><span>Reward</span><strong>${escapeHtml(payment.amountDisplay)}</strong></div>
               <div><span>Payment state</span><strong>${escapeHtml(payment.label)}</strong></div>
@@ -49420,13 +49431,13 @@ function renderTaskDetailPageView({
               ${payment.fundingTxLink ? `<a href="${payment.fundingTxLink}" target="_blank" rel="noreferrer">Funding tx on Arcscan</a>` : `<span class="tx-fallback">No valid transaction link available.</span>`}
               ${payment.settlementTxLink ? `<a href="${payment.settlementTxLink}" target="_blank" rel="noreferrer">Release tx on Arcscan</a>` : `<span class="tx-fallback">No valid transaction link available.</span>`}
             </div>
-            ${reviewModel.primaryActions.includes("settle") ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release Payment</button>` : `<small class="disabled-reason">${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
+            ${canReleasePayment ? `<button class="hero-primary" data-task-action="settle" data-task-id="${task.taskId}">Release payment</button>` : `<small class="disabled-reason">${escapeHtml(payment.nextPaymentAction || lifecycle.nextActionHelper || "Payment unlocks after approval.")}</small>`}
           </article>
         </aside>
       </section>
 
       <section class="task-support-grid reveal-on-scroll">
-        <article class="task-support-panel task-support-panel--revision">
+        <article class="task-support-panel task-support-panel--revision ${revisionModel?.hasRevisionRequested ? "is-active" : "is-quiet"}">
           <div class="task-section-head">
             <div>
               <p class="task-detail-eyebrow">Revision</p>
@@ -49434,9 +49445,10 @@ function renderTaskDetailPageView({
             </div>
             <span>${escapeHtml(revisionModel?.hasRevisionRequested ? "Payment locked" : "Quiet")}</span>
           </div>
-          <p>${escapeHtml(revisionModel?.description || "Ask for changes if the work is not ready.")}</p>
-          ${reviewModel.primaryActions.includes("request_revision") ? `
+          <p>${escapeHtml(revisionDescription)}</p>
+          ${canAskForChanges ? `
             <div class="task-form-panel" data-revision-form>
+              <p class="task-action-helper">Tell the agent what needs to change.</p>
               <label><span>What needs to change?</span><textarea id="revisionChangeRequest" rows="3" placeholder="Explain the exact changes you need."></textarea></label>
               <label><span>What was missing?</span><textarea id="revisionMissingDetails" rows="3" placeholder="List missing details, format issues, or weak sections."></textarea></label>
               <label><span>Optional extra instruction</span><textarea id="revisionExtraInstruction" rows="2" placeholder="Add any additional instruction for the revised output."></textarea></label>
@@ -49458,7 +49470,7 @@ function renderTaskDetailPageView({
           </div>
         </article>
 
-        <article class="task-support-panel task-support-panel--dispute">
+        <article class="task-support-panel task-support-panel--dispute ${disputeModel?.hasOpenDispute ? "is-active" : "is-quiet"}">
           <div class="task-section-head">
             <div>
               <p class="task-detail-eyebrow">Dispute</p>
@@ -49466,9 +49478,10 @@ function renderTaskDetailPageView({
             </div>
             <span>${escapeHtml(disputeModel?.hasOpenDispute ? "Under review" : "Closed")}</span>
           </div>
-          <p>${escapeHtml(disputeModel?.description || "Disputes keep payment locked.")}</p>
-          ${reviewModel.advancedActions.includes("dispute") ? `
+          <p>${escapeHtml(disputeDescription)}</p>
+          ${canOpenDispute ? `
             <div class="task-form-panel" data-dispute-form>
+              <p class="task-action-helper">Disputes keep payment locked.</p>
               <label>
                 <span>Reason</span>
                 <select id="disputeReason">
@@ -49507,7 +49520,7 @@ function renderTaskDetailPageView({
           </div>
           <div class="task-detail-alert task-detail-alert--warning">
             <strong>Payment remains locked</strong>
-            <p>Opening a dispute does not mark work complete, release USDC, refund USDC, or create a transaction hash.</p>
+            <p>Disputes keep payment locked. No refund or release happens from this action.</p>
           </div>
         </article>
       </section>
@@ -49517,7 +49530,8 @@ function renderTaskDetailPageView({
           <div class="task-section-head">
             <div>
               <p class="task-detail-eyebrow">Activity</p>
-              <h2>Task history</h2>
+              <h2>Activity</h2>
+              <p>Task updates appear here.</p>
             </div>
           </div>
           <div class="task-activity-list">
@@ -49528,13 +49542,14 @@ function renderTaskDetailPageView({
               </article>
             `).join("") || emptyState("No timeline yet. Waiting for update.", {
     title: "No activity yet.",
-    body: "Task updates and settlement events will appear here."
+    body: "Task updates appear here."
   })}
           </div>
         </article>
-        <aside class="task-history-panel">
-          <p class="task-detail-eyebrow">Settlement history</p>
-          <h2>Payout trail</h2>
+        <aside class="task-history-panel task-history-panel--technical">
+          <p class="task-detail-eyebrow">Technical details</p>
+          <h2>Payment history</h2>
+          <p>Transaction and timing details for debugging.</p>
           ${latestSettlementTx ? `<p><a href="${latestSettlementTx}" target="_blank" rel="noreferrer">Open latest settlement transaction on Arcscan</a></p>` : ""}
           <div class="task-activity-list">
             ${(history2.items || []).slice().reverse().map((item) => `
@@ -49558,7 +49573,7 @@ function renderTaskDetailPageView({
     return href ? `<a href="${href}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>` : `<span>${escapeHtml(label)}</span>`;
   }).join("")}
               </div>
-              ${!fundingConfirmed ? `<button data-check-funding="${task.taskId}">Refresh execution status</button>` : ""}
+              ${!fundingConfirmed ? `<button data-check-funding="${task.taskId}">Refresh payment status</button>` : ""}
             </div>
           ` : ""}
           ${onchainTask ? `<p>Chain state: ${escapeHtml(onchainState || "unknown")} | Escrow locked: ${escapeHtml(escrowLocked.toString())}</p>` : ""}
