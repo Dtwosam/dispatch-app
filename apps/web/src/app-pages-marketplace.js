@@ -418,7 +418,25 @@ export function renderAgentsMarketplacePage({ el, state, onNavigate, rerender })
         </div>
       </section>
       <section class="marketplace-results reveal-on-scroll">
-        ${filtered.length ? `
+        ${state.marketDataLoading && !state.marketDataLoaded ? `
+          <article class="marketplace-empty-state empty-state state-card state-card--info">
+            <span class="empty-state__mark" aria-hidden="true"></span>
+            <div>
+              <p class="marketplace-eyebrow">Loading agents</p>
+              <h2>Preparing marketplace agents.</h2>
+              <p>Agent listings will appear as soon as they are available.</p>
+            </div>
+          </article>
+        ` : state.marketDataError && !filtered.length && !hasActiveFilters ? `
+          <article class="marketplace-empty-state empty-state state-card state-card--info">
+            <span class="empty-state__mark" aria-hidden="true"></span>
+            <div>
+              <p class="marketplace-eyebrow">Marketplace update</p>
+              <h2>Agents are temporarily unavailable.</h2>
+              <p>Try again shortly while marketplace data reconnects.</p>
+            </div>
+          </article>
+        ` : filtered.length ? `
           <div class="agent-market-grid">
             ${filtered.map(renderAgentCard).join("")}
           </div>
@@ -476,12 +494,12 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
   if (!agent) {
     el.appRoot.innerHTML = `
       <section data-structure="agent-profile" class="agent-profile-page">
-        <article class="agent-profile-missing empty-state state-card state-card--empty">
+        <article class="agent-profile-missing empty-state state-card state-card--${state.marketDataLoading && !state.marketDataLoaded ? "info" : "empty"}">
           <span class="empty-state__mark" aria-hidden="true"></span>
           <div>
             <p class="profile-eyebrow">Agent profile</p>
-            <h1>Agent not found.</h1>
-            <p>This agent is not available in the current marketplace.</p>
+            <h1>${state.marketDataLoading && !state.marketDataLoaded ? "Loading agent..." : state.marketDataError ? "Agent profile unavailable." : "Agent not found."}</h1>
+            <p>${state.marketDataLoading && !state.marketDataLoaded ? "This profile will appear as soon as marketplace data is available." : state.marketDataError ? "Try again shortly while marketplace data reconnects." : "This agent is not available in the current marketplace."}</p>
             <div class="empty-state-actions">
               <button class="hero-primary" data-route="/agents">Back to agents</button>
             </div>
@@ -719,6 +737,26 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
 }
 
 export function renderDashboardPage({ el, state, onNavigate, rerender }) {
+  if (state.marketDataLoading && !state.marketDataLoaded) {
+    el.appRoot.innerHTML = `
+      <section data-structure="dashboard" class="builder-dashboard-page">
+        <header class="builder-dashboard-header reveal-on-scroll is-visible">
+          <div>
+            <p class="builder-dashboard-eyebrow">Builder dashboard</p>
+            <h1>Manage agent work.</h1>
+            <p>Track agents, funded tasks, earnings, and readiness signals.</p>
+          </div>
+          <button class="hero-primary" data-route="/connect-agent">Connect Agent</button>
+        </header>
+        <article class="builder-empty-state">
+          <strong>Loading builder activity.</strong>
+          <p>Agents, tasks, and earnings will appear as soon as they are available.</p>
+        </article>
+      </section>
+    `;
+    revealSections(el.appRoot);
+    return;
+  }
   const taskCollections = {
     myPostedTasks: state.tasks?.myPostedTasks || [],
     allOpenTasks: state.tasks?.allOpenTasks || [],
@@ -758,6 +796,12 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
         <strong>Builder dashboard preview</strong>
         <p>${escapeHtml(summary.ownershipNote)}</p>
       </article>
+      ${state.marketDataError ? `
+        <article class="builder-preview-note reveal-on-scroll">
+          <strong>Some activity is temporarily unavailable.</strong>
+          <p>Dashboard sections will update when marketplace data reconnects.</p>
+        </article>
+      ` : ""}
 
       <section class="builder-summary-grid reveal-on-scroll">
         <article>

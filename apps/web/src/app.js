@@ -70,6 +70,9 @@ const state = createInitialState();
 const el = getAppElements();
 let ambientRefreshPending = false;
 let attachmentIngestionModulePromise = null;
+let initialMarketHydrationPromise = null;
+let postTaskReadinessPromise = null;
+let postTaskReadinessLastAttemptAt = 0;
 const pendingTaskAutoChecks = new Set();
 let activeTaskDetailRenderToken = 0;
 
@@ -143,7 +146,8 @@ const chainClient = createMarketplaceChainClient({
 el.ownerWallet.value = state.wallet;
 
 syncInjectedWalletFromBrowser().catch((error) => {
-  renderFatalAppError(error, "Wallet initialization failed");
+  updateStatus("Wallet unavailable", statusMessage(error, "Wallet connection could not be prepared."), "warn");
+  renderTopbar();
 });
 watchInjectedWallet({
   onAccountsChanged: (accounts) => {
@@ -282,11 +286,25 @@ function renderWalletSheet(open) {
   });
 }
 
+async function settleWithin(promise, timeoutMs, message) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function refreshWalletNetworkState() {
   if (!state.wallet.trim()) return null;
   try {
     state.walletNetwork = { ...state.walletNetwork, loading: true, error: "" };
-    const snapshot = await chainClient.getWalletNetworkSnapshot();
+    const snapshot = await settleWithin(chainClient.getWalletNetworkSnapshot(), 4500, "Wallet network check timed out.");
     state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
     return snapshot;
   } catch (error) {
@@ -300,7 +318,13 @@ async function refreshWalletNetworkState() {
 }
 
 async function loadMarketData() {
-  return loadMarketDataModule();
+  state.marketDataLoading = true;
+  try {
+    await loadMarketDataModule();
+    state.marketDataLoaded = true;
+  } finally {
+    state.marketDataLoading = false;
+  }
 }
 const loadMarketDataModule = () =>
   hydrateMarketData({
@@ -1058,13 +1082,32 @@ async function createTask() {
   }
 }
 
-async function renderPostTaskPage() {
-  try {
-    state.chainStatus = await chainClient.getStatus();
-    state.chainConfig = state.chainStatus.config;
-    state.chainStatusError = "";
-  } catch (error) {
-    state.chainStatusError = error instanceof Error ? error.message : "Chain status request failed.";
+function refreshPostTaskReadiness() {
+  if (postTaskReadinessPromise) return postTaskReadinessPromise;
+  postTaskReadinessLastAttemptAt = Date.now();
+  postTaskReadinessPromise = (async () => {
+    try {
+      state.chainStatus = await settleWithin(chainClient.getStatus(), 4500, "Arc Testnet status check timed out.");
+      state.chainConfig = state.chainStatus.config;
+      state.chainStatusError = "";
+    } catch (error) {
+      state.chainStatusError = error instanceof Error ? error.message : "Chain status request failed.";
+    }
+    if (state.wallet.trim()) {
+      await refreshWalletNetworkState();
+    }
+  })().finally(() => {
+    postTaskReadinessPromise = null;
+    if (window.location.pathname === "/post-task") {
+      safeRender("Post task readiness render failed");
+    }
+  });
+  return postTaskReadinessPromise;
+}
+
+function renderPostTaskPage() {
+  if (!postTaskReadinessPromise && Date.now() - postTaskReadinessLastAttemptAt > 10000) {
+    void refreshPostTaskReadiness();
   }
 
   setChrome(
@@ -1082,9 +1125,6 @@ async function renderPostTaskPage() {
   const selectedTemplate = getTaskBriefTemplate(state.taskForm.templateId || "custom_task");
   const templateResult = buildTaskTemplateBrief(selectedTemplate.id, state.taskForm.templateFields || {});
   const walletReady = Boolean(state.wallet.trim());
-  if (walletReady) {
-    await refreshWalletNetworkState();
-  }
   const chainMode = state.chainConfig?.chainMode || "unknown";
   const chainStatus = state.chainStatus;
   const chainWritable = chainMode !== "read_only" && chainMode !== "unknown";
@@ -1264,7 +1304,7 @@ async function renderPostTaskPage() {
                 ? `
                   <label class="post-field post-field--wide"><strong>Selected agent</strong>
                     <select id="selectedAgentId">
-                      <option value="">Choose an agent</option>
+                      <option value="">${state.marketDataLoading && !state.marketDataLoaded ? "Loading agents..." : "Choose an agent"}</option>
                       ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} readiness</option>`).join("")}
                     </select>
                   </label>
@@ -2487,45 +2527,23 @@ async function renderAdmin() {
   revealSections(el.appRoot);
 }
 
+function startInitialMarketHydration() {
+  if (initialMarketHydrationPromise) return;
+  initialMarketHydrationPromise = loadMarketData()
+    .catch((error) => {
+      state.marketDataError = statusMessage(error, "Marketplace data is temporarily unavailable.");
+    })
+    .finally(() => {
+      safeRender("Marketplace hydration render failed");
+    });
+}
+
 async function render() {
   renderNav();
   renderTopbar();
   renderFooter();
 
-  if (!state.tasks) {
-    el.appRoot.innerHTML = `
-      <section data-structure="app-loading" class="loading-shell">
-        <div class="loading-shell__copy">
-          <strong>Loading Dispatch...</strong>
-          <p>Preparing agents, tasks, and payment state.</p>
-        </div>
-        <article class="skeleton"></article>
-        <article class="skeleton"></article>
-        <article class="skeleton"></article>
-        <article class="skeleton"></article>
-      </section>
-    `;
-    try {
-      await loadMarketData();
-    } catch (error) {
-      el.appRoot.innerHTML = `
-        <div class="error-state state-card state-card--error shell-section surface-page">
-          <span class="empty-state__mark" aria-hidden="true"></span>
-          <strong>Network error</strong>
-          <p>${escapeHtml(statusMessage(error, "Marketplace data could not be loaded."))}</p>
-          <div class="empty-state-actions">
-            <button class="hero-primary" id="retryHydrate">Retry</button>
-            <button data-wallet="open">Check Wallet</button>
-          </div>
-        </div>
-      `;
-      document.getElementById("retryHydrate")?.addEventListener("click", () => {
-        state.tasks = null;
-        render();
-      });
-      return;
-    }
-  }
+  if (!state.marketDataLoaded && !initialMarketHydrationPromise) startInitialMarketHydration();
 
   const path = window.location.pathname;
 

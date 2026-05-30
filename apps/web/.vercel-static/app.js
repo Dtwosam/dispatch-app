@@ -46665,6 +46665,9 @@ function createInitialState() {
     agents: [],
     tasks: null,
     leaderboards: { buckets: [] },
+    marketDataLoading: false,
+    marketDataLoaded: false,
+    marketDataError: "",
     chainConfig: null,
     chainStatus: null,
     chainStatusError: "",
@@ -46814,8 +46817,41 @@ async function sendJson(apiBase, path, method, body, validate6) {
   }
   return validate6 ? validate6(payload) : payload;
 }
+async function getJsonWithin(apiBase, path, validate6, timeoutMs = 4500) {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${apiBase}${path}`, { signal: controller.signal });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || `Request failed for ${path}`);
+    }
+    return validate6 ? validate6(payload) : payload;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
+async function settleWithin(promise, timeoutMs, message) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeoutId = globalThis.setTimeout(() => reject(new Error(message)), timeoutMs);
+      })
+    ]);
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
 async function loadMarketData({ apiBase, state: state2, chainClient: chainClient2, validators }) {
-  const chainStatusPromise = chainClient2.getStatus().then((status) => {
+  const hydrationErrors = [];
+  const fallback = (message, value) => (error) => {
+    hydrationErrors.push(message);
+    console.warn(message, error);
+    return value;
+  };
+  const chainStatusPromise = settleWithin(chainClient2.getStatus(), 4500, "Chain status request timed out.").then((status) => {
     state2.chainStatusError = "";
     return status;
   }).catch((error) => {
@@ -46823,12 +46859,12 @@ async function loadMarketData({ apiBase, state: state2, chainClient: chainClient
     return null;
   });
   const [agentPayload, taskPayload, leaderboardPayload, chainStatus] = await Promise.all([
-    getJson(apiBase, "/api/agent-registry/agents", validators.validateAgentListResponse).catch(() => ({ items: [] })),
-    getJson(
+    getJsonWithin(apiBase, "/api/agent-registry/agents", validators.validateAgentListResponse).catch(fallback("Agent data is temporarily unavailable.", { items: [] })),
+    getJsonWithin(
       apiBase,
       `/api/task-market/tasks?viewerWallet=${encodeURIComponent(state2.wallet)}`,
       validators.validateTaskListResponse
-    ).catch(() => ({
+    ).catch(fallback("Task data is temporarily unavailable.", {
       allOpenTasks: [],
       myPostedTasks: [],
       tasksAssignedToMyAgents: [],
@@ -46837,7 +46873,7 @@ async function loadMarketData({ apiBase, state: state2, chainClient: chainClient
       rejectedTasks: [],
       disputedTasks: []
     })),
-    getJson(apiBase, "/api/trust/leaderboards", validators.validateLeaderboardResponse).catch(() => ({ buckets: [] })),
+    getJsonWithin(apiBase, "/api/trust/leaderboards", validators.validateLeaderboardResponse).catch(fallback("Leaderboard data is temporarily unavailable.", { buckets: [] })),
     chainStatusPromise
   ]);
   state2.agents = agentPayload.items || [];
@@ -46845,6 +46881,7 @@ async function loadMarketData({ apiBase, state: state2, chainClient: chainClient
   state2.leaderboards = leaderboardPayload;
   state2.chainStatus = chainStatus;
   state2.chainConfig = chainStatus?.config || null;
+  state2.marketDataError = hydrationErrors.length ? "Some marketplace data is temporarily unavailable. Try again shortly." : "";
 }
 
 // apps/web/src/app-dom.js
@@ -48658,7 +48695,25 @@ function renderAgentsMarketplacePage({ el: el2, state: state2, onNavigate, reren
         </div>
       </section>
       <section class="marketplace-results reveal-on-scroll">
-        ${filtered.length ? `
+        ${state2.marketDataLoading && !state2.marketDataLoaded ? `
+          <article class="marketplace-empty-state empty-state state-card state-card--info">
+            <span class="empty-state__mark" aria-hidden="true"></span>
+            <div>
+              <p class="marketplace-eyebrow">Loading agents</p>
+              <h2>Preparing marketplace agents.</h2>
+              <p>Agent listings will appear as soon as they are available.</p>
+            </div>
+          </article>
+        ` : state2.marketDataError && !filtered.length && !hasActiveFilters ? `
+          <article class="marketplace-empty-state empty-state state-card state-card--info">
+            <span class="empty-state__mark" aria-hidden="true"></span>
+            <div>
+              <p class="marketplace-eyebrow">Marketplace update</p>
+              <h2>Agents are temporarily unavailable.</h2>
+              <p>Try again shortly while marketplace data reconnects.</p>
+            </div>
+          </article>
+        ` : filtered.length ? `
           <div class="agent-market-grid">
             ${filtered.map(renderAgentCard).join("")}
           </div>
@@ -48713,12 +48768,12 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
   if (!agent) {
     el2.appRoot.innerHTML = `
       <section data-structure="agent-profile" class="agent-profile-page">
-        <article class="agent-profile-missing empty-state state-card state-card--empty">
+        <article class="agent-profile-missing empty-state state-card state-card--${state2.marketDataLoading && !state2.marketDataLoaded ? "info" : "empty"}">
           <span class="empty-state__mark" aria-hidden="true"></span>
           <div>
             <p class="profile-eyebrow">Agent profile</p>
-            <h1>Agent not found.</h1>
-            <p>This agent is not available in the current marketplace.</p>
+            <h1>${state2.marketDataLoading && !state2.marketDataLoaded ? "Loading agent..." : state2.marketDataError ? "Agent profile unavailable." : "Agent not found."}</h1>
+            <p>${state2.marketDataLoading && !state2.marketDataLoaded ? "This profile will appear as soon as marketplace data is available." : state2.marketDataError ? "Try again shortly while marketplace data reconnects." : "This agent is not available in the current marketplace."}</p>
             <div class="empty-state-actions">
               <button class="hero-primary" data-route="/agents">Back to agents</button>
             </div>
@@ -48947,6 +49002,26 @@ function renderAgentProfilePage({ el: el2, state: state2, slug, onNavigate }) {
   revealSections(el2.appRoot);
 }
 function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
+  if (state2.marketDataLoading && !state2.marketDataLoaded) {
+    el2.appRoot.innerHTML = `
+      <section data-structure="dashboard" class="builder-dashboard-page">
+        <header class="builder-dashboard-header reveal-on-scroll is-visible">
+          <div>
+            <p class="builder-dashboard-eyebrow">Builder dashboard</p>
+            <h1>Manage agent work.</h1>
+            <p>Track agents, funded tasks, earnings, and readiness signals.</p>
+          </div>
+          <button class="hero-primary" data-route="/connect-agent">Connect Agent</button>
+        </header>
+        <article class="builder-empty-state">
+          <strong>Loading builder activity.</strong>
+          <p>Agents, tasks, and earnings will appear as soon as they are available.</p>
+        </article>
+      </section>
+    `;
+    revealSections(el2.appRoot);
+    return;
+  }
   const taskCollections = {
     myPostedTasks: state2.tasks?.myPostedTasks || [],
     allOpenTasks: state2.tasks?.allOpenTasks || [],
@@ -48981,6 +49056,12 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
         <strong>Builder dashboard preview</strong>
         <p>${escapeHtml(summary.ownershipNote)}</p>
       </article>
+      ${state2.marketDataError ? `
+        <article class="builder-preview-note reveal-on-scroll">
+          <strong>Some activity is temporarily unavailable.</strong>
+          <p>Dashboard sections will update when marketplace data reconnects.</p>
+        </article>
+      ` : ""}
 
       <section class="builder-summary-grid reveal-on-scroll">
         <article>
@@ -49924,6 +50005,9 @@ var state = createInitialState();
 var el = getAppElements();
 var ambientRefreshPending = false;
 var attachmentIngestionModulePromise = null;
+var initialMarketHydrationPromise = null;
+var postTaskReadinessPromise = null;
+var postTaskReadinessLastAttemptAt = 0;
 var pendingTaskAutoChecks = /* @__PURE__ */ new Set();
 var activeTaskDetailRenderToken = 0;
 function persistRevisionRequests() {
@@ -49987,7 +50071,8 @@ var chainClient = createMarketplaceChainClient({
 });
 el.ownerWallet.value = state.wallet;
 syncInjectedWalletFromBrowser().catch((error) => {
-  renderFatalAppError(error, "Wallet initialization failed");
+  updateStatus2("Wallet unavailable", statusMessage(error, "Wallet connection could not be prepared."), "warn");
+  renderTopbar2();
 });
 watchInjectedWallet({
   onAccountsChanged: (accounts) => {
@@ -50118,11 +50203,24 @@ function renderWalletSheet2(open) {
     onClose: () => closeWalletSheet(el)
   });
 }
+async function settleWithin2(promise, timeoutMs, message) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+      })
+    ]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
 async function refreshWalletNetworkState() {
   if (!state.wallet.trim()) return null;
   try {
     state.walletNetwork = { ...state.walletNetwork, loading: true, error: "" };
-    const snapshot = await chainClient.getWalletNetworkSnapshot();
+    const snapshot = await settleWithin2(chainClient.getWalletNetworkSnapshot(), 4500, "Wallet network check timed out.");
     state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
     return snapshot;
   } catch (error) {
@@ -50135,7 +50233,13 @@ async function refreshWalletNetworkState() {
   }
 }
 async function loadMarketData2() {
-  return loadMarketDataModule();
+  state.marketDataLoading = true;
+  try {
+    await loadMarketDataModule();
+    state.marketDataLoaded = true;
+  } finally {
+    state.marketDataLoading = false;
+  }
 }
 var loadMarketDataModule = () => loadMarketData({
   apiBase: API_BASE,
@@ -50803,13 +50907,31 @@ async function createTask() {
     buttons.forEach((button) => setButtonLoading(button, false));
   }
 }
-async function renderPostTaskPage() {
-  try {
-    state.chainStatus = await chainClient.getStatus();
-    state.chainConfig = state.chainStatus.config;
-    state.chainStatusError = "";
-  } catch (error) {
-    state.chainStatusError = error instanceof Error ? error.message : "Chain status request failed.";
+function refreshPostTaskReadiness() {
+  if (postTaskReadinessPromise) return postTaskReadinessPromise;
+  postTaskReadinessLastAttemptAt = Date.now();
+  postTaskReadinessPromise = (async () => {
+    try {
+      state.chainStatus = await settleWithin2(chainClient.getStatus(), 4500, "Arc Testnet status check timed out.");
+      state.chainConfig = state.chainStatus.config;
+      state.chainStatusError = "";
+    } catch (error) {
+      state.chainStatusError = error instanceof Error ? error.message : "Chain status request failed.";
+    }
+    if (state.wallet.trim()) {
+      await refreshWalletNetworkState();
+    }
+  })().finally(() => {
+    postTaskReadinessPromise = null;
+    if (window.location.pathname === "/post-task") {
+      safeRender("Post task readiness render failed");
+    }
+  });
+  return postTaskReadinessPromise;
+}
+function renderPostTaskPage() {
+  if (!postTaskReadinessPromise && Date.now() - postTaskReadinessLastAttemptAt > 1e4) {
+    void refreshPostTaskReadiness();
   }
   setChrome2(
     "Post Funded Task",
@@ -50825,9 +50947,6 @@ async function renderPostTaskPage() {
   const selectedTemplate = getTaskBriefTemplate(state.taskForm.templateId || "custom_task");
   const templateResult = buildTaskTemplateBrief(selectedTemplate.id, state.taskForm.templateFields || {});
   const walletReady = Boolean(state.wallet.trim());
-  if (walletReady) {
-    await refreshWalletNetworkState();
-  }
   const chainMode = state.chainConfig?.chainMode || "unknown";
   const chainStatus = state.chainStatus;
   const chainWritable = chainMode !== "read_only" && chainMode !== "unknown";
@@ -50973,7 +51092,7 @@ async function renderPostTaskPage() {
               ${state.taskForm.hiringMode === "direct_hire" ? `
                   <label class="post-field post-field--wide"><strong>Selected agent</strong>
                     <select id="selectedAgentId">
-                      <option value="">Choose an agent</option>
+                      <option value="">${state.marketDataLoading && !state.marketDataLoaded ? "Loading agents..." : "Choose an agent"}</option>
                       ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} readiness</option>`).join("")}
                     </select>
                   </label>
@@ -52099,44 +52218,19 @@ async function renderAdmin() {
   });
   revealSections(el.appRoot);
 }
+function startInitialMarketHydration() {
+  if (initialMarketHydrationPromise) return;
+  initialMarketHydrationPromise = loadMarketData2().catch((error) => {
+    state.marketDataError = statusMessage(error, "Marketplace data is temporarily unavailable.");
+  }).finally(() => {
+    safeRender("Marketplace hydration render failed");
+  });
+}
 async function render() {
   renderNav2();
   renderTopbar2();
   renderFooter();
-  if (!state.tasks) {
-    el.appRoot.innerHTML = `
-      <section data-structure="app-loading" class="loading-shell">
-        <div class="loading-shell__copy">
-          <strong>Loading Dispatch...</strong>
-          <p>Preparing agents, tasks, and payment state.</p>
-        </div>
-        <article class="skeleton"></article>
-        <article class="skeleton"></article>
-        <article class="skeleton"></article>
-        <article class="skeleton"></article>
-      </section>
-    `;
-    try {
-      await loadMarketData2();
-    } catch (error) {
-      el.appRoot.innerHTML = `
-        <div class="error-state state-card state-card--error shell-section surface-page">
-          <span class="empty-state__mark" aria-hidden="true"></span>
-          <strong>Network error</strong>
-          <p>${escapeHtml(statusMessage(error, "Marketplace data could not be loaded."))}</p>
-          <div class="empty-state-actions">
-            <button class="hero-primary" id="retryHydrate">Retry</button>
-            <button data-wallet="open">Check Wallet</button>
-          </div>
-        </div>
-      `;
-      document.getElementById("retryHydrate")?.addEventListener("click", () => {
-        state.tasks = null;
-        render();
-      });
-      return;
-    }
-  }
+  if (!state.marketDataLoaded && !initialMarketHydrationPromise) startInitialMarketHydration();
   const path = window.location.pathname;
   if (path === "/") return renderHome();
   if (path === "/agents") return renderAgentsPage();

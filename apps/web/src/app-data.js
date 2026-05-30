@@ -20,8 +20,43 @@ export async function sendJson(apiBase, path, method, body, validate) {
   return validate ? validate(payload) : payload;
 }
 
+async function getJsonWithin(apiBase, path, validate, timeoutMs = 4500) {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${apiBase}${path}`, { signal: controller.signal });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || `Request failed for ${path}`);
+    }
+    return validate ? validate(payload) : payload;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
+
+async function settleWithin(promise, timeoutMs, message) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeoutId = globalThis.setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
+
 export async function loadMarketData({ apiBase, state, chainClient, validators }) {
-  const chainStatusPromise = chainClient.getStatus()
+  const hydrationErrors = [];
+  const fallback = (message, value) => (error) => {
+    hydrationErrors.push(message);
+    console.warn(message, error);
+    return value;
+  };
+  const chainStatusPromise = settleWithin(chainClient.getStatus(), 4500, "Chain status request timed out.")
     .then((status) => {
       state.chainStatusError = "";
       return status;
@@ -32,12 +67,13 @@ export async function loadMarketData({ apiBase, state, chainClient, validators }
     });
 
   const [agentPayload, taskPayload, leaderboardPayload, chainStatus] = await Promise.all([
-    getJson(apiBase, "/api/agent-registry/agents", validators.validateAgentListResponse).catch(() => ({ items: [] })),
-    getJson(
+    getJsonWithin(apiBase, "/api/agent-registry/agents", validators.validateAgentListResponse)
+      .catch(fallback("Agent data is temporarily unavailable.", { items: [] })),
+    getJsonWithin(
       apiBase,
       `/api/task-market/tasks?viewerWallet=${encodeURIComponent(state.wallet)}`,
       validators.validateTaskListResponse,
-    ).catch(() => ({
+    ).catch(fallback("Task data is temporarily unavailable.", {
       allOpenTasks: [],
       myPostedTasks: [],
       tasksAssignedToMyAgents: [],
@@ -46,7 +82,8 @@ export async function loadMarketData({ apiBase, state, chainClient, validators }
       rejectedTasks: [],
       disputedTasks: [],
     })),
-    getJson(apiBase, "/api/trust/leaderboards", validators.validateLeaderboardResponse).catch(() => ({ buckets: [] })),
+    getJsonWithin(apiBase, "/api/trust/leaderboards", validators.validateLeaderboardResponse)
+      .catch(fallback("Leaderboard data is temporarily unavailable.", { buckets: [] })),
     chainStatusPromise,
   ]);
 
@@ -55,4 +92,7 @@ export async function loadMarketData({ apiBase, state, chainClient, validators }
   state.leaderboards = leaderboardPayload;
   state.chainStatus = chainStatus;
   state.chainConfig = chainStatus?.config || null;
+  state.marketDataError = hydrationErrors.length
+    ? "Some marketplace data is temporarily unavailable. Try again shortly."
+    : "";
 }
