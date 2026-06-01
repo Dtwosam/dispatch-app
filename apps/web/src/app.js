@@ -1716,7 +1716,7 @@ async function runUserDecision(taskId, decision, trigger) {
   }
   pendingTaskReviewActions.add(taskId);
   try {
-    setButtonLoading(trigger, true, labelize(decision));
+    setButtonLoading(trigger, true, decision === "approve" ? "Approving..." : "Rejecting...");
     requireWallet();
     const rejectionReason = decision === "reject"
       ? window.prompt("Why are you rejecting this result?", "Output did not meet the requested quality bar.")

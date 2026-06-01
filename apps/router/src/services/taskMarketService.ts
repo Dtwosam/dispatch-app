@@ -31,7 +31,7 @@ import { InMemoryRegistryStore } from "../db/store";
 import { makeId } from "../lib/ids";
 import { AgentRegistryService } from "./agentRegistryService";
 import { Erc8183AdapterService } from "./erc8183AdapterService";
-import { EvaluatorClient } from "./evaluatorClient";
+import { buildLocalUserReviewEvaluation, EvaluatorClient } from "./evaluatorClient";
 import { SafetyService } from "./safetyService";
 import type { PlatformRefinementContext, PlatformQualityMode } from "./platformQualityTypes";
 
@@ -731,7 +731,9 @@ export class TaskMarketService {
       throw new Error("User review requires a submitted result");
     }
     const request = this.buildEvaluationRequest(task, submissionId, "user_review");
-    const result = await this.evaluatorClient.submitUserReview(request, review);
+    // Manual buyer decisions are authoritative after the existing ownership,
+    // funded-state, and submission checks. Evaluator availability must not block them.
+    const result = buildLocalUserReviewEvaluation(request, review);
     const normalizedResult = this.normalizeEvaluationResult(task, submissionId, result);
     task.userReview = review;
     task.latestEvaluation = normalizedResult;

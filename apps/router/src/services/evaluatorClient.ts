@@ -45,7 +45,7 @@ export class EvaluatorClient {
 
       // Buyer review is deterministic. Keep owner approval available if the
       // evaluator service is temporarily throttled, without bypassing AI review paths.
-      return evaluationRunResponseSchema.parse(buildThrottledUserReviewFallback(request, review));
+      return buildLocalUserReviewEvaluation(request, review);
     }
   }
 
@@ -58,14 +58,14 @@ export class EvaluatorClient {
   }
 }
 
-function buildThrottledUserReviewFallback(request: EvaluationRunRequest, review: UserReviewDecision) {
+export function buildLocalUserReviewEvaluation(request: EvaluationRunRequest, review: UserReviewDecision) {
   const approved = review.decision === "approve";
   const overallScore = approved ? ((review.starRating ?? 4) / 5) * 100 : 35;
   const confidence = approved ? 0.95 : 0.92;
   const reasoning = review.feedback ?? review.rejectionReason ?? "No additional feedback provided.";
   const createdAt = new Date().toISOString();
 
-  return {
+  return evaluationRunResponseSchema.parse({
     evaluationId: `eval_router_fallback_${Date.now()}`,
     taskId: request.taskId,
     winningSubmissionId: approved ? review.submissionId : null,
@@ -114,7 +114,7 @@ function buildThrottledUserReviewFallback(request: EvaluationRunRequest, review:
     ],
     reviewerType: "buyer" as const,
     createdAt,
-  };
+  });
 }
 
 function normalizeEvaluatorBaseUrl(value: string) {

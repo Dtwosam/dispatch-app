@@ -665,6 +665,65 @@ test("assisted review stays advisory and leaves owner approval available", async
   assert.equal(service.getTask(created.task.taskId).settlementSummary?.canReleasePayment, true);
 });
 
+test("manual buyer approval skips throttled evaluator and unlocks release payment", async () => {
+  const store = new InMemoryRegistryStore();
+  seedAgents(store);
+  let evaluatorCalls = 0;
+  const throttledEvaluator = {
+    ...evaluatorClient,
+    async submitUserReview() {
+      evaluatorCalls += 1;
+      throw new Error("HTTP 429 for /api/evaluations/user-review");
+    },
+  };
+  const service = new TaskMarketService(store, createRegistryServiceStub(store) as never, throttledEvaluator as never, new SafetyService(store));
+
+  const created = service.createTaskDraft({
+    title: "Manual approval task",
+    description: "Return a concise launch checklist with clear ownership and next actions.",
+    category: "research",
+    rewardAmount: 50,
+    deadline: new Date(Date.now() + 3600000).toISOString(),
+    hiringMode: "direct_hire",
+    selectedAgentId: "agent_fast",
+    attachments: [],
+    evaluationPreference: "assisted_evaluation",
+    structuredNotes: null,
+    creatorWallet: "0xbuyer",
+    maxParticipants: 1,
+  });
+
+  service.syncTaskWithChain(created.task.taskId, {
+    createTxHash: "tx_create",
+    fundTxHash: "tx_fund",
+    assignTxHash: "tx_assign",
+    onchainTaskRef: "onchain:manual-approval",
+    latestReceipt: {
+      hash: "tx_assign",
+      status: "ACCEPTED",
+      finalized: false,
+      blockNumber: 151,
+      createdAt: new Date().toISOString(),
+    },
+  });
+  await service.markSubmissionReceived(created.task.taskId, "agent_fast", "memory://result", "hash_manual_approval");
+  const submissionId = service.getTask(created.task.taskId).latestSubmissionId!;
+  const approved = await service.reviewWithUser(created.task.taskId, submissionId, {
+    taskId: created.task.taskId,
+    submissionId,
+    reviewerWallet: "0xbuyer",
+    decision: "approve",
+    starRating: 5,
+    feedback: "Approved by the buyer.",
+  });
+
+  assert.equal(evaluatorCalls, 0);
+  assert.equal(approved.task.status, "APPROVED");
+  assert.equal(approved.task.userReview?.decision, "approve");
+  assert.equal(approved.task.latestEvaluation?.reviewerType, "buyer");
+  assert.equal(service.getTask(created.task.taskId).settlementSummary?.canReleasePayment, true);
+});
+
 test("appeal reruns consensus and can resolve a previously disputed task into approval", async () => {
   const store = new InMemoryRegistryStore();
   seedAgents(store);
