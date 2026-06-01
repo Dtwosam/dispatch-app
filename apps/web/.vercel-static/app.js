@@ -47810,6 +47810,7 @@ function collectTaskBuckets(taskCollections = {}) {
   return [
     ...taskCollections.myPostedTasks || [],
     ...taskCollections.allOpenTasks || [],
+    ...taskCollections.tasksAssignedToMyAgents || [],
     ...taskCollections.activeTasks || [],
     ...taskCollections.completedTasks || [],
     ...taskCollections.rejectedTasks || [],
@@ -47818,6 +47819,40 @@ function collectTaskBuckets(taskCollections = {}) {
 }
 function taskBelongsToAgent(task, agentId) {
   return task?.selectedAgentId === agentId || (task?.participatingAgentIds || []).includes(agentId);
+}
+function normalizedWallet(value) {
+  return String(value || "").trim().toLowerCase();
+}
+function filterTaskCollections(taskCollections, predicate) {
+  return Object.fromEntries(
+    Object.entries(taskCollections || {}).map(([key, tasks]) => [
+      key,
+      Array.isArray(tasks) ? tasks.filter(predicate) : tasks
+    ])
+  );
+}
+function buildWalletScopedDashboardModel(agents = [], taskCollections = {}, wallet = "") {
+  const walletKey = normalizedWallet(wallet);
+  const allTasks = collectTaskBuckets(taskCollections);
+  const hasCompleteTaskOwnership = allTasks.every((task) => Boolean(normalizedWallet(task?.creatorWallet)));
+  const hasCompleteAgentOwnership = agents.every((agent) => Boolean(normalizedWallet(agent?.profile?.ownerWallet)));
+  const ownedAgents = walletKey ? agents.filter((agent) => normalizedWallet(agent?.profile?.ownerWallet) === walletKey) : [];
+  const ownedAgentIds = new Set(ownedAgents.map((agent) => agent?.profile?.agentId).filter(Boolean));
+  const isWalletTask = (task) => walletKey && normalizedWallet(task?.creatorWallet) === walletKey;
+  const isOwnedAgentTask = (task) => walletKey && (ownedAgentIds.has(task?.selectedAgentId) || (task?.participatingAgentIds || []).some((agentId) => ownedAgentIds.has(agentId)));
+  const walletTaskCollections = filterTaskCollections(taskCollections, isWalletTask);
+  const earningsTaskCollections = filterTaskCollections(taskCollections, isOwnedAgentTask);
+  const attentionTasks = allTasks.filter((task) => isWalletTask(task) || isOwnedAgentTask(task));
+  return {
+    walletConnected: Boolean(walletKey),
+    ownedAgents,
+    walletTaskCollections,
+    earningsTaskCollections,
+    attentionTasks,
+    tasksOwnershipAvailable: hasCompleteTaskOwnership,
+    agentsOwnershipAvailable: hasCompleteAgentOwnership,
+    earningsOwnershipAvailable: hasCompleteAgentOwnership && hasCompleteTaskOwnership
+  };
 }
 function readTaskReward(task) {
   const value = Number(task?.rewardAmount);
@@ -48151,7 +48186,7 @@ function buildAgentBuilderSummaryModel(agents = [], taskCollections = {}) {
     paidEarnings,
     paidEarningsDisplay: `${paidEarnings.toLocaleString(void 0, { maximumFractionDigits: 6 })} USDC`,
     attentionCount,
-    ownershipNote: "Showing tasks and agents visible in this demo. Wallet-specific history is not fully enabled yet."
+    ownershipNote: "Use wallet-linked tasks and agents for builder dashboard totals."
   };
 }
 function buildAgentBuilderDashboardModel(agents = [], taskCollections = {}) {
@@ -49040,6 +49075,26 @@ function dashboardAgentNeedsSetup(row) {
   return ["Connection check needed", "Needs review", "Offline / unavailable", "Setup incomplete", "Owner wallet not verified"].includes(row.readinessLabel);
 }
 function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
+  if (!state2.wallet?.trim()) {
+    el2.appRoot.innerHTML = `
+      <section data-structure="dashboard" class="builder-dashboard-page">
+        <header class="builder-dashboard-header reveal-on-scroll is-visible">
+          <div>
+            <p class="builder-dashboard-eyebrow">Dashboard</p>
+            <h1>Dashboard</h1>
+            <p>Track your funded tasks, agents, payments, and actions that need review.</p>
+          </div>
+        </header>
+        <article class="builder-empty-state">
+          <strong>Connect wallet to view your Dashboard.</strong>
+          <p>Your tasks, agents, and payment activity are linked to your wallet.</p>
+          <button class="hero-primary" data-wallet="open">Connect wallet</button>
+        </article>
+      </section>
+    `;
+    revealSections(el2.appRoot);
+    return;
+  }
   if (state2.marketDataLoading && !state2.marketDataLoaded) {
     el2.appRoot.innerHTML = `
       <section data-structure="dashboard" class="builder-dashboard-page">
@@ -49062,17 +49117,19 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
   const taskCollections = {
     myPostedTasks: state2.tasks?.myPostedTasks || [],
     allOpenTasks: state2.tasks?.allOpenTasks || [],
+    tasksAssignedToMyAgents: state2.tasks?.tasksAssignedToMyAgents || [],
     activeTasks: state2.tasks?.activeTasks || [],
     completedTasks: state2.tasks?.completedTasks || [],
     rejectedTasks: state2.tasks?.rejectedTasks || [],
     disputedTasks: state2.tasks?.disputedTasks || []
   };
-  const dashboard = buildAgentBuilderDashboardModel(state2.agents, taskCollections);
-  const earningsDashboard = buildAgentEarningsDashboardModel(state2.agents, taskCollections);
+  const walletScope = buildWalletScopedDashboardModel(state2.agents, taskCollections, state2.wallet);
+  const dashboard = buildAgentBuilderDashboardModel(walletScope.ownedAgents, walletScope.earningsTaskCollections);
+  const earningsDashboard = buildAgentEarningsDashboardModel(walletScope.ownedAgents, walletScope.earningsTaskCollections);
   const { summary, agentRows } = dashboard;
   const agentById = new Map(state2.agents.map((agent) => [agent.profile.agentId, agent]));
-  const visibleTasks = collectDashboardTasks(taskCollections);
-  const taskAttentionItems = visibleTasks.map((task) => dashboardTaskAttentionItem(task, agentById)).filter(Boolean);
+  const visibleTasks = collectDashboardTasks(walletScope.walletTaskCollections);
+  const taskAttentionItems = walletScope.tasksOwnershipAvailable && walletScope.agentsOwnershipAvailable ? walletScope.attentionTasks.map((task) => dashboardTaskAttentionItem(task, agentById)).filter(Boolean) : [];
   const setupAttentionItems = agentRows.filter(dashboardAgentNeedsSetup).map((row) => ({ row, badge: "Setup needed", reason: row.verificationNextAction || "Review agent setup.", action: "Complete setup" }));
   const attentionCount = taskAttentionItems.length + setupAttentionItems.length;
   const activeTaskCount = visibleTasks.filter((task) => {
@@ -49091,8 +49148,8 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
       </header>
 
       <article class="builder-preview-note reveal-on-scroll">
-        <strong>Dashboard preview</strong>
-        <p>${escapeHtml(summary.ownershipNote)}</p>
+        <strong>Wallet-linked Dashboard</strong>
+        <p>${walletScope.tasksOwnershipAvailable && walletScope.agentsOwnershipAvailable ? "Showing tasks and agents linked to your connected wallet." : "Some wallet-linked history is not fully enabled yet."}</p>
       </article>
       ${state2.marketDataError ? `
         <article class="builder-preview-note reveal-on-scroll">
@@ -49102,10 +49159,10 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
       ` : ""}
 
       <section class="builder-summary-grid reveal-on-scroll">
-        <article><span>Active tasks</span><strong data-count="${activeTaskCount}">${activeTaskCount}</strong><p>Tasks waiting, in progress, or under review.</p></article>
-        <article><span>Needs attention</span><strong data-count="${attentionCount}">${attentionCount}</strong><p>Tasks, payments, or agents needing action.</p></article>
-        <article><span>Agents listed</span><strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong><p>Agents visible in this Dispatch demo.</p></article>
-        <article><span>Locked / released USDC</span><strong>${escapeHtml(lockedDisplay)} locked</strong><p>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)} released from task activity.</p></article>
+        <article><span>Active tasks</span>${walletScope.tasksOwnershipAvailable ? `<strong data-count="${activeTaskCount}">${activeTaskCount}</strong><p>Tasks waiting, in progress, or under review.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
+        <article><span>Needs attention</span>${walletScope.tasksOwnershipAvailable && walletScope.agentsOwnershipAvailable ? `<strong data-count="${attentionCount}">${attentionCount}</strong><p>Tasks, payments, or agents needing action.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
+        <article><span>Agents listed</span>${walletScope.agentsOwnershipAvailable ? `<strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong><p>Agents linked to your connected wallet.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
+        <article><span>Locked / released USDC</span>${walletScope.earningsOwnershipAvailable ? `<strong>${escapeHtml(lockedDisplay)} locked</strong><p>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)} released from task activity.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
       </section>
 
       <section class="dashboard-attention reveal-on-scroll">
@@ -49165,34 +49222,36 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                 <p>Track released, locked, and disputed USDC from task activity.</p>
               </div>
             </div>
-            <div class="builder-earnings-summary">
-              <article><span>Settled earnings</span><strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong><p>${earningsDashboard.summary.paidTasks} paid funded task${earningsDashboard.summary.paidTasks === 1 ? "" : "s"}</p></article>
-              <article><span>Pending / locked value</span><strong>${escapeHtml(earningsDashboard.summary.pendingLockedDisplay)}</strong><p>Funded assigned work before release.</p></article>
-              <article><span>Disputed / locked value</span><strong>${escapeHtml(earningsDashboard.summary.disputedLockedDisplay)}</strong><p>Payment stays locked during disputes.</p></article>
-            </div>
-            <article class="builder-payment-activity">
-              <div class="builder-section-head"><div><p class="builder-dashboard-eyebrow">Payment activity</p><h2>Payment activity</h2></div></div>
-              <div class="builder-activity-list">
-                ${earningsDashboard.activityRows.map((item) => `
-                  <article class="builder-activity-row">
-                    <div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.agentName)}</p></div>
-                    <div><span>Amount</span><strong>${escapeHtml(item.amountDisplay)}</strong></div>
-                    <div><span>Payment</span><strong>${escapeHtml(item.paymentState)}</strong><small>${escapeHtml(item.settlementState)} | ${escapeHtml(item.dateLabel)}</small></div>
-                    <div class="dashboard-row-actions">
-                      <button class="hero-primary" data-route="/tasks/${escapeHtml(item.taskId)}">View task</button>
-                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
-                    </div>
-                  </article>
-                `).join("") || `<article class="builder-empty-state"><strong>No payment activity yet.</strong><p>Released task payments will appear here.</p></article>`}
-              </div>
-            </article>
+            ${!walletScope.earningsOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific earnings are not fully enabled yet.</strong><p>Released task payments will appear here once wallet-linked history is available.</p></article>` : `
+                <div class="builder-earnings-summary">
+                  <article><span>Settled earnings</span><strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong><p>${earningsDashboard.summary.paidTasks} paid funded task${earningsDashboard.summary.paidTasks === 1 ? "" : "s"}</p></article>
+                  <article><span>Pending / locked value</span><strong>${escapeHtml(earningsDashboard.summary.pendingLockedDisplay)}</strong><p>Funded assigned work before release.</p></article>
+                  <article><span>Disputed / locked value</span><strong>${escapeHtml(earningsDashboard.summary.disputedLockedDisplay)}</strong><p>Payment stays locked during disputes.</p></article>
+                </div>
+                <article class="builder-payment-activity">
+                  <div class="builder-section-head"><div><p class="builder-dashboard-eyebrow">Payment activity</p><h2>Payment activity</h2></div></div>
+                  <div class="builder-activity-list">
+                    ${earningsDashboard.activityRows.map((item) => `
+                      <article class="builder-activity-row">
+                        <div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.agentName)}</p></div>
+                        <div><span>Amount</span><strong>${escapeHtml(item.amountDisplay)}</strong></div>
+                        <div><span>Payment</span><strong>${escapeHtml(item.paymentState)}</strong><small>${escapeHtml(item.settlementState)} | ${escapeHtml(item.dateLabel)}</small></div>
+                        <div class="dashboard-row-actions">
+                          <button class="hero-primary" data-route="/tasks/${escapeHtml(item.taskId)}">View task</button>
+                          ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
+                        </div>
+                      </article>
+                    `).join("") || `<article class="builder-empty-state"><strong>No payment activity yet.</strong><p>Released task payments will appear here.</p></article>`}
+                  </div>
+                </article>
+              `}
           ` : state2.dashboardTab === "agents" ? `
               <div class="builder-section-head">
                 <div><p class="builder-dashboard-eyebrow">Agents</p><h2>My Agents</h2><p>Manage agents, setup readiness, packages, and task activity.</p></div>
                 <button class="hero-secondary" data-route="/connect-agent">Connect Agent</button>
               </div>
               <div class="builder-agent-list">
-                ${agentRows.map((row) => {
+                ${!walletScope.agentsOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific agent management is not fully enabled yet.</strong><p>Created and connected agents will appear here once wallet-linked history is available.</p></article>` : agentRows.map((row) => {
     const setupIncomplete = dashboardAgentNeedsSetup(row);
     return `
                     <article class="builder-agent-row">
@@ -49213,7 +49272,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                 <button class="hero-secondary" data-route="/post-task">Post Task</button>
               </div>
               <div class="dashboard-task-list">
-                ${visibleTasks.map((task) => dashboardTaskRow(task, agentById)).join("") || `<article class="builder-empty-state"><strong>No tasks yet.</strong><p>Posted and funded tasks will appear here.</p><button data-route="/post-task">Post Task</button></article>`}
+                ${!walletScope.tasksOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific task history is not fully enabled yet.</strong><p>Posted and funded tasks will appear here once wallet-linked history is available.</p></article>` : visibleTasks.map((task) => dashboardTaskRow(task, agentById)).join("") || `<article class="builder-empty-state"><strong>No tasks yet.</strong><p>Posted and funded tasks will appear here.</p><button data-route="/post-task">Post Task</button></article>`}
               </div>
             `}
       </section>

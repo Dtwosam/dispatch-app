@@ -26,6 +26,7 @@ import {
   buildTaskResultModel,
   buildTaskStatusDisplayModel,
   buildTaskTemplateBrief,
+  buildWalletScopedDashboardModel,
   getTaskBriefTemplate,
   taskBriefTemplates,
 } from "./ui-models.js";
@@ -366,7 +367,64 @@ test("builder dashboard summary uses real agent performance data only", () => {
   assert.equal(summary.activeAgents, 1);
   assert.equal(summary.paidTasksCompleted, 2);
   assert.equal(summary.paidEarningsDisplay, "30 USDC");
-  assert.equal(summary.ownershipNote, "Showing tasks and agents visible in this demo. Wallet-specific history is not fully enabled yet.");
+  assert.equal(summary.ownershipNote, "Use wallet-linked tasks and agents for builder dashboard totals.");
+});
+
+test("wallet-scoped dashboard separates buyer tasks owned agents and owned-agent earnings", () => {
+  const scope = buildWalletScopedDashboardModel([
+    { profile: { agentId: "mine", ownerWallet: "0xBuilder", publicName: "Mine" } },
+    { profile: { agentId: "other", ownerWallet: "0xOther", publicName: "Other" } },
+  ], {
+    allOpenTasks: [
+      { taskId: "buyer-task", creatorWallet: "0xbuilder", selectedAgentId: "other", participatingAgentIds: [] },
+      { taskId: "agent-task", creatorWallet: "0xbuyer", selectedAgentId: "mine", participatingAgentIds: ["mine"] },
+      { taskId: "other-task", creatorWallet: "0xother", selectedAgentId: "other", participatingAgentIds: ["other"] },
+    ],
+  }, "0xBuilder");
+
+  assert.equal(scope.walletConnected, true);
+  assert.deepEqual(scope.ownedAgents.map((agent) => agent.profile.agentId), ["mine"]);
+  assert.deepEqual(scope.walletTaskCollections.allOpenTasks.map((task) => task.taskId), ["buyer-task"]);
+  assert.deepEqual(scope.earningsTaskCollections.allOpenTasks.map((task) => task.taskId), ["agent-task"]);
+  assert.deepEqual(scope.attentionTasks.map((task) => task.taskId), ["buyer-task", "agent-task"]);
+  assert.equal(scope.tasksOwnershipAvailable, true);
+  assert.equal(scope.agentsOwnershipAvailable, true);
+  assert.equal(scope.earningsOwnershipAvailable, true);
+});
+
+test("wallet-scoped dashboard fails closed when ownership fields are incomplete", () => {
+  const scope = buildWalletScopedDashboardModel([
+    { profile: { agentId: "mine", ownerWallet: "0xbuilder" } },
+    { profile: { agentId: "unknown-owner" } },
+  ], {
+    activeTasks: [
+      { taskId: "mine", creatorWallet: "0xbuilder", selectedAgentId: "mine", participatingAgentIds: ["mine"] },
+      { taskId: "unknown-creator", selectedAgentId: "unknown-owner", participatingAgentIds: ["unknown-owner"] },
+    ],
+  }, "0xbuilder");
+
+  assert.deepEqual(scope.ownedAgents.map((agent) => agent.profile.agentId), ["mine"]);
+  assert.deepEqual(scope.walletTaskCollections.activeTasks.map((task) => task.taskId), ["mine"]);
+  assert.deepEqual(scope.earningsTaskCollections.activeTasks.map((task) => task.taskId), ["mine"]);
+  assert.equal(scope.tasksOwnershipAvailable, false);
+  assert.equal(scope.agentsOwnershipAvailable, false);
+  assert.equal(scope.earningsOwnershipAvailable, false);
+});
+
+test("wallet-scoped dashboard exposes no private rows without a connected wallet", () => {
+  const scope = buildWalletScopedDashboardModel([
+    { profile: { agentId: "mine", ownerWallet: "0xbuilder" } },
+  ], {
+    myPostedTasks: [
+      { taskId: "mine", creatorWallet: "0xbuilder", selectedAgentId: "mine", participatingAgentIds: ["mine"] },
+    ],
+  });
+
+  assert.equal(scope.walletConnected, false);
+  assert.deepEqual(scope.ownedAgents, []);
+  assert.deepEqual(scope.walletTaskCollections.myPostedTasks, []);
+  assert.deepEqual(scope.earningsTaskCollections.myPostedTasks, []);
+  assert.deepEqual(scope.attentionTasks, []);
 });
 
 test("builder agent rows expose packages and honest missing metric fallbacks", () => {

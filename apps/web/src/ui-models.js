@@ -1036,6 +1036,7 @@ function collectTaskBuckets(taskCollections = {}) {
   return [
     ...(taskCollections.myPostedTasks || []),
     ...(taskCollections.allOpenTasks || []),
+    ...(taskCollections.tasksAssignedToMyAgents || []),
     ...(taskCollections.activeTasks || []),
     ...(taskCollections.completedTasks || []),
     ...(taskCollections.rejectedTasks || []),
@@ -1045,6 +1046,49 @@ function collectTaskBuckets(taskCollections = {}) {
 
 function taskBelongsToAgent(task, agentId) {
   return task?.selectedAgentId === agentId || (task?.participatingAgentIds || []).includes(agentId);
+}
+
+function normalizedWallet(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function filterTaskCollections(taskCollections, predicate) {
+  return Object.fromEntries(
+    Object.entries(taskCollections || {}).map(([key, tasks]) => [
+      key,
+      Array.isArray(tasks) ? tasks.filter(predicate) : tasks,
+    ]),
+  );
+}
+
+export function buildWalletScopedDashboardModel(agents = [], taskCollections = {}, wallet = "") {
+  const walletKey = normalizedWallet(wallet);
+  const allTasks = collectTaskBuckets(taskCollections);
+  const hasCompleteTaskOwnership = allTasks.every((task) => Boolean(normalizedWallet(task?.creatorWallet)));
+  const hasCompleteAgentOwnership = agents.every((agent) => Boolean(normalizedWallet(agent?.profile?.ownerWallet)));
+  const ownedAgents = walletKey
+    ? agents.filter((agent) => normalizedWallet(agent?.profile?.ownerWallet) === walletKey)
+    : [];
+  const ownedAgentIds = new Set(ownedAgents.map((agent) => agent?.profile?.agentId).filter(Boolean));
+  const isWalletTask = (task) => walletKey && normalizedWallet(task?.creatorWallet) === walletKey;
+  const isOwnedAgentTask = (task) => walletKey && (
+    ownedAgentIds.has(task?.selectedAgentId)
+    || (task?.participatingAgentIds || []).some((agentId) => ownedAgentIds.has(agentId))
+  );
+  const walletTaskCollections = filterTaskCollections(taskCollections, isWalletTask);
+  const earningsTaskCollections = filterTaskCollections(taskCollections, isOwnedAgentTask);
+  const attentionTasks = allTasks.filter((task) => isWalletTask(task) || isOwnedAgentTask(task));
+
+  return {
+    walletConnected: Boolean(walletKey),
+    ownedAgents,
+    walletTaskCollections,
+    earningsTaskCollections,
+    attentionTasks,
+    tasksOwnershipAvailable: hasCompleteTaskOwnership,
+    agentsOwnershipAvailable: hasCompleteAgentOwnership,
+    earningsOwnershipAvailable: hasCompleteAgentOwnership && hasCompleteTaskOwnership,
+  };
 }
 
 function readTaskReward(task) {
@@ -1435,7 +1479,7 @@ export function buildAgentBuilderSummaryModel(agents = [], taskCollections = {})
     paidEarnings,
     paidEarningsDisplay: `${paidEarnings.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`,
     attentionCount,
-    ownershipNote: "Showing tasks and agents visible in this demo. Wallet-specific history is not fully enabled yet.",
+    ownershipNote: "Use wallet-linked tasks and agents for builder dashboard totals.",
   };
 }
 
