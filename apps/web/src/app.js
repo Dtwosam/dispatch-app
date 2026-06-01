@@ -1234,9 +1234,9 @@ function renderPostTaskPage() {
           <article class="post-task-composer reveal-on-scroll">
             <div class="post-task-section-head">
               <div>
-                <p class="post-task-eyebrow">Task brief</p>
-                <h2>Describe the outcome.</h2>
-                <p>Tell the agent what outcome you want.</p>
+                <p class="post-task-eyebrow">Work request</p>
+                <h2>What do you need done?</h2>
+                <p>Describe the outcome you want. Templates and packages only help you start faster.</p>
               </div>
               <div class="post-task-meta">
                 <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
@@ -1255,11 +1255,17 @@ function renderPostTaskPage() {
               </div>
             ` : ""}
 
+            <section class="post-brief-fields">
+              <label class="post-field post-field--wide"><strong>Task title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
+              <label class="post-field post-field--wide"><strong>Work request <span class="post-required-badge">Required</span></strong><span>Tell the agent what outcome you want.</span><textarea id="taskDescription" rows="9" placeholder="Example: Write a 5-post X thread explaining my product in simple language.">${escapeHtml(state.taskForm.description)}</textarea></label>
+            </section>
+
             <section class="post-template-section">
               <div class="post-task-section-head post-task-section-head--compact">
                 <div>
-                  <p class="post-task-eyebrow">Template</p>
-                  <h3>Pick a starting point.</h3>
+                  <p class="post-task-eyebrow">Quick start</p>
+                  <h3>Start from a template</h3>
+                  <p>Pick a starting point, then edit the brief.</p>
                 </div>
                 <span>${escapeHtml(selectedTemplate.name)}</span>
               </div>
@@ -1288,40 +1294,52 @@ function renderPostTaskPage() {
             </section>
 
             <section class="post-brief-fields">
-              <label class="post-field post-field--wide"><strong>Title</strong><input id="taskTitle" value="${escapeHtml(state.taskForm.title)}" placeholder="Rewrite our pricing page for higher conversion clarity" /></label>
-              <label class="post-field post-field--wide"><strong>Final editable brief</strong><textarea id="taskDescription" rows="9" placeholder="Describe what good looks like, what to avoid, and what must be delivered.">${escapeHtml(state.taskForm.description)}</textarea></label>
               <label class="post-field"><strong>Category</strong><select id="taskCategory">${categories.map((category) => `<option value="${category}" ${state.taskForm.category === category ? "selected" : ""}>${labelize(category)}</option>`).join("")}</select></label>
               <label class="post-field"><strong>USDC reward</strong><input id="taskReward" type="number" min="1" value="${state.taskForm.rewardAmount}" /><span>This amount is locked before the agent starts.</span></label>
               <label class="post-field"><strong>Deadline</strong><input id="taskDeadline" type="datetime-local" value="${state.taskForm.deadline}" /></label>
-              <div class="post-route-control">
-                <p class="post-task-eyebrow">Agent route</p>
-                <div class="segmented">
-                  <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "active" : ""}">Choose an agent</button>
-                  <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "active" : ""}">Post to marketplace</button>
-                </div>
-                <p class="post-helper">${escapeHtml(routeChoiceHelper)}</p>
-              </div>
-              ${state.taskForm.hiringMode === "direct_hire"
-                ? `
-                  <label class="post-field post-field--wide"><strong>Selected agent</strong>
-                    <select id="selectedAgentId">
-                      <option value="">${state.marketDataLoading && !state.marketDataLoaded ? "Loading agents..." : "Choose an agent"}</option>
-                      ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} readiness</option>`).join("")}
-                    </select>
-                  </label>
-                `
-                : `
-                  <label class="post-field post-field--wide"><strong>Max participants</strong><input id="taskParticipants" type="number" min="1" max="20" value="${state.taskForm.maxParticipants}" /></label>
-                `}
             </section>
+          </article>
+
+          <article class="post-assignment-card reveal-on-scroll">
+            <div class="post-task-section-head">
+              <div>
+                <p class="post-task-eyebrow">Assignment</p>
+                <h2>Who should do it?</h2>
+                <p>Send the task to one agent or let available agents pick it up.</p>
+              </div>
+            </div>
+            <div class="post-assignment-options">
+              <button type="button" data-mode="direct_hire" class="${state.taskForm.hiringMode === "direct_hire" ? "is-selected" : ""}">
+                <strong>Choose an agent</strong>
+                <span>Best when you already know who should do the work.</span>
+              </button>
+              <button type="button" data-mode="open_market" class="${state.taskForm.hiringMode === "open_market" ? "is-selected" : ""}">
+                <strong>Post to marketplace</strong>
+                <span>Best when you want available agents to pick it up.</span>
+              </button>
+            </div>
+            ${state.taskForm.hiringMode === "direct_hire"
+              ? `
+                <label class="post-field"><strong>Selected agent</strong>
+                  <select id="selectedAgentId">
+                    <option value="">${state.marketDataLoading && !state.marketDataLoaded ? "Loading agents..." : "Choose an agent"}</option>
+                    ${state.agents.map((agent) => `<option value="${agent.profile.agentId}" ${state.taskForm.selectedAgentId === agent.profile.agentId ? "selected" : ""}>${escapeHtml(agent.profile.publicName)} | ${trustScore(agent)} readiness</option>`).join("")}
+                  </select>
+                  <span>${escapeHtml(routeChoiceHelper)}</span>
+                </label>
+              `
+              : `
+                <label class="post-field"><strong>Max participants</strong><input id="taskParticipants" type="number" min="1" max="20" value="${state.taskForm.maxParticipants}" /><span>${escapeHtml(routeChoiceHelper)}</span></label>
+              `}
           </article>
 
           <details class="post-advanced reveal-on-scroll">
             <summary>
-              <span>Advanced options</span>
-              <small>Optional evaluation and attachment settings</small>
+              <span>Optional details</span>
+              <small>Files, evaluation, and extra setup</small>
             </summary>
             <div class="post-advanced__body">
+              <p class="post-helper">Use these only if your task needs files, evaluation, or extra setup.</p>
               <div class="post-advanced-grid">
                 <label class="post-field"><strong>Evaluation preference</strong>
                   <select id="taskEvaluationPreference">
@@ -1354,19 +1372,26 @@ function renderPostTaskPage() {
               </div>
             </div>
           </details>
+
+          <details class="post-demo-card reveal-on-scroll">
+            <summary>Local test flow</summary>
+            <p>Use only for local testing when wallet funding is unavailable.</p>
+            <button type="button" data-start-demo-flow>Run local test</button>
+          </details>
         </div>
 
         <aside class="post-task-side">
           <article class="post-funding-summary reveal-on-scroll">
-            <p class="post-task-eyebrow">Funding summary</p>
-            <h2>${escapeHtml(primaryActionLabel)}</h2>
+            <p class="post-task-eyebrow">Checkout</p>
+            <h2>Fund the task</h2>
+            <p class="post-helper">This reward is locked before work starts.</p>
             <div class="post-summary-list">
               <div><span>Reward</span><strong>${state.taskForm.rewardAmount ? formatCurrency(state.taskForm.rewardAmount) : "Not set"}</strong></div>
               <div><span>Network</span><strong>Arc Testnet</strong></div>
               <div><span>Token</span><strong>USDC</strong></div>
               <div><span>Wallet</span><strong>${walletReady ? shortWallet(state.wallet) : "Required"}</strong></div>
               <div><span>Balance</span><strong>${walletReady ? escapeHtml(state.walletNetwork?.usdcBalance == null ? "Balance unavailable" : `${Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`) : "Connect wallet"}</strong></div>
-              <div><span>Agent route</span><strong>${state.taskForm.hiringMode === "direct_hire" ? (selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose agent") : "Post to marketplace"}</strong></div>
+              <div><span>Task path</span><strong>${state.taskForm.hiringMode === "direct_hire" ? (selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : "Choose an agent") : "Post to marketplace"}</strong></div>
               <div><span>Package</span><strong>${state.taskForm.selectedServicePackage ? escapeHtml(state.taskForm.selectedServicePackage.name) : "Custom task"}</strong></div>
             </div>
             ${!walletOnArc && walletReady ? `<button type="button" class="hero-secondary post-switch-button" id="switchArcFromPost">Switch to Arc Testnet</button>` : ""}
@@ -1378,44 +1403,9 @@ function renderPostTaskPage() {
             ` : ""}
             <button class="hero-primary" id="fundTaskButton" ${fundingBlocked ? "disabled" : ""}>${escapeHtml(primaryActionLabel)}</button>
             <p class="post-checkout-note">USDC stays locked until you approve the work.</p>
+            <p class="post-dashboard-guidance">After funding, this task will appear in your Dashboard.</p>
             <p class="post-funding-hint disabled-reason">${escapeHtml(fundingHint)}</p>
           </article>
-
-          <article class="post-route-summary reveal-on-scroll">
-            <p class="post-task-eyebrow">Agent route</p>
-            <h3>${selectedAgent ? escapeHtml(selectedAgent.profile.publicName) : escapeHtml(routeChoiceLabel)}</h3>
-            <p>${selectedAgent ? escapeHtml(selectedAgent.profile.description) : escapeHtml(routeChoiceHelper)}</p>
-            ${selectedAgent ? `
-              <div class="post-route-tags">
-                ${selectedAgentBestFor.slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
-              </div>
-              <div class="post-suggested-list">
-                ${selectedAgentIdeas.slice(0, 2).map((idea, index) => `
-                  <button type="button" data-suggested-task="${index}">
-                    <strong>Starter idea ${index + 1}</strong>
-                    <span>${escapeHtml(idea)}</span>
-                  </button>
-                `).join("")}
-              </div>
-            ` : ""}
-          </article>
-
-          <article class="post-preview-card reveal-on-scroll">
-            <p class="post-task-eyebrow">Preview</p>
-            <h3>${escapeHtml(state.taskForm.title || "Your task title appears here")}</h3>
-            <p>${escapeHtml(state.taskForm.description || "A clearer brief makes execution faster and review easier.")}</p>
-            <div>
-              <span>${labelize(state.taskForm.category)}</span>
-              <span>${state.taskForm.rewardAmount ? `Reward ${formatCurrency(state.taskForm.rewardAmount)}` : "Reward not set"}</span>
-              <span>${state.taskForm.deadline ? `Deadline ${deadlineCountdown(state.taskForm.deadline)}` : "Deadline not set"}</span>
-            </div>
-          </article>
-
-          <details class="post-demo-card reveal-on-scroll">
-            <summary>Local test flow</summary>
-            <p>Use only for local testing when wallet funding is unavailable.</p>
-            <button type="button" data-start-demo-flow>Start local test</button>
-          </details>
         </aside>
       </section>
 

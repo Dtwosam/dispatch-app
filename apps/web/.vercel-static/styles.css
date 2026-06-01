@@ -1722,16 +1722,25 @@ button[data-open-dispute] {
 }
 
 .post-task-composer,
-.post-funding-summary {
+.post-funding-summary,
+.post-assignment-card {
   border: 1px solid rgba(142, 255, 240, 0.1);
   border-radius: 30px;
   background: rgba(9, 25, 42, 0.7);
 }
 
-.post-task-composer {
+.post-task-composer,
+.post-assignment-card {
   display: grid;
   gap: 24px;
   padding: 32px;
+}
+
+.post-assignment-card {
+  padding: 26px;
+  border-color: rgba(142, 255, 240, 0.08);
+  border-radius: 28px;
+  background: rgba(9, 25, 42, 0.62);
 }
 
 .post-funding-summary {
@@ -1818,6 +1827,7 @@ button[data-open-dispute] {
 .post-package-summary p,
 .post-helper,
 .post-checkout-note,
+.post-dashboard-guidance,
 .post-funding-hint {
   margin: 0;
   color: #9bb1c5;
@@ -1938,6 +1948,40 @@ button[data-open-dispute] {
 .post-route-control {
   display: grid;
   gap: 10px;
+}
+
+.post-assignment-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.post-assignment-options button {
+  display: grid;
+  gap: 7px;
+  min-height: 104px;
+  padding: 18px 20px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.post-assignment-options button:hover,
+.post-assignment-options button.is-selected {
+  border-color: rgba(150, 255, 240, 0.16);
+  background: rgba(150, 255, 240, 0.06);
+}
+
+.post-assignment-options strong {
+  color: #f4fbff;
+  font-size: 1rem;
+}
+
+.post-assignment-options span {
+  color: #9bb1c5;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .post-quiet-button,
@@ -2086,6 +2130,24 @@ button[data-open-dispute] {
   padding: 16px 18px;
   border-color: rgba(255, 255, 255, 0.035);
   background: rgba(255, 255, 255, 0.012);
+}
+
+.post-dashboard-guidance {
+  color: #bffef6;
+}
+
+.post-required-badge {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0 8px;
+  border: 1px solid rgba(150, 255, 240, 0.12);
+  border-radius: 999px;
+  color: #bffef6 !important;
+  font-size: 0.68rem !important;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .post-demo-card summary {
@@ -6968,8 +7030,37 @@ body::after {
     grid-template-columns: 1fr;
   }
 
+  .post-task-main,
+  .post-task-side {
+    display: contents;
+  }
+
   .post-task-side {
     position: static;
+  }
+
+  .post-task-alert {
+    order: 0;
+  }
+
+  .post-task-composer {
+    order: 1;
+  }
+
+  .post-assignment-card {
+    order: 2;
+  }
+
+  .post-funding-summary {
+    order: 3;
+  }
+
+  .post-advanced {
+    order: 4;
+  }
+
+  .post-demo-card {
+    order: 5;
   }
 
   .post-template-grid {
@@ -7029,6 +7120,7 @@ body::after {
 
   .post-task-flow,
   .post-task-composer,
+  .post-assignment-card,
   .post-funding-summary {
     padding: 20px;
     border-radius: 24px;
@@ -7051,6 +7143,11 @@ body::after {
 
   #taskDescription {
     min-height: 180px;
+  }
+
+  .post-assignment-options {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .post-mobile-action {
