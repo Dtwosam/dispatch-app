@@ -8144,3 +8144,307 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Task review workspace: submission first, decision second, technical details last. */
+.task-detail-page {
+  gap: 0;
+}
+
+.task-detail-hero {
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  align-items: center;
+  background: rgba(9, 25, 42, 0.72);
+}
+
+.task-next-panel {
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.task-next-rows > div,
+.task-payment-rows > div {
+  min-height: auto;
+  padding: 10px 0;
+}
+
+.task-next-rows span,
+.task-payment-rows span {
+  font-weight: 650;
+}
+
+.task-next-rows strong,
+.task-payment-rows strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.task-next-status {
+  min-height: 42px;
+  margin-top: 0;
+  font-size: 0.82rem;
+}
+
+.task-lifecycle-strip {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.task-lifecycle-step {
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.task-lifecycle-step--complete,
+.task-lifecycle-step--current {
+  border-color: rgba(150, 255, 240, 0.12);
+  background: rgba(150, 255, 240, 0.045);
+}
+
+.task-detail-alert.reveal-on-scroll {
+  margin-top: 22px;
+}
+
+.task-review-workspace {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 400px);
+  gap: 30px;
+  margin-top: 40px;
+}
+
+.task-result-panel {
+  gap: 20px;
+  padding: 28px;
+  background: rgba(9, 25, 42, 0.7);
+}
+
+.task-decision-panel {
+  padding: 24px;
+  border-radius: 28px;
+  background: rgba(9, 25, 42, 0.74);
+}
+
+.task-payment-panel {
+  padding: 24px;
+  border-color: rgba(255, 255, 255, 0.06);
+  border-radius: 28px;
+  background: rgba(9, 25, 42, 0.64);
+}
+
+.task-submission-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.task-submission-summary > div {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.task-submission-summary span,
+.task-submission-summary strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.task-submission-summary span {
+  color: #6f879d;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.task-submission-summary strong {
+  margin-top: 5px;
+  color: #f4fbff;
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.task-delivered-work,
+.task-review-assistance {
+  display: grid;
+  gap: 12px;
+}
+
+.task-delivered-work h3,
+.task-review-assistance h3 {
+  margin: 0;
+  color: #f4fbff;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.task-review-assistance {
+  margin-top: 2px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.task-review-assistance p {
+  margin: 4px 0 0;
+  color: #9bb1c5;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.task-result-surface {
+  padding: 20px 22px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.task-decision-actions,
+.task-secondary-actions {
+  gap: 10px;
+}
+
+.task-decision-actions button,
+.task-secondary-actions button {
+  width: 100%;
+}
+
+.task-decision-actions button[data-user-review="approve"],
+.task-payment-panel button[data-task-action="settle"] {
+  min-height: 52px;
+  border-radius: 16px;
+  color: #031018;
+  background: #96fff0;
+  box-shadow: 0 0 24px rgba(150, 255, 240, 0.14);
+}
+
+.task-decision-actions button[data-request-revision-toggle],
+.task-form-panel button[data-request-revision] {
+  border-color: rgba(142, 255, 240, 0.16);
+  background: transparent;
+  color: #f4fbff;
+}
+
+.task-secondary-actions button[data-open-dispute-toggle],
+.task-form-panel button[data-open-dispute] {
+  border-color: rgba(246, 196, 83, 0.16);
+  background: rgba(246, 196, 83, 0.04);
+  color: #f6c453;
+}
+
+.task-support-grid {
+  gap: 22px;
+  margin-top: 44px;
+}
+
+.task-support-panel {
+  padding: 22px;
+  border-radius: 24px;
+}
+
+.task-support-panel.is-quiet {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.task-history-grid {
+  grid-template-columns: 1fr;
+  margin-top: 40px;
+}
+
+.task-history-panel {
+  padding: 22px 24px;
+  border-color: rgba(255, 255, 255, 0.045);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.task-activity-list article {
+  min-height: 56px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.task-technical-section {
+  margin-top: 36px;
+}
+
+.task-technical-section .task-detail-details {
+  padding: 18px 20px;
+  border-color: rgba(255, 255, 255, 0.04);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.task-technical-section .task-detail-details > div > section {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .task-detail-hero,
+  .task-review-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .task-review-workspace {
+    gap: 22px;
+  }
+
+  .task-lifecycle-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .task-detail-hero,
+  .task-result-panel,
+  .task-decision-panel,
+  .task-payment-panel {
+    padding: 22px;
+  }
+
+  .task-lifecycle-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 28px;
+    padding: 0;
+  }
+
+  .task-lifecycle-step {
+    min-height: 58px;
+    padding: 11px 12px;
+  }
+
+  .task-review-workspace {
+    margin-top: 36px;
+  }
+
+  .task-submission-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .task-result-surface {
+    padding: 16px 18px;
+  }
+
+  .task-support-grid {
+    margin-top: 40px;
+  }
+
+  .task-history-grid {
+    margin-top: 36px;
+  }
+
+  .task-technical-section {
+    margin-top: 32px;
+  }
+}
