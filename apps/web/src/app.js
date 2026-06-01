@@ -74,6 +74,7 @@ let initialMarketHydrationPromise = null;
 let postTaskReadinessPromise = null;
 let postTaskReadinessLastAttemptAt = 0;
 const pendingTaskAutoChecks = new Set();
+const pendingTaskReviewActions = new Set();
 let activeTaskDetailRenderToken = 0;
 
 function persistRevisionRequests() {
@@ -1693,6 +1694,11 @@ async function runTaskAction(taskId, action, trigger) {
 }
 
 async function runAssistedReview(taskId, mode, trigger) {
+  if (pendingTaskReviewActions.has(taskId)) {
+    updateStatus("Review already running", "Please wait for the current review request to finish.", "neutral");
+    return;
+  }
+  pendingTaskReviewActions.add(taskId);
   try {
     setButtonLoading(trigger, true, "Running review");
     requireWallet();
@@ -1708,11 +1714,17 @@ async function runAssistedReview(taskId, mode, trigger) {
   } catch (error) {
     updateStatus("Evaluation failed", statusMessage(error, "Evaluation failed"), "warn");
   } finally {
+    pendingTaskReviewActions.delete(taskId);
     setButtonLoading(trigger, false);
   }
 }
 
 async function runUserDecision(taskId, decision, trigger) {
+  if (pendingTaskReviewActions.has(taskId)) {
+    updateStatus("Review already running", "Please wait for the current review request to finish.", "neutral");
+    return;
+  }
+  pendingTaskReviewActions.add(taskId);
   try {
     setButtonLoading(trigger, true, labelize(decision));
     requireWallet();
@@ -1740,6 +1752,7 @@ async function runUserDecision(taskId, decision, trigger) {
   } catch (error) {
     updateStatus("Review failed", statusMessage(error, "Review failed"), "warn");
   } finally {
+    pendingTaskReviewActions.delete(taskId);
     setButtonLoading(trigger, false);
   }
 }

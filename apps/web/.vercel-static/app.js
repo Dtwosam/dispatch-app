@@ -46813,7 +46813,11 @@ async function sendJson(apiBase, path, method, body, validate6) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error || `Request failed for ${path}`);
+    const message = payload.error || `Request failed for ${path}`;
+    if (/HTTP 429|too many review requests|rate.?limit/i.test(message)) {
+      throw new Error("Too many review requests. Please wait a moment and try again.");
+    }
+    throw new Error(message);
   }
   return validate6 ? validate6(payload) : payload;
 }
@@ -49967,6 +49971,7 @@ var initialMarketHydrationPromise = null;
 var postTaskReadinessPromise = null;
 var postTaskReadinessLastAttemptAt = 0;
 var pendingTaskAutoChecks = /* @__PURE__ */ new Set();
+var pendingTaskReviewActions = /* @__PURE__ */ new Set();
 var activeTaskDetailRenderToken = 0;
 function persistRevisionRequests() {
   localStorage.setItem("dispatchRevisionRequests", JSON.stringify(state.revisionRequests || {}));
@@ -51414,6 +51419,11 @@ async function runTaskAction(taskId, action, trigger) {
   }
 }
 async function runAssistedReview(taskId, mode, trigger) {
+  if (pendingTaskReviewActions.has(taskId)) {
+    updateStatus2("Review already running", "Please wait for the current review request to finish.", "neutral");
+    return;
+  }
+  pendingTaskReviewActions.add(taskId);
   try {
     setButtonLoading(trigger, true, "Running review");
     requireWallet2();
@@ -51429,10 +51439,16 @@ async function runAssistedReview(taskId, mode, trigger) {
   } catch (error) {
     updateStatus2("Evaluation failed", statusMessage(error, "Evaluation failed"), "warn");
   } finally {
+    pendingTaskReviewActions.delete(taskId);
     setButtonLoading(trigger, false);
   }
 }
 async function runUserDecision(taskId, decision, trigger) {
+  if (pendingTaskReviewActions.has(taskId)) {
+    updateStatus2("Review already running", "Please wait for the current review request to finish.", "neutral");
+    return;
+  }
+  pendingTaskReviewActions.add(taskId);
   try {
     setButtonLoading(trigger, true, labelize(decision));
     requireWallet2();
@@ -51456,6 +51472,7 @@ async function runUserDecision(taskId, decision, trigger) {
   } catch (error) {
     updateStatus2("Review failed", statusMessage(error, "Review failed"), "warn");
   } finally {
+    pendingTaskReviewActions.delete(taskId);
     setButtonLoading(trigger, false);
   }
 }

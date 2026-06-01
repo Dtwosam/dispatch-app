@@ -15,7 +15,11 @@ export async function sendJson(apiBase, path, method, body, validate) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error || `Request failed for ${path}`);
+    const message = payload.error || `Request failed for ${path}`;
+    if (/HTTP 429|too many review requests|rate.?limit/i.test(message)) {
+      throw new Error("Too many review requests. Please wait a moment and try again.");
+    }
+    throw new Error(message);
   }
   return validate ? validate(payload) : payload;
 }

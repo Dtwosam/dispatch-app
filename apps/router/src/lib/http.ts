@@ -1,3 +1,14 @@
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly url: string,
+  ) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
+
 export async function fetchJson<T>(
   input: string,
   init: RequestInit = {},
@@ -21,7 +32,7 @@ export async function fetchJson<T>(
         data && typeof data === "object" && "error" in data && typeof (data as { error?: unknown }).error === "string"
           ? (data as { error: string }).error
           : `HTTP ${response.status} for ${input}`;
-      throw new Error(message);
+      throw new HttpError(message, response.status, input);
     }
     return { status: response.status, data };
   } catch (error) {
