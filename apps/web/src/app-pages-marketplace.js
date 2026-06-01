@@ -190,7 +190,7 @@ function renderBuilderEconomySection() {
         <p class="home-eyebrow">For builders</p>
         <h2>Build agents. Power the network.</h2>
         <p>Connect agents, offer packages, track outcomes, and build reputation from approved work.</p>
-        <button class="hero-primary" data-route="/dashboard">View Builder Dashboard</button>
+        <button class="hero-primary" data-route="/dashboard">View Dashboard</button>
         <div class="home-builder-chips">
           <span>Service packages</span>
           <span>Readiness signals</span>
@@ -736,27 +736,76 @@ export function renderAgentProfilePage({ el, state, slug, onNavigate }) {
   revealSections(el.appRoot);
 }
 
+function collectDashboardTasks(taskCollections) {
+  return Object.values(taskCollections)
+    .flat()
+    .filter((task, index, tasks) => task?.taskId && tasks.findIndex((item) => item?.taskId === task.taskId) === index);
+}
+
+function dashboardTaskAgentLabel(task, agentById) {
+  const agentId = task?.selectedAgentId || task?.participatingAgentIds?.[0];
+  return agentById.get(agentId)?.profile?.publicName || (agentId ? "Assigned agent" : "Marketplace task");
+}
+
+function dashboardTaskAction(lifecycle) {
+  if (lifecycle.isDisputed) return { label: "View dispute", primary: false };
+  if (lifecycle.primaryAction.kind === "settle") return { label: "Release payment", primary: true };
+  if (lifecycle.primaryAction.kind === "review") return { label: "Review work", primary: true };
+  if (lifecycle.isSettled || lifecycle.statusDisplay.label === "Completed") return { label: "View completed task", primary: false };
+  return { label: "View task", primary: false };
+}
+
+function dashboardTaskRow(task, agentById) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  const action = dashboardTaskAction(lifecycle);
+  return `
+    <article class="dashboard-task-row">
+      <div class="dashboard-task-identity">
+        <span class="dashboard-status dashboard-status--${taskStatusTone(lifecycle.statusDisplay.label)}">${escapeHtml(lifecycle.statusDisplay.label)}</span>
+        <strong>${escapeHtml(task.title || "Untitled funded task")}</strong>
+        <p>${escapeHtml(dashboardTaskAgentLabel(task, agentById))}</p>
+      </div>
+      <div><span>Reward</span><strong>${escapeHtml(lifecycle.paymentDisplay.amountDisplay)}</strong></div>
+      <div><span>Payment</span><strong>${escapeHtml(lifecycle.paymentDisplay.label)}</strong></div>
+      <button class="${action.primary ? "hero-primary" : "hero-secondary"}" data-route="/tasks/${escapeHtml(task.taskId)}">${escapeHtml(action.label)}</button>
+    </article>
+  `;
+}
+
+function dashboardTaskAttentionItem(task, agentById) {
+  const lifecycle = buildTaskLifecycleModel(task);
+  if (lifecycle.isDisputed) return { task, badge: "Dispute open", tone: "warning", reason: "Payment remains locked while the issue is reviewed.", action: "Check dispute", primary: false, agentLabel: dashboardTaskAgentLabel(task, agentById) };
+  if (lifecycle.primaryAction.kind === "settle") return { task, badge: "Payment ready", tone: "action", reason: "Approval is complete. You can release payment.", action: "Release payment", primary: true, agentLabel: dashboardTaskAgentLabel(task, agentById) };
+  if (lifecycle.primaryAction.kind === "review") return { task, badge: "Review needed", tone: "action", reason: "Submitted work is waiting for your review.", action: "Review work", primary: true, agentLabel: dashboardTaskAgentLabel(task, agentById) };
+  if (lifecycle.isRevisionRequested) return { task, badge: "Changes requested", tone: "warning", reason: "The task is waiting for updated work.", action: "View task", primary: false, agentLabel: dashboardTaskAgentLabel(task, agentById) };
+  return null;
+}
+
+function dashboardAgentNeedsSetup(row) {
+  return ["Connection check needed", "Needs review", "Offline / unavailable", "Setup incomplete", "Owner wallet not verified"].includes(row.readinessLabel);
+}
+
 export function renderDashboardPage({ el, state, onNavigate, rerender }) {
   if (state.marketDataLoading && !state.marketDataLoaded) {
     el.appRoot.innerHTML = `
       <section data-structure="dashboard" class="builder-dashboard-page">
         <header class="builder-dashboard-header reveal-on-scroll is-visible">
           <div>
-            <p class="builder-dashboard-eyebrow">Builder dashboard</p>
-            <h1>Manage agent work.</h1>
-            <p>Track agents, funded tasks, earnings, and readiness signals.</p>
+            <p class="builder-dashboard-eyebrow">Dashboard</p>
+            <h1>Dashboard</h1>
+            <p>Track your funded tasks, agents, payments, and actions that need review.</p>
           </div>
-          <button class="hero-primary" data-route="/connect-agent">Connect Agent</button>
         </header>
         <article class="builder-empty-state">
-          <strong>Loading builder activity.</strong>
-          <p>Agents, tasks, and earnings will appear as soon as they are available.</p>
+          <strong>Loading dashboard activity.</strong>
+          <p>Tasks, agents, and payment activity will appear as soon as they are available.</p>
         </article>
       </section>
     `;
     revealSections(el.appRoot);
     return;
   }
+
   const taskCollections = {
     myPostedTasks: state.tasks?.myPostedTasks || [],
     allOpenTasks: state.tasks?.allOpenTasks || [],
@@ -768,32 +817,35 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
   const dashboard = buildAgentBuilderDashboardModel(state.agents, taskCollections);
   const earningsDashboard = buildAgentEarningsDashboardModel(state.agents, taskCollections);
   const { summary, agentRows } = dashboard;
-  const attentionItems = agentRows.flatMap((row) => row.attentionItems.map((item) => ({ ...item, agentName: row.name, agentSlug: row.slug })));
-  const readinessCounts = agentRows.reduce((counts, row) => {
-    const key = String(row.readinessLabel || "Limited data").toLowerCase().replace(/\s+/g, "_");
-    return { ...counts, [key]: (counts[key] || 0) + 1 };
-  }, {});
-  const lockedValueDisplay = earningsDashboard.summary.pendingLockedValue > 0
+  const agentById = new Map(state.agents.map((agent) => [agent.profile.agentId, agent]));
+  const visibleTasks = collectDashboardTasks(taskCollections);
+  const taskAttentionItems = visibleTasks.map((task) => dashboardTaskAttentionItem(task, agentById)).filter(Boolean);
+  const setupAttentionItems = agentRows
+    .filter(dashboardAgentNeedsSetup)
+    .map((row) => ({ row, badge: "Setup needed", reason: row.verificationNextAction || "Review agent setup.", action: "Complete setup" }));
+  const attentionCount = taskAttentionItems.length + setupAttentionItems.length;
+  const activeTaskCount = visibleTasks.filter((task) => {
+    const lifecycle = buildTaskLifecycleModel(task);
+    return !lifecycle.isSettled
+      && !lifecycle.isRefunded
+      && !["Completed", "Cancelled", "Draft", "Unknown"].includes(lifecycle.statusDisplay.label);
+  }).length;
+  const lockedDisplay = earningsDashboard.summary.pendingLockedValue > 0
     ? earningsDashboard.summary.pendingLockedDisplay
     : earningsDashboard.summary.disputedLockedDisplay;
-  const lockedValueLabel = earningsDashboard.summary.pendingLockedValue > 0 ? "Pending / locked value" : "Disputed / locked value";
-  const lockedValueHelper = earningsDashboard.summary.pendingLockedValue > 0
-    ? "Funded assigned work not yet released."
-    : "Value locked by disputed tasks when available.";
 
   el.appRoot.innerHTML = `
     <section data-structure="dashboard" class="builder-dashboard-page">
       <header class="builder-dashboard-header reveal-on-scroll is-visible">
         <div>
-          <p class="builder-dashboard-eyebrow">Builder dashboard</p>
-          <h1>Manage agent work.</h1>
-          <p>Track agents, funded tasks, earnings, and readiness signals.</p>
+          <p class="builder-dashboard-eyebrow">Dashboard</p>
+          <h1>Dashboard</h1>
+          <p>Track your funded tasks, agents, payments, and actions that need review.</p>
         </div>
-        <button class="hero-primary" data-route="/connect-agent">Connect Agent</button>
       </header>
 
       <article class="builder-preview-note reveal-on-scroll">
-        <strong>Builder dashboard preview</strong>
+        <strong>Dashboard preview</strong>
         <p>${escapeHtml(summary.ownershipNote)}</p>
       </article>
       ${state.marketDataError ? `
@@ -804,186 +856,124 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
       ` : ""}
 
       <section class="builder-summary-grid reveal-on-scroll">
-        <article>
-          <span>Agents listed</span>
-          <strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong>
-          <p>${summary.activeAgents} active or available</p>
-        </article>
-        <article>
-          <span>Tasks needing attention</span>
-          <strong data-count="${summary.attentionCount}">${summary.attentionCount}</strong>
-          <p>${summary.attentionCount ? "Review submitted, revision, or disputed work." : "No attention tasks"}</p>
-        </article>
-        <article>
-          <span>Settled earnings</span>
-          <strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong>
-          <p>${earningsDashboard.summary.paidTasks} paid funded task${earningsDashboard.summary.paidTasks === 1 ? "" : "s"}</p>
-        </article>
-        <article>
-          <span>${escapeHtml(lockedValueLabel)}</span>
-          <strong>${escapeHtml(lockedValueDisplay)}</strong>
-          <p>${escapeHtml(lockedValueHelper)}</p>
-        </article>
+        <article><span>Active tasks</span><strong data-count="${activeTaskCount}">${activeTaskCount}</strong><p>Tasks waiting, in progress, or under review.</p></article>
+        <article><span>Needs attention</span><strong data-count="${attentionCount}">${attentionCount}</strong><p>Tasks, payments, or agents needing action.</p></article>
+        <article><span>Agents listed</span><strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong><p>Agents visible in this Dispatch demo.</p></article>
+        <article><span>Locked / released USDC</span><strong>${escapeHtml(lockedDisplay)} locked</strong><p>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)} released from task activity.</p></article>
+      </section>
+
+      <section class="dashboard-attention reveal-on-scroll">
+        <div class="builder-section-head">
+          <div>
+            <p class="builder-dashboard-eyebrow">Next actions</p>
+            <h2>Needs attention</h2>
+            <p>Review tasks, payments, and agent setup items that need action.</p>
+          </div>
+        </div>
+        <div class="builder-attention-list">
+          ${taskAttentionItems.map((item) => `
+            <article class="builder-attention-row">
+              <div>
+                <span class="dashboard-status dashboard-status--${item.tone}">${escapeHtml(item.badge)}</span>
+                <strong>${escapeHtml(item.task.title || "Untitled funded task")}</strong>
+                <p>${escapeHtml(item.agentLabel)}</p>
+              </div>
+              <p>${escapeHtml(item.reason)}</p>
+              <button class="${item.primary ? "hero-primary" : "hero-secondary"}" data-route="/tasks/${escapeHtml(item.task.taskId)}">${escapeHtml(item.action)}</button>
+            </article>
+          `).join("")}
+          ${setupAttentionItems.map(({ row, badge, reason, action }) => `
+            <article class="builder-attention-row">
+              <div>
+                <span class="dashboard-status dashboard-status--warning">${escapeHtml(badge)}</span>
+                <strong>${escapeHtml(row.name)}</strong>
+                <p>${escapeHtml(row.readinessLabel)}</p>
+              </div>
+              <p>${escapeHtml(reason)}</p>
+              <button class="hero-primary" data-route="${row.typeLabel === "External Agent" ? "/connect-agent" : "/create-agent"}">${escapeHtml(action)}</button>
+            </article>
+          `).join("")}
+          ${attentionCount ? "" : `
+            <article class="builder-empty-state">
+              <strong>Nothing needs attention.</strong>
+              <p>Tasks, payments, and agent setup issues will appear here when action is needed.</p>
+            </article>
+          `}
+        </div>
       </section>
 
       <section class="builder-dashboard-tabs reveal-on-scroll">
-        <div role="tablist" aria-label="Builder dashboard sections">
-          <button class="${state.dashboardTab === "agents" ? "active" : ""}" data-dashboard-tab="agents">Agents</button>
-          <button class="${state.dashboardTab === "attention" ? "active" : ""}" data-dashboard-tab="attention">Needs attention</button>
+        <div role="tablist" aria-label="Dashboard sections">
+          <button class="${state.dashboardTab === "tasks" ? "active" : ""}" data-dashboard-tab="tasks">My Tasks</button>
+          <button class="${state.dashboardTab === "agents" ? "active" : ""}" data-dashboard-tab="agents">My Agents</button>
           <button class="${state.dashboardTab === "earnings" ? "active" : ""}" data-dashboard-tab="earnings">Earnings</button>
         </div>
       </section>
 
       <section class="builder-tab-panel reveal-on-scroll">
-        ${state.dashboardTab === "attention"
+        ${state.dashboardTab === "earnings"
           ? `
             <div class="builder-section-head">
               <div>
-                <p class="builder-dashboard-eyebrow">Attention</p>
-                <h2>Tasks needing attention</h2>
-                <p>Submitted, revision, disputed, or active task states appear here.</p>
+                <p class="builder-dashboard-eyebrow">Earnings</p>
+                <h2>Earnings</h2>
+                <p>Track released, locked, and disputed USDC from task activity.</p>
               </div>
             </div>
-            <div class="builder-attention-list">
-              ${attentionItems.map((item) => `
-                <article class="builder-attention-row builder-attention-row--${taskStatusTone(item.statusLabel)}">
-                  <div>
-                    <strong>${escapeHtml(item.title)}</strong>
-                    <p>${escapeHtml(item.agentName)} | ${escapeHtml(item.paymentLabel)}</p>
-                  </div>
-                  <span>${escapeHtml(item.statusLabel)}</span>
-                  <div>
-                    <small>Next</small>
-                    <strong>${escapeHtml(item.nextAction)}</strong>
-                    <p>${escapeHtml(item.whoActsNext)}</p>
-                  </div>
-                  <button data-route="/tasks/${item.taskId}">View Task</button>
-                </article>
-              `).join("") || `
-                <article class="builder-empty-state">
-                  <strong>No agent tasks need attention yet.</strong>
-                  <p>Submitted, revision, or disputed tasks will appear here.</p>
-                  <button data-route="/agents">Explore agents</button>
-                </article>
-              `}
+            <div class="builder-earnings-summary">
+              <article><span>Settled earnings</span><strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong><p>${earningsDashboard.summary.paidTasks} paid funded task${earningsDashboard.summary.paidTasks === 1 ? "" : "s"}</p></article>
+              <article><span>Pending / locked value</span><strong>${escapeHtml(earningsDashboard.summary.pendingLockedDisplay)}</strong><p>Funded assigned work before release.</p></article>
+              <article><span>Disputed / locked value</span><strong>${escapeHtml(earningsDashboard.summary.disputedLockedDisplay)}</strong><p>Payment stays locked during disputes.</p></article>
             </div>
+            <article class="builder-payment-activity">
+              <div class="builder-section-head"><div><p class="builder-dashboard-eyebrow">Payment activity</p><h2>Payment activity</h2></div></div>
+              <div class="builder-activity-list">
+                ${earningsDashboard.activityRows.map((item) => `
+                  <article class="builder-activity-row">
+                    <div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.agentName)}</p></div>
+                    <div><span>Amount</span><strong>${escapeHtml(item.amountDisplay)}</strong></div>
+                    <div><span>Payment</span><strong>${escapeHtml(item.paymentState)}</strong><small>${escapeHtml(item.settlementState)} | ${escapeHtml(item.dateLabel)}</small></div>
+                    <div class="dashboard-row-actions">
+                      <button class="hero-primary" data-route="/tasks/${escapeHtml(item.taskId)}">View task</button>
+                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
+                    </div>
+                  </article>
+                `).join("") || `<article class="builder-empty-state"><strong>No payment activity yet.</strong><p>Released task payments will appear here.</p></article>`}
+              </div>
+            </article>
           `
-          : state.dashboardTab === "earnings"
+          : state.dashboardTab === "agents"
             ? `
               <div class="builder-section-head">
-                <div>
-                  <p class="builder-dashboard-eyebrow">Earnings</p>
-                  <h2>Agent earnings from available task data</h2>
-                  <p>${escapeHtml(earningsDashboard.note)}</p>
-                </div>
+                <div><p class="builder-dashboard-eyebrow">Agents</p><h2>My Agents</h2><p>Manage agents, setup readiness, packages, and task activity.</p></div>
+                <button class="hero-secondary" data-route="/connect-agent">Connect Agent</button>
               </div>
-              <div class="builder-earnings-summary">
-                <article><span>Settled earnings</span><strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong><p>${earningsDashboard.summary.paidTasks} paid funded task${earningsDashboard.summary.paidTasks === 1 ? "" : "s"}</p></article>
-                <article><span>Pending / locked</span><strong>${escapeHtml(earningsDashboard.summary.pendingLockedDisplay)}</strong><p>Funded assigned work before release.</p></article>
-                <article><span>Disputed / locked</span><strong>${escapeHtml(earningsDashboard.summary.disputedLockedDisplay)}</strong><p>Payment stays locked during disputes.</p></article>
-              </div>
-              <div class="builder-earnings-list">
-                ${earningsDashboard.breakdowns.map((item) => `
-                  <article class="builder-earning-row">
-                    <div>
-                      <strong>${escapeHtml(item.name)}</strong>
-                      <p>${escapeHtml(item.typeLabel)} | Package from ${escapeHtml(item.packageStartingPriceDisplay)}</p>
-                    </div>
-                    <div><span>Settled</span><strong>${escapeHtml(item.settledEarningsDisplay)}</strong></div>
-                    <div><span>Paid tasks</span><strong>${escapeHtml(item.paidTasksDisplay)}</strong></div>
-                    <div><span>Locked</span><strong>${escapeHtml(item.pendingLockedDisplay)}</strong><small>Disputed: ${escapeHtml(item.disputedLockedDisplay)}</small></div>
-                    <div><span>Approval</span><strong>${escapeHtml(item.approvalRateDisplay)}</strong></div>
-                  </article>
-                `).join("") || `
-                  <article class="builder-empty-state">
-                    <strong>No agent earnings yet.</strong>
-                    <p>Earnings appear after approved funded tasks are released.</p>
-                  </article>
-                `}
-              </div>
-              <article class="builder-payment-activity">
-                <div class="builder-section-head">
-                  <div>
-                    <p class="builder-dashboard-eyebrow">Payment activity</p>
-                    <h2>Task-linked earning activity</h2>
-                  </div>
-                </div>
-                <div class="builder-activity-list">
-                  ${earningsDashboard.activityRows.map((item) => `
-                    <article class="builder-activity-row">
-                      <div>
-                        <strong>${escapeHtml(item.title)}</strong>
-                        <p>${escapeHtml(item.agentName)} | ${escapeHtml(item.amountDisplay)}</p>
-                      </div>
-                      <span>${escapeHtml(item.paymentState)}</span>
-                      <span>${escapeHtml(item.settlementState)}</span>
-                      <small>${escapeHtml(item.dateLabel)}</small>
-                      ${item.txLink ? `<a href="${item.txLink}" target="_blank" rel="noreferrer">${escapeHtml(item.txLabel)}</a>` : `<em class="tx-fallback">No valid transaction link available.</em>`}
+              <div class="builder-agent-list">
+                ${agentRows.map((row) => {
+                  const setupIncomplete = dashboardAgentNeedsSetup(row);
+                  return `
+                    <article class="builder-agent-row">
+                      <div class="builder-agent-identity"><span>${escapeHtml(initials(row.name))}</span><div><strong>${escapeHtml(row.name)}</strong><p>${escapeHtml(row.typeLabel)} | ${escapeHtml(row.packageSummary)}</p></div></div>
+                      <div class="builder-agent-readiness"><span>${escapeHtml(row.readinessLabel)}</span><p>${escapeHtml(row.verificationNextAction)}</p></div>
+                      <div class="builder-agent-performance"><div><span>Paid tasks</span><strong>${escapeHtml(row.completedTasksDisplay)}</strong></div><div><span>Earned</span><strong>${escapeHtml(row.totalEarnedDisplay)}</strong></div><div><span>Approval</span><strong>${escapeHtml(row.approvalRateDisplay)}</strong></div></div>
+                      <footer>
+                        <button class="hero-primary" data-route="${setupIncomplete ? (row.typeLabel === "External Agent" ? "/connect-agent" : "/create-agent") : `/agents/${row.slug}`}">${setupIncomplete ? "Complete setup" : "View profile"}</button>
+                        ${setupIncomplete ? `<button class="hero-secondary" data-route="/agents/${row.slug}">View profile</button>` : `<button class="hero-secondary" data-direct="${row.agentId}">Create task</button>`}
+                      </footer>
                     </article>
-                  `).join("") || `
-                    <article class="builder-empty-state">
-                      <strong>No payment activity yet.</strong>
-                      <p>Released task payments will appear here.</p>
-                    </article>
-                  `}
-                </div>
-              </article>
+                  `;
+                }).join("") || `<article class="builder-empty-state"><strong>No agents listed yet.</strong><p>Create or connect an agent to begin.</p><button data-route="/connect-agent">Connect Agent</button></article>`}
+              </div>
             `
             : `
               <div class="builder-section-head">
-                <div>
-                  <p class="builder-dashboard-eyebrow">Agents</p>
-                  <h2>Builder-visible agents</h2>
-                  <p>Agent setup, packages, readiness, and performance at a glance.</p>
-                </div>
+                <div><p class="builder-dashboard-eyebrow">Tasks</p><h2>My Tasks</h2><p>Track funded tasks, review submitted work, and follow payment status.</p></div>
+                <button class="hero-secondary" data-route="/post-task">Post Task</button>
               </div>
-              <div class="builder-agent-list">
-                ${agentRows.map((row) => `
-                  <article class="builder-agent-row">
-                    <div class="builder-agent-identity">
-                      <span>${escapeHtml(initials(row.name))}</span>
-                      <div>
-                        <strong>${escapeHtml(row.name)}</strong>
-                        <p>${escapeHtml(row.typeLabel)} | ${escapeHtml(row.packageSummary)}</p>
-                      </div>
-                    </div>
-                    <div class="builder-agent-readiness">
-                      <span>${escapeHtml(row.readinessLabel)}</span>
-                      <p>${escapeHtml(row.verificationLabel)} | ${row.verificationMissingCount} missing setup item${row.verificationMissingCount === 1 ? "" : "s"}</p>
-                      <small>${escapeHtml(row.verificationNextAction)}</small>
-                    </div>
-                    <div class="builder-agent-performance">
-                      <div><span>Paid tasks</span><strong>${escapeHtml(row.completedTasksDisplay)}</strong></div>
-                      <div><span>Earned</span><strong>${escapeHtml(row.totalEarnedDisplay)}</strong></div>
-                      <div><span>Approval</span><strong>${escapeHtml(row.approvalRateDisplay)}</strong></div>
-                    </div>
-                    <footer>
-                      <button class="hero-primary" data-route="/agents/${row.slug}">View Profile</button>
-                      ${row.firstPackageId ? `<button class="hero-secondary" data-dashboard-package-agent="${row.agentId}" data-dashboard-package="${row.firstPackageId}">Start Package</button>` : `<button class="hero-secondary" data-direct="${row.agentId}">Create Task</button>`}
-                    </footer>
-                  </article>
-                `).join("") || `
-                  <article class="builder-empty-state">
-                    <strong>No agents listed yet.</strong>
-                    <p>Connect or register an agent to begin.</p>
-                    <button data-route="/connect-agent">Connect Agent</button>
-                  </article>
-                `}
+              <div class="dashboard-task-list">
+                ${visibleTasks.map((task) => dashboardTaskRow(task, agentById)).join("") || `<article class="builder-empty-state"><strong>No tasks yet.</strong><p>Posted and funded tasks will appear here.</p><button data-route="/post-task">Post Task</button></article>`}
               </div>
             `}
-      </section>
-
-      <section class="builder-readiness-panel reveal-on-scroll">
-        <div>
-          <p class="builder-dashboard-eyebrow">Readiness signals</p>
-          <h2>Setup and history signals</h2>
-          <p>Readiness is based on available agent setup, packages, task history, and honest missing-data fallbacks.</p>
-        </div>
-        <div>
-          <span>Ready: ${readinessCounts.ready || 0}</span>
-          <span>Limited data: ${readinessCounts.limited_data || 0}</span>
-          <span>Needs check: ${(readinessCounts.connection_check_needed || 0) + (readinessCounts.needs_review || 0)}</span>
-        </div>
       </section>
     </section>
   `;
@@ -998,27 +988,6 @@ export function renderDashboardPage({ el, state, onNavigate, rerender }) {
     node.addEventListener("click", () => {
       state.taskForm.hiringMode = "direct_hire";
       state.taskForm.selectedAgentId = node.dataset.direct;
-      onNavigate("/post-task");
-    });
-  });
-  document.querySelectorAll("[data-dashboard-package]").forEach((node) => {
-    node.addEventListener("click", () => {
-      const agent = state.agents.find((item) => item.profile.agentId === node.dataset.dashboardPackageAgent);
-      const servicePackage = buildAgentServicePackages(agent).find((item) => item.id === node.dataset.dashboardPackage);
-      const draft = buildTaskDraftFromServicePackage(servicePackage, agent);
-      state.taskForm = {
-        ...state.taskForm,
-        title: draft.title,
-        description: draft.description,
-        category: draft.category,
-        rewardAmount: draft.rewardAmount,
-        templateId: draft.templateId,
-        templateFields: draft.templateFields,
-        templateMessage: draft.templateMessage,
-        hiringMode: draft.hiringMode,
-        selectedAgentId: draft.selectedAgentId,
-        selectedServicePackage: draft.servicePackage,
-      };
       onNavigate("/post-task");
     });
   });

@@ -1435,7 +1435,7 @@ export function buildAgentBuilderSummaryModel(agents = [], taskCollections = {})
     paidEarnings,
     paidEarningsDisplay: `${paidEarnings.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`,
     attentionCount,
-    ownershipNote: "Builder view for agents visible in this demo. Wallet-specific ownership is not fully enabled yet.",
+    ownershipNote: "Showing tasks and agents visible in this demo. Wallet-specific history is not fully enabled yet.",
   };
 }
 

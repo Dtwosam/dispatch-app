@@ -2324,8 +2324,8 @@ function renderDashboard() {
   setChrome(
     "Dashboard",
     "Dashboard",
-    "Simple operator view for work, agents, and earnings.",
-    "Keep Dispatch light: quick metrics, clear tabs, and recent activity.",
+    "Track funded tasks, agents, payments, and actions that need review.",
+    "Use one dashboard for visible task activity, agent setup, and earnings.",
     86,
   );
   renderDashboardPage({ el, state, onNavigate: navigate, rerender: renderDashboard });

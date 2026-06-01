@@ -47,7 +47,7 @@ export const routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
   ["/post-task", "Post Task"],
-  ["/dashboard", "Builder Dashboard"],
+  ["/dashboard", "Dashboard"],
   ["/connect-agent", "Connect Agent"],
   ["/create-agent", "Create Agent"],
 ];
@@ -134,7 +134,7 @@ export function createInitialState() {
     mobileNavOpen: false,
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
-    dashboardTab: "agents",
+    dashboardTab: "tasks",
     wizardStep: 1,
     agentDraftMeta: {
       draftId: null,
