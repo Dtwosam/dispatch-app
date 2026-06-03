@@ -100,6 +100,11 @@ export function createInitialState() {
     marketDataLoading: false,
     marketDataLoaded: false,
     marketDataError: "",
+    marketDataUnavailable: {
+      agents: false,
+      tasks: false,
+      leaderboards: false,
+    },
     chainConfig: null,
     chainStatus: null,
     chainStatusError: "",

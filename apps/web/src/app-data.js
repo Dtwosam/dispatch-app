@@ -55,7 +55,13 @@ async function settleWithin(promise, timeoutMs, message) {
 
 export async function loadMarketData({ apiBase, state, chainClient, validators }) {
   const hydrationErrors = [];
-  const fallback = (message, value) => (error) => {
+  const unavailable = {
+    agents: false,
+    tasks: false,
+    leaderboards: false,
+  };
+  const fallback = (key, message, value) => (error) => {
+    unavailable[key] = true;
     hydrationErrors.push(message);
     console.warn(message, error);
     return value;
@@ -72,12 +78,12 @@ export async function loadMarketData({ apiBase, state, chainClient, validators }
 
   const [agentPayload, taskPayload, leaderboardPayload, chainStatus] = await Promise.all([
     getJsonWithin(apiBase, "/api/agent-registry/agents", validators.validateAgentListResponse)
-      .catch(fallback("Agent data is temporarily unavailable.", { items: [] })),
+      .catch(fallback("agents", "Agent data is temporarily unavailable.", { items: [] })),
     getJsonWithin(
       apiBase,
       `/api/task-market/tasks?viewerWallet=${encodeURIComponent(state.wallet)}`,
       validators.validateTaskListResponse,
-    ).catch(fallback("Task data is temporarily unavailable.", {
+    ).catch(fallback("tasks", "Task data is temporarily unavailable.", {
       allOpenTasks: [],
       myPostedTasks: [],
       tasksAssignedToMyAgents: [],
@@ -87,7 +93,7 @@ export async function loadMarketData({ apiBase, state, chainClient, validators }
       disputedTasks: [],
     })),
     getJsonWithin(apiBase, "/api/trust/leaderboards", validators.validateLeaderboardResponse)
-      .catch(fallback("Leaderboard data is temporarily unavailable.", { buckets: [] })),
+      .catch(fallback("leaderboards", "Leaderboard data is temporarily unavailable.", { buckets: [] })),
     chainStatusPromise,
   ]);
 
@@ -96,6 +102,7 @@ export async function loadMarketData({ apiBase, state, chainClient, validators }
   state.leaderboards = leaderboardPayload;
   state.chainStatus = chainStatus;
   state.chainConfig = chainStatus?.config || null;
+  state.marketDataUnavailable = unavailable;
   state.marketDataError = hydrationErrors.length
     ? "Some marketplace data is temporarily unavailable. Try again shortly."
     : "";

@@ -46668,6 +46668,11 @@ function createInitialState() {
     marketDataLoading: false,
     marketDataLoaded: false,
     marketDataError: "",
+    marketDataUnavailable: {
+      agents: false,
+      tasks: false,
+      leaderboards: false
+    },
     chainConfig: null,
     chainStatus: null,
     chainStatusError: "",
@@ -46850,7 +46855,13 @@ async function settleWithin(promise, timeoutMs, message) {
 }
 async function loadMarketData({ apiBase, state: state2, chainClient: chainClient2, validators }) {
   const hydrationErrors = [];
-  const fallback = (message, value) => (error) => {
+  const unavailable = {
+    agents: false,
+    tasks: false,
+    leaderboards: false
+  };
+  const fallback = (key, message, value) => (error) => {
+    unavailable[key] = true;
     hydrationErrors.push(message);
     console.warn(message, error);
     return value;
@@ -46863,12 +46874,12 @@ async function loadMarketData({ apiBase, state: state2, chainClient: chainClient
     return null;
   });
   const [agentPayload, taskPayload, leaderboardPayload, chainStatus] = await Promise.all([
-    getJsonWithin(apiBase, "/api/agent-registry/agents", validators.validateAgentListResponse).catch(fallback("Agent data is temporarily unavailable.", { items: [] })),
+    getJsonWithin(apiBase, "/api/agent-registry/agents", validators.validateAgentListResponse).catch(fallback("agents", "Agent data is temporarily unavailable.", { items: [] })),
     getJsonWithin(
       apiBase,
       `/api/task-market/tasks?viewerWallet=${encodeURIComponent(state2.wallet)}`,
       validators.validateTaskListResponse
-    ).catch(fallback("Task data is temporarily unavailable.", {
+    ).catch(fallback("tasks", "Task data is temporarily unavailable.", {
       allOpenTasks: [],
       myPostedTasks: [],
       tasksAssignedToMyAgents: [],
@@ -46877,7 +46888,7 @@ async function loadMarketData({ apiBase, state: state2, chainClient: chainClient
       rejectedTasks: [],
       disputedTasks: []
     })),
-    getJsonWithin(apiBase, "/api/trust/leaderboards", validators.validateLeaderboardResponse).catch(fallback("Leaderboard data is temporarily unavailable.", { buckets: [] })),
+    getJsonWithin(apiBase, "/api/trust/leaderboards", validators.validateLeaderboardResponse).catch(fallback("leaderboards", "Leaderboard data is temporarily unavailable.", { buckets: [] })),
     chainStatusPromise
   ]);
   state2.agents = agentPayload.items || [];
@@ -46885,6 +46896,7 @@ async function loadMarketData({ apiBase, state: state2, chainClient: chainClient
   state2.leaderboards = leaderboardPayload;
   state2.chainStatus = chainStatus;
   state2.chainConfig = chainStatus?.config || null;
+  state2.marketDataUnavailable = unavailable;
   state2.marketDataError = hydrationErrors.length ? "Some marketplace data is temporarily unavailable. Try again shortly." : "";
 }
 
@@ -49074,6 +49086,15 @@ function dashboardTaskAttentionItem(task, agentById) {
 function dashboardAgentNeedsSetup(row) {
   return ["Connection check needed", "Needs review", "Offline / unavailable", "Setup incomplete", "Owner wallet not verified"].includes(row.readinessLabel);
 }
+function dashboardSectionFallback(title, body, cta = "") {
+  return `
+    <article class="builder-empty-state">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(body)}</p>
+      ${cta}
+    </article>
+  `;
+}
 function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
   if (!state2.wallet?.trim()) {
     el2.appRoot.innerHTML = `
@@ -49095,25 +49116,16 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
     revealSections(el2.appRoot);
     return;
   }
-  if (state2.marketDataLoading && !state2.marketDataLoaded) {
-    el2.appRoot.innerHTML = `
-      <section data-structure="dashboard" class="builder-dashboard-page">
-        <header class="builder-dashboard-header reveal-on-scroll is-visible">
-          <div>
-            <p class="builder-dashboard-eyebrow">Dashboard</p>
-            <h1>Dashboard</h1>
-            <p>Track your funded tasks, agents, payments, and actions that need review.</p>
-          </div>
-        </header>
-        <article class="builder-empty-state">
-          <strong>Loading dashboard activity.</strong>
-          <p>Tasks, agents, and payment activity will appear as soon as they are available.</p>
-        </article>
-      </section>
-    `;
-    revealSections(el2.appRoot);
-    return;
-  }
+  const dashboardHydrating = state2.marketDataLoading && !state2.marketDataLoaded;
+  const unavailable = state2.marketDataUnavailable || {};
+  const tasksLoading = dashboardHydrating && !state2.tasks;
+  const agentsLoading = dashboardHydrating && !(state2.agents || []).length;
+  const paymentLoading = tasksLoading || agentsLoading;
+  const tasksUnavailable = Boolean(unavailable.tasks) && !tasksLoading;
+  const agentsUnavailable = Boolean(unavailable.agents) && !agentsLoading;
+  const paymentUnavailable = (tasksUnavailable || agentsUnavailable) && !paymentLoading;
+  const attentionLoading = tasksLoading || agentsLoading;
+  const attentionUnavailable = tasksUnavailable || agentsUnavailable;
   const taskCollections = {
     myPostedTasks: state2.tasks?.myPostedTasks || [],
     allOpenTasks: state2.tasks?.allOpenTasks || [],
@@ -49137,6 +49149,11 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
     return !lifecycle.isSettled && !lifecycle.isRefunded && !["Completed", "Cancelled", "Draft", "Unknown"].includes(lifecycle.statusDisplay.label);
   }).length;
   const lockedDisplay = earningsDashboard.summary.pendingLockedValue > 0 ? earningsDashboard.summary.pendingLockedDisplay : earningsDashboard.summary.disputedLockedDisplay;
+  const dashboardNote = dashboardHydrating ? "Loading wallet-linked sections as your data becomes available." : walletScope.tasksOwnershipAvailable && walletScope.agentsOwnershipAvailable ? "Showing tasks and agents linked to your connected wallet." : "Some wallet-linked history is not fully enabled yet.";
+  const sectionUnavailableMarkup = dashboardSectionFallback(
+    "This section is temporarily unavailable.",
+    "Please try again shortly."
+  );
   el2.appRoot.innerHTML = `
     <section data-structure="dashboard" class="builder-dashboard-page">
       <header class="builder-dashboard-header reveal-on-scroll is-visible">
@@ -49149,20 +49166,14 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
 
       <article class="builder-preview-note reveal-on-scroll">
         <strong>Wallet-linked Dashboard</strong>
-        <p>${walletScope.tasksOwnershipAvailable && walletScope.agentsOwnershipAvailable ? "Showing tasks and agents linked to your connected wallet." : "Some wallet-linked history is not fully enabled yet."}</p>
+        <p>${escapeHtml(dashboardNote)}</p>
       </article>
-      ${state2.marketDataError ? `
-        <article class="builder-preview-note reveal-on-scroll">
-          <strong>Some activity is temporarily unavailable.</strong>
-          <p>Dashboard sections will update when marketplace data reconnects.</p>
-        </article>
-      ` : ""}
 
       <section class="builder-summary-grid reveal-on-scroll">
-        <article><span>Active tasks</span>${walletScope.tasksOwnershipAvailable ? `<strong data-count="${activeTaskCount}">${activeTaskCount}</strong><p>Tasks waiting, in progress, or under review.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
-        <article><span>Needs attention</span>${walletScope.tasksOwnershipAvailable && walletScope.agentsOwnershipAvailable ? `<strong data-count="${attentionCount}">${attentionCount}</strong><p>Tasks, payments, or agents needing action.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
-        <article><span>Agents listed</span>${walletScope.agentsOwnershipAvailable ? `<strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong><p>Agents linked to your connected wallet.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
-        <article><span>Locked / released USDC</span>${walletScope.earningsOwnershipAvailable ? `<strong>${escapeHtml(lockedDisplay)} locked</strong><p>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)} released from task activity.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
+        <article><span>Active tasks</span>${tasksLoading ? `<p class="metric-fallback">Loading your tasks...</p>` : tasksUnavailable ? `<p class="metric-fallback">This section is temporarily unavailable.</p>` : walletScope.tasksOwnershipAvailable ? `<strong data-count="${activeTaskCount}">${activeTaskCount}</strong><p>Tasks waiting, in progress, or under review.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
+        <article><span>Needs attention</span>${attentionLoading ? `<p class="metric-fallback">Loading your tasks...</p>` : attentionUnavailable ? `<p class="metric-fallback">This section is temporarily unavailable.</p>` : walletScope.tasksOwnershipAvailable && walletScope.agentsOwnershipAvailable ? `<strong data-count="${attentionCount}">${attentionCount}</strong><p>Tasks, payments, or agents needing action.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
+        <article><span>Agents listed</span>${agentsLoading ? `<p class="metric-fallback">Loading your agents...</p>` : agentsUnavailable ? `<p class="metric-fallback">This section is temporarily unavailable.</p>` : walletScope.agentsOwnershipAvailable ? `<strong data-count="${summary.agentsListed}">${summary.agentsListed}</strong><p>Agents linked to your connected wallet.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
+        <article><span>Locked / released USDC</span>${paymentLoading ? `<p class="metric-fallback">Loading payment activity...</p>` : paymentUnavailable ? `<p class="metric-fallback">This section is temporarily unavailable.</p>` : walletScope.earningsOwnershipAvailable ? `<strong>${escapeHtml(lockedDisplay)} locked</strong><p>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)} released from task activity.</p>` : `<p class="metric-fallback">Wallet-linked history unavailable.</p>`}</article>
       </section>
 
       <section class="dashboard-attention reveal-on-scroll">
@@ -49174,6 +49185,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
           </div>
         </div>
         <div class="builder-attention-list">
+          ${attentionLoading ? dashboardSectionFallback("Loading your tasks...", "Needs-attention items will appear here when available.") : attentionUnavailable ? sectionUnavailableMarkup : `
           ${taskAttentionItems.map((item) => `
             <article class="builder-attention-row">
               <div>
@@ -49201,7 +49213,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
               <strong>Nothing needs attention.</strong>
               <p>Tasks, payments, and agent setup issues will appear here when action is needed.</p>
             </article>
-          `}
+          `}`}
         </div>
       </section>
 
@@ -49222,7 +49234,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                 <p>Track released, locked, and disputed USDC from task activity.</p>
               </div>
             </div>
-            ${!walletScope.earningsOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific earnings are not fully enabled yet.</strong><p>Released task payments will appear here once wallet-linked history is available.</p></article>` : `
+            ${paymentLoading ? dashboardSectionFallback("Loading payment activity...", "Released task payments will appear here when available.") : paymentUnavailable ? sectionUnavailableMarkup : !walletScope.earningsOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific earnings are not fully enabled yet.</strong><p>Released task payments will appear here once wallet-linked history is available.</p></article>` : `
                 <div class="builder-earnings-summary">
                   <article><span>Settled earnings</span><strong>${escapeHtml(earningsDashboard.summary.settledEarningsDisplay)}</strong><p>${earningsDashboard.summary.paidTasks} paid funded task${earningsDashboard.summary.paidTasks === 1 ? "" : "s"}</p></article>
                   <article><span>Pending / locked value</span><strong>${escapeHtml(earningsDashboard.summary.pendingLockedDisplay)}</strong><p>Funded assigned work before release.</p></article>
@@ -49251,7 +49263,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                 <button class="hero-secondary" data-route="/connect-agent">Connect Agent</button>
               </div>
               <div class="builder-agent-list">
-                ${!walletScope.agentsOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific agent management is not fully enabled yet.</strong><p>Created and connected agents will appear here once wallet-linked history is available.</p></article>` : agentRows.map((row) => {
+                ${agentsLoading ? dashboardSectionFallback("Loading your agents...", "Your created and connected agents will appear here when available.") : agentsUnavailable ? sectionUnavailableMarkup : !walletScope.agentsOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific agent management is not fully enabled yet.</strong><p>Created and connected agents will appear here once wallet-linked history is available.</p></article>` : agentRows.map((row) => {
     const setupIncomplete = dashboardAgentNeedsSetup(row);
     return `
                     <article class="builder-agent-row">
@@ -49272,7 +49284,7 @@ function renderDashboardPage({ el: el2, state: state2, onNavigate, rerender }) {
                 <button class="hero-secondary" data-route="/post-task">Post Task</button>
               </div>
               <div class="dashboard-task-list">
-                ${!walletScope.tasksOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific task history is not fully enabled yet.</strong><p>Posted and funded tasks will appear here once wallet-linked history is available.</p></article>` : visibleTasks.map((task) => dashboardTaskRow(task, agentById)).join("") || `<article class="builder-empty-state"><strong>No tasks yet.</strong><p>Posted and funded tasks will appear here.</p><button data-route="/post-task">Post Task</button></article>`}
+                ${tasksLoading ? dashboardSectionFallback("Loading your tasks...", "Posted and funded tasks will appear here when available.") : tasksUnavailable ? sectionUnavailableMarkup : !walletScope.tasksOwnershipAvailable ? `<article class="builder-empty-state"><strong>Wallet-specific task history is not fully enabled yet.</strong><p>Posted and funded tasks will appear here once wallet-linked history is available.</p></article>` : visibleTasks.map((task) => dashboardTaskRow(task, agentById)).join("") || `<article class="builder-empty-state"><strong>No tasks yet.</strong><p>Posted and funded tasks will appear here.</p><button data-route="/post-task">Post Task</button></article>`}
               </div>
             `}
       </section>
