@@ -20,6 +20,7 @@ import { OwnerProofService } from "./services/ownerProofService";
 import { createOwnerProofVerifier } from "./services/ownerProofVerifier";
 import { ExecutionEngine } from "./services/executionEngine";
 import { SettlementService } from "./services/settlementService";
+import { NanoArcProofService } from "./services/nanoArcProofService";
 import { NanoBudgetService } from "./services/nanoBudgetService";
 import { TaskMarketService } from "./services/taskMarketService";
 import { TrustRankingService } from "./services/trustRankingService";
@@ -95,6 +96,7 @@ const nanoBudgetService = new NanoBudgetService(store);
 const trustRankingService = new TrustRankingService(store);
 const demoFlowService = new DemoFlowService(store, taskMarketService, settlementService, trustRankingService);
 const chainService = new ArcChainService();
+const nanoArcProofService = new NanoArcProofService(chainService);
 for (const issue of chainService.startupIssues()) {
   console.warn(`arc config warning: ${issue}`);
 }
@@ -234,7 +236,7 @@ app.use("/api/demo", createDemoRoutes(demoFlowService));
 app.use("/api/chain", createChainRoutes(chainService, taskMarketService, registryService));
 app.use("/api/execution", createExecutionRoutes(executionEngine));
 app.use("/api/settlements", createSettlementRoutes(settlementService, adminWallets));
-app.use("/api/nano", createNanoRoutes(nanoBudgetService));
+app.use("/api/nano", createNanoRoutes(nanoBudgetService, nanoArcProofService));
 app.use("/api/trust", createTrustRoutes(trustRankingService));
 app.use("/api/admin", createAdminRoutes(adminService, adminWallets));
 

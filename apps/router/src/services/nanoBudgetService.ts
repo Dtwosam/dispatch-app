@@ -197,6 +197,10 @@ export class NanoBudgetService {
     return updated;
   }
 
+  getSpendIntent(intentId: string, wallet?: string) {
+    return this.requireIntent(intentId, wallet);
+  }
+
   recordPaymentProof(intentId: string, input: NanoSpendPaymentRecordRequest) {
     const intent = this.requireIntent(intentId, input.ownerWallet);
     if (!["approved", "payment_recorded"].includes(intent.status)) {
@@ -274,7 +278,11 @@ export class NanoBudgetService {
       totalApprovedIntentValue: sumAmounts(
         intents.filter((intent) => ["approved", "payment_recorded"].includes(intent.status)).map((intent) => intent.amount),
       ),
-      totalRecordedPaymentValue: sumAmounts(receipts.filter((receipt) => receipt.paymentState === "recorded").map((receipt) => receipt.amount)),
+      totalRecordedPaymentValue: sumAmounts(
+        receipts
+          .filter((receipt) => receipt.paymentState === "recorded" && receipt.proof.proofType === "arc_tx")
+          .map((receipt) => receipt.amount),
+      ),
       availableBudget: sumAmounts(budgets.map((budget) => this.calculateAvailableBudget(budget.budgetId))),
       walletsWithBudgets: new Set(budgets.map((budget) => normalizeWallet(budget.ownerWallet))).size,
     };

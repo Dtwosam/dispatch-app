@@ -796,6 +796,29 @@ export const nanoSpendPaymentRecordRequestSchema = z.object({
   contributionSummary: z.string().min(1).max(1000),
 });
 
+export const nanoArcProofVerifyRequestSchema = z.object({
+  ownerWallet: z.string().min(3),
+  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  payerWallet: z.string().min(3).nullable().optional(),
+  payeeWallet: z.string().min(3).nullable().optional(),
+  expectedAmountUsdc: z.number().positive(),
+  recipientLabel: z.string().min(1).max(120).nullable().optional(),
+});
+
+export const nanoArcProofVerifyResponseSchema = z.object({
+  proofStatus: z.enum(["verified", "pending", "rejected", "unavailable"]),
+  reason: z.string().min(1),
+  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/).nullable(),
+  explorerLink: z.string().url().nullable(),
+  matched: z.object({
+    token: z.string().min(3),
+    from: z.string().min(3),
+    to: z.string().min(3),
+    amountUsdc: z.number().nonnegative(),
+  }).nullable(),
+  receipt: nanoSpendReceiptSchema.nullable().optional(),
+});
+
 export const nanoBudgetActivityResponseSchema = z.object({
   budget: nanoBudgetSchema,
   runContext: nanoRunContextSchema,
@@ -962,6 +985,8 @@ export type NanoBudgetFundProofRequest = z.infer<typeof nanoBudgetFundProofReque
 export type NanoSpendIntentCreateRequest = z.infer<typeof nanoSpendIntentCreateRequestSchema>;
 export type NanoSpendIntentApproveRequest = z.infer<typeof nanoSpendIntentApproveRequestSchema>;
 export type NanoSpendPaymentRecordRequest = z.infer<typeof nanoSpendPaymentRecordRequestSchema>;
+export type NanoArcProofVerifyRequest = z.infer<typeof nanoArcProofVerifyRequestSchema>;
+export type NanoArcProofVerifyResponse = z.infer<typeof nanoArcProofVerifyResponseSchema>;
 export type NanoBudgetActivityResponse = z.infer<typeof nanoBudgetActivityResponseSchema>;
 export type NanoRunLedgerResponse = z.infer<typeof nanoRunLedgerResponseSchema>;
 export type NanoBudgetListResponse = z.infer<typeof nanoBudgetListResponseSchema>;

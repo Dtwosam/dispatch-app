@@ -114,9 +114,9 @@ export function buildNanoReceiptStatusModel(receipt) {
   }
   if (proofType === "arc_tx") {
     return {
-      label: "Arc proof recorded",
+      label: "Paid with proof",
       tone: "good",
-      helper: receipt.proof?.txHash ? "Valid Arc transaction hash recorded." : "Arc proof is missing a valid transaction hash.",
+      helper: receipt.proof?.txHash ? "Verified Arc Testnet USDC proof recorded." : "Arc proof is missing a valid transaction hash.",
     };
   }
   if (proofType === "circle_gateway") {

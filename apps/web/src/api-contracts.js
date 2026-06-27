@@ -315,6 +315,25 @@ export function validateNanoSpendReceiptResponse(payload) {
   return validateNanoSpendReceipt(payload, "nano spend receipt response");
 }
 
+export function validateNanoArcProofVerifyResponse(payload) {
+  const root = assertObject(payload, "nano arc proof response");
+  assertString(root.proofStatus, "nano arc proof response.proofStatus");
+  assertString(root.reason, "nano arc proof response.reason");
+  assertNullableString(root.txHash, "nano arc proof response.txHash");
+  assertNullableString(root.explorerLink, "nano arc proof response.explorerLink");
+  if (root.matched !== null) {
+    const matched = assertObject(root.matched, "nano arc proof response.matched");
+    assertString(matched.token, "nano arc proof response.matched.token");
+    assertString(matched.from, "nano arc proof response.matched.from");
+    assertString(matched.to, "nano arc proof response.matched.to");
+    assertNumber(matched.amountUsdc, "nano arc proof response.matched.amountUsdc");
+  }
+  if (root.receipt !== undefined && root.receipt !== null) {
+    validateNanoSpendReceipt(root.receipt, "nano arc proof response.receipt");
+  }
+  return root;
+}
+
 export function validateNanoMetricsResponse(payload) {
   const root = assertObject(payload, "nano metrics response");
   assertString(root.generatedAt, "nano metrics response.generatedAt");

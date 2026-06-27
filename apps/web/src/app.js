@@ -53,6 +53,7 @@ import {
   validateNanoBudgetActivityResponse,
   validateNanoBudgetDraftResponse,
   validateNanoBudgetListResponse,
+  validateNanoArcProofVerifyResponse,
   validateNanoHealthResponse,
   validateNanoMetricsResponse,
   validateNanoSpendIntentResponse,
@@ -2420,6 +2421,15 @@ function makeNanoLocalProof(label, notes = []) {
   };
 }
 
+function selectedNanoArcProofIntent(intents, receiptsByIntent) {
+  const requestedId = state.nano.arcProofIntentId;
+  return intents.find((intent) => intent.intentId === requestedId)
+    || intents.find((intent) => intent.status === "approved" && !receiptsByIntent.has(intent.intentId))
+    || intents.find((intent) => !receiptsByIntent.has(intent.intentId))
+    || intents[0]
+    || null;
+}
+
 async function refreshNanoActivity(budgetId = state.nano.selectedBudgetId) {
   if (!budgetId || !state.wallet.trim()) {
     state.nano.activity = null;
@@ -2825,6 +2835,11 @@ function renderNanoPageSimplified() {
   const canRecordFundingProof = Boolean(budget) && !budget.fundingProof;
   const canApproveAny = Boolean(budget?.fundingProof) && intents.some((intent) => intent.status === "proposed");
   const canRecordAnyReceipt = intents.some((intent) => intent.status === "approved" && !receiptsByIntent.has(intent.intentId));
+  const arcProofIntent = selectedNanoArcProofIntent(intents, receiptsByIntent);
+  const arcProofReceipt = arcProofIntent ? receiptsByIntent.get(arcProofIntent.intentId) : null;
+  const arcProofHasRecipient = Boolean(arcProofIntent?.payee?.walletAddress);
+  const canPayNanoOnArc = Boolean(arcProofIntent?.status === "approved" && !arcProofReceipt && arcProofHasRecipient);
+  const canVerifyArcProof = Boolean(arcProofIntent && !arcProofReceipt && state.nano.arcProofTxHash.trim());
   const primaryAction = !walletConnected
     ? { label: "Connect wallet", wallet: true, disabled: false }
     : !budget
@@ -2991,6 +3006,26 @@ function renderNanoPageSimplified() {
             <div><strong>No payment trail yet.</strong><p>Create a budget to start.</p></div>
           </div>
         `}
+        ${intents.length ? `
+          <div class="nano-proof-box">
+            <div>
+              <p class="mini-label">Arc proof</p>
+              <h3>${arcProofIntent ? escapeHtml(arcProofIntent.payee.label) : "Select a planned spend"}</h3>
+              <p>Use a real Arc Testnet USDC transaction. Dispatch only marks a spend paid after proof matches.</p>
+            </div>
+            <label class="nano-field">
+              <span>Paste Arc tx hash</span>
+              <input id="nanoArcProofTxHash" type="text" value="${escapeHtml(state.nano.arcProofTxHash)}" placeholder="0x..." />
+            </label>
+            <div class="nano-quiet-actions">
+              <button type="button" id="nanoPaySourceOnArc" ${!canPayNanoOnArc || state.nano.actionPending ? "disabled" : ""}>Pay source on Arc</button>
+              <button type="button" id="nanoVerifyArcProof" ${!canVerifyArcProof || state.nano.actionPending ? "disabled" : ""}>${state.nano.actionPending === "arcProof" ? "Verifying proof" : "Verify Arc proof"}</button>
+            </div>
+            <p class="nano-helper">${arcProofHasRecipient ? "Browser-wallet payment can be added for this recipient later." : "Attach a recipient wallet to pay on Arc."}</p>
+            ${state.nano.arcProofMessage ? `<p class="nano-helper ${state.nano.arcProofStatus === "rejected" || state.nano.arcProofStatus === "unavailable" ? "nano-helper--warn" : ""}">${escapeHtml(state.nano.arcProofMessage)}</p>` : ""}
+            <p class="nano-helper">Gateway/x402 settlement is planned for the payment proof roadmap.</p>
+          </div>
+        ` : ""}
         <div class="nano-quiet-actions">
           <button type="button" id="nanoRecordReceipts" ${!canRecordAnyReceipt || state.nano.actionPending ? "disabled" : ""}>Record local proof</button>
         </div>
@@ -3035,6 +3070,9 @@ function renderNanoPageSimplified() {
   document.getElementById("nanoBudgetAmount")?.addEventListener("input", (event) => {
     state.nano.budgetAmount = event.target.value;
   });
+  document.getElementById("nanoArcProofTxHash")?.addEventListener("input", (event) => {
+    state.nano.arcProofTxHash = event.target.value;
+  });
   document.getElementById("nanoBudgetSelect")?.addEventListener("change", async (event) => {
     state.nano.selectedBudgetId = event.target.value;
     state.nano.activity = null;
@@ -3066,6 +3104,12 @@ function renderNanoPageSimplified() {
   });
   document.getElementById("nanoRecordReceipts")?.addEventListener("click", async () => {
     await withNanoAction("receipts", recordNanoReceipts);
+  });
+  document.getElementById("nanoPaySourceOnArc")?.addEventListener("click", async () => {
+    await withNanoAction("nanoArcPay", payNanoSpendOnArc);
+  });
+  document.getElementById("nanoVerifyArcProof")?.addEventListener("click", async () => {
+    await withNanoAction("arcProof", verifyNanoArcProof);
   });
   revealSections(el.appRoot);
 }
@@ -3161,6 +3205,59 @@ async function recordNanoReceipts() {
       contributionSummary: plan?.contributionSummary || `Recorded local proof for ${intent.payee.label}.`,
     }, validateNanoSpendReceiptResponse);
   }
+}
+
+async function verifyNanoArcProof() {
+  requireWallet();
+  const receiptsByIntent = selectedNanoReceiptsByIntent();
+  const intents = state.nano.activity?.spendIntents || [];
+  const intent = selectedNanoArcProofIntent(intents, receiptsByIntent);
+  if (!intent) throw new Error("Create and approve a planned spend first.");
+  if (receiptsByIntent.has(intent.intentId)) throw new Error("This spend already has proof recorded.");
+  const txHash = state.nano.arcProofTxHash.trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+    state.nano.arcProofStatus = "rejected";
+    state.nano.arcProofMessage = "Proof rejected. Enter a valid Arc transaction hash.";
+    throw new Error("Enter a valid Arc transaction hash.");
+  }
+  const result = await sendJson(
+    `/api/nano/spend-intents/${encodeURIComponent(intent.intentId)}/verify-arc-proof`,
+    "POST",
+    {
+      ownerWallet: state.wallet,
+      txHash,
+      payerWallet: state.wallet,
+      payeeWallet: intent.payee.walletAddress || null,
+      expectedAmountUsdc: intent.amount,
+      recipientLabel: intent.payee.label,
+    },
+    validateNanoArcProofVerifyResponse,
+  );
+  state.nano.arcProofStatus = result.proofStatus;
+  state.nano.arcProofMessage = result.proofStatus === "verified" ? "Paid with proof." : result.reason;
+  if (result.proofStatus !== "verified") {
+    throw new Error(result.reason);
+  }
+}
+
+async function payNanoSpendOnArc() {
+  requireWallet();
+  const receiptsByIntent = selectedNanoReceiptsByIntent();
+  const intents = state.nano.activity?.spendIntents || [];
+  const intent = selectedNanoArcProofIntent(intents, receiptsByIntent);
+  if (!intent) throw new Error("Create and approve a planned spend first.");
+  if (intent.status !== "approved") throw new Error("Approve this planned spend before paying on Arc.");
+  if (receiptsByIntent.has(intent.intentId)) throw new Error("This spend already has proof recorded.");
+  if (!intent.payee.walletAddress) throw new Error("Attach a recipient wallet to pay on Arc.");
+  const txHash = await chainClient.transferNanoUsdc({
+    recipientWallet: intent.payee.walletAddress,
+    amountUsdc: intent.amount,
+  });
+  state.nano.arcProofIntentId = intent.intentId;
+  state.nano.arcProofTxHash = txHash;
+  state.nano.arcProofStatus = "pending";
+  state.nano.arcProofMessage = "Arc payment submitted. Verifying proof now.";
+  await verifyNanoArcProof();
 }
 
 async function renderAdmin() {

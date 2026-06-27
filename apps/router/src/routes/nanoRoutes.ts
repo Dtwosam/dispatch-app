@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  nanoArcProofVerifyRequestSchema,
   nanoBudgetDraftCreateRequestSchema,
   nanoBudgetFundProofRequestSchema,
   nanoSpendIntentApproveRequestSchema,
@@ -7,6 +8,7 @@ import {
   nanoSpendPaymentRecordRequestSchema,
 } from "@marketplace/shared";
 import type { NanoBudgetService } from "../services/nanoBudgetService";
+import type { NanoArcProofService } from "../services/nanoArcProofService";
 
 function walletQuery(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -18,7 +20,11 @@ function respondError(res: express.Response, error: unknown, fallback: string) {
   res.status(notFound ? 404 : 400).json({ error: message });
 }
 
-export function createNanoRoutes(service: NanoBudgetService) {
+function amountsMatch(left: number, right: number) {
+  return Math.round(Number(left) * 1_000_000) === Math.round(Number(right) * 1_000_000);
+}
+
+export function createNanoRoutes(service: NanoBudgetService, arcProofService?: NanoArcProofService) {
   const router = express.Router();
 
   router.get("/health", (_req, res) => {
@@ -89,6 +95,71 @@ export function createNanoRoutes(service: NanoBudgetService) {
       res.status(201).json(service.recordPaymentProof(req.params.intentId, payload));
     } catch (error) {
       respondError(res, error, "Nano payment proof recording failed");
+    }
+  });
+
+  router.post("/spend-intents/:intentId/verify-arc-proof", async (req, res) => {
+    try {
+      if (!arcProofService) {
+        res.status(503).json({
+          proofStatus: "unavailable",
+          reason: "Arc proof verification is temporarily unavailable.",
+          txHash: null,
+          explorerLink: null,
+          matched: null,
+          receipt: null,
+        });
+        return;
+      }
+      const payload = nanoArcProofVerifyRequestSchema.parse(req.body);
+      const intent = service.getSpendIntent(req.params.intentId, payload.ownerWallet);
+      if (!amountsMatch(payload.expectedAmountUsdc, intent.amount)) {
+        res.status(400).json({
+          proofStatus: "rejected",
+          reason: "Expected amount does not match this planned spend.",
+          txHash: payload.txHash,
+          explorerLink: null,
+          matched: null,
+          receipt: null,
+        });
+        return;
+      }
+      const expectedPayee = payload.payeeWallet || intent.payee.walletAddress || null;
+      const verification = await arcProofService.verify({
+        txHash: payload.txHash,
+        expectedPayer: payload.payerWallet || payload.ownerWallet,
+        expectedPayee,
+        expectedAmountUsdc: intent.amount,
+        network: "Arc Testnet",
+      });
+      if (verification.proofStatus !== "verified") {
+        res.status(200).json({
+          ...verification,
+          receipt: null,
+        });
+        return;
+      }
+      const receipt = service.recordPaymentProof(intent.intentId, {
+        ownerWallet: payload.ownerWallet,
+        proof: {
+          proofType: "arc_tx",
+          paymentState: "recorded",
+          txHash: payload.txHash,
+          proofReference: payload.txHash,
+          recordedAt: new Date().toISOString(),
+          notes: [
+            `Verified Arc Testnet USDC transfer for ${payload.recipientLabel || intent.payee.label}.`,
+            "Gateway/x402 settlement is planned for the payment proof roadmap.",
+          ],
+        },
+        contributionSummary: `Verified Arc USDC proof for ${payload.recipientLabel || intent.payee.label}.`,
+      });
+      res.status(201).json({
+        ...verification,
+        receipt,
+      });
+    } catch (error) {
+      respondError(res, error, "Nano Arc proof verification failed");
     }
   });
 

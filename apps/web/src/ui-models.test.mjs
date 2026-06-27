@@ -402,6 +402,21 @@ test("Nano local receipts are not labeled as settled payments", () => {
   assert.match(model.helper, /not settlement/i);
 });
 
+test("Nano Arc receipts are labeled paid only when verified proof exists", () => {
+  const txHash = `0x${"d".repeat(64)}`;
+  const model = buildNanoReceiptStatusModel({
+    paymentState: "recorded",
+    proof: {
+      proofType: "arc_tx",
+      paymentState: "recorded",
+      txHash,
+    },
+  });
+
+  assert.equal(model.label, "Paid with proof");
+  assert.match(model.helper, /Verified Arc Testnet USDC proof/);
+});
+
 test("Nano metrics use zero fallbacks without inventing payment data", () => {
   const model = buildNanoMetricsModel(null);
 

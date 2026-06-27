@@ -81,6 +81,55 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
     });
   }
 
+  async function transferNanoUsdc({ recipientWallet, amountUsdc }) {
+    await connectWallet();
+    const config = await getConfig();
+    if (config.chainMode === "read_only") {
+      throw new Error("Funding is unavailable in this environment.");
+    }
+    if (config.chainMode !== "browser_wallet") {
+      throw new Error("Nano Arc payments must be signed from the connected browser wallet.");
+    }
+    if (!/^0x[a-fA-F0-9]{40}$/.test(String(recipientWallet || "").trim())) {
+      throw new Error("Attach a recipient wallet to pay on Arc.");
+    }
+    if (!config?.paymentTokenAddress) {
+      throw new Error("Arc USDC token address is not configured.");
+    }
+    const walletAddress = getWalletAddress()?.trim();
+    const providerLabel = getInjectedWalletProviderLabel();
+    if (!walletAddress) {
+      throw new Error(`Connect ${providerLabel} before sending a Nano payment on Arc Testnet.`);
+    }
+    const { publicClient, walletClient } = await getBrowserWriteContext(config);
+    const tokenDecimals = Number(config.paymentTokenDecimals ?? ARC_TESTNET_USDC_DECIMALS);
+    const amountBaseUnits = toTokenBaseUnits(String(amountUsdc ?? ""), tokenDecimals);
+    const tokenBalance = await publicClient.readContract({
+      address: config.paymentTokenAddress,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [walletAddress],
+    }).catch(() => 0n);
+    if (BigInt(tokenBalance || 0n) < amountBaseUnits) {
+      throw new Error("Not enough USDC for this Nano payment.");
+    }
+    return runWriteStep({
+      walletClient,
+      publicClient,
+      label: "Nano USDC transfer",
+      stepIndex: 1,
+      totalSteps: 1,
+      onStatus,
+      request: {
+        address: config.paymentTokenAddress,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [recipientWallet, amountBaseUnits],
+        account: walletAddress,
+      },
+    });
+  }
+
   async function createBrowserTaskLifecycle({
     config,
     taskId,
@@ -406,6 +455,7 @@ export function createMarketplaceChainClient({ apiBase, getWalletAddress, onStat
     getConfig,
     getStatus,
     connectWallet,
+    transferNanoUsdc,
     createTaskLifecycle,
     primeBrowserLifecycle,
     getWalletNetworkSnapshot,

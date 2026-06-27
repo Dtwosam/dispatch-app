@@ -136,7 +136,7 @@ test("records payment proof only from provided proof and updates real-record met
 
   const ledger = service.getRunLedger(runContext.runId, wallet);
   assert.equal(ledger.receipts.length, 1);
-  assert.equal(ledger.metrics.totalRecordedPaymentValue, 0.03);
+  assert.equal(ledger.metrics.totalRecordedPaymentValue, 0);
 
   const metrics = service.calculateMetrics(wallet);
   assert.equal(metrics.budgetCount, 1);
@@ -145,7 +145,7 @@ test("records payment proof only from provided proof and updates real-record met
   assert.equal(metrics.receiptCount, 1);
   assert.equal(metrics.totalAuthorizedBudget, 1);
   assert.equal(metrics.totalApprovedIntentValue, 0.03);
-  assert.equal(metrics.totalRecordedPaymentValue, 0.03);
+  assert.equal(metrics.totalRecordedPaymentValue, 0);
 });
 
 test("rejects fake-looking tx hashes in payment proof requests", () => {
@@ -165,4 +165,40 @@ test("rejects fake-looking tx hashes in payment proof requests", () => {
       }),
     /Invalid/,
   );
+});
+
+test("counts only verified Arc proof records as recorded payment value", () => {
+  const { service } = createService();
+  const { budget } = service.createBudgetDraft({
+    ownerWallet: wallet,
+    goal: "Create a Nano run.",
+    amount: 1,
+  });
+  service.recordBudgetFundingProof(budget.budgetId, {
+    ownerWallet: wallet,
+    proof: fundingProof(),
+  });
+  const intent = service.createSpendIntent({
+    budgetId: budget.budgetId,
+    ownerWallet: wallet,
+    payee: {
+      payeeId: "source_unlock",
+      type: "source",
+      label: "Source unlock",
+      walletAddress: "0xSource0000000000000000000000000000000001",
+    },
+    amount: 0.05,
+    reason: "Unlock a source for the brief.",
+    estimated: false,
+  });
+  service.approveSpendIntent(intent.intentId, { ownerWallet: wallet });
+  service.recordPaymentProof(intent.intentId, {
+    ownerWallet: wallet,
+    proof: fundingProof(),
+    contributionSummary: "Verified Arc payment proof for source unlock.",
+  });
+
+  const metrics = service.calculateMetrics(wallet);
+  assert.equal(metrics.receiptCount, 1);
+  assert.equal(metrics.totalRecordedPaymentValue, 0.05);
 });
