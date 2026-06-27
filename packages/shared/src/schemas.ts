@@ -470,6 +470,141 @@ export const agentResultResponseSchema = z.object({
   completedAt: isoDateTimeSchema,
 });
 
+const usdcAmountSchema = z.number().nonnegative();
+const optionalTxHashSchema = z
+  .string()
+  .regex(/^0x[a-fA-F0-9]{64}$/)
+  .nullable();
+
+export const nanoBudgetStatusSchema = z.enum([
+  "draft",
+  "funding_proof_recorded",
+  "spending",
+  "completed",
+  "unavailable",
+]);
+
+export const nanoSpendIntentStatusSchema = z.enum([
+  "proposed",
+  "approved",
+  "payment_recorded",
+  "failed",
+  "skipped",
+]);
+
+export const nanoPayeeTypeSchema = z.enum(["source", "tool", "creator", "agent", "platform"]);
+export const nanoProofTypeSchema = z.enum(["none", "local", "arc_tx", "circle_gateway", "x402", "external_reference"]);
+export const nanoPaymentStateSchema = z.enum(["not_paid", "authorized", "recorded", "failed", "unavailable"]);
+
+export const nanoPayeeSchema = z.object({
+  payeeId: z.string().min(1),
+  type: nanoPayeeTypeSchema,
+  label: z.string().min(1).max(120),
+  walletAddress: walletAddressSchema.nullable().optional(),
+  externalRef: z.string().min(1).nullable().optional(),
+});
+
+export const nanoPolicySchema = z.object({
+  maxBudgetAmount: usdcAmountSchema,
+  maxSpendAmount: usdcAmountSchema,
+  allowedPayeeTypes: z.array(nanoPayeeTypeSchema).min(1),
+  requireApprovalForEachSpend: z.boolean().default(true),
+  notes: z.array(z.string().max(240)).default([]),
+}).superRefine((value, ctx) => {
+  if (value.maxSpendAmount > value.maxBudgetAmount) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["maxSpendAmount"],
+      message: "maxSpendAmount cannot exceed maxBudgetAmount",
+    });
+  }
+});
+
+export const nanoPaymentProofSchema = z.object({
+  proofType: nanoProofTypeSchema.exclude(["none"]),
+  paymentState: nanoPaymentStateSchema.exclude(["not_paid", "authorized"]),
+  txHash: optionalTxHashSchema.default(null),
+  proofReference: z.string().min(1),
+  recordedAt: isoDateTimeSchema,
+  notes: z.array(z.string().max(240)).default([]),
+}).superRefine((value, ctx) => {
+  if (value.proofType === "arc_tx" && !value.txHash) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["txHash"],
+      message: "A valid txHash is required for arc_tx proof",
+    });
+  }
+});
+
+export const nanoBudgetSchema = z.object({
+  budgetId: z.string().min(1),
+  ownerWallet: walletAddressSchema,
+  runId: z.string().min(1),
+  goal: z.string().min(3).max(2000),
+  amount: usdcAmountSchema,
+  tokenSymbol: z.literal("USDC"),
+  tokenDecimals: z.literal(6),
+  network: z.literal("Arc Testnet"),
+  status: nanoBudgetStatusSchema,
+  policy: nanoPolicySchema,
+  fundingProof: nanoPaymentProofSchema.nullable(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+export const nanoSpendIntentSchema = z.object({
+  intentId: z.string().min(1),
+  budgetId: z.string().min(1),
+  runId: z.string().min(1),
+  ownerWallet: walletAddressSchema,
+  payee: nanoPayeeSchema,
+  amount: usdcAmountSchema,
+  reason: z.string().min(3).max(1000),
+  status: nanoSpendIntentStatusSchema,
+  estimated: z.boolean().default(false),
+  createdAt: isoDateTimeSchema,
+  approvedAt: isoDateTimeSchema.nullable(),
+  updatedAt: isoDateTimeSchema,
+});
+
+export const nanoSpendReceiptSchema = z.object({
+  receiptId: z.string().min(1),
+  intentId: z.string().min(1),
+  budgetId: z.string().min(1),
+  runId: z.string().min(1),
+  ownerWallet: walletAddressSchema,
+  payee: nanoPayeeSchema,
+  amount: usdcAmountSchema,
+  paymentState: nanoPaymentStateSchema,
+  proof: nanoPaymentProofSchema,
+  contributionSummary: z.string().min(1).max(1000),
+  createdAt: isoDateTimeSchema,
+});
+
+export const nanoRunContextSchema = z.object({
+  runId: z.string().min(1),
+  budgetId: z.string().min(1),
+  ownerWallet: walletAddressSchema,
+  goal: z.string().min(3).max(2000),
+  spendPlanSummary: z.string().max(2000).nullable(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+export const nanoMetricsSchema = z.object({
+  generatedAt: isoDateTimeSchema,
+  budgetCount: z.number().int().nonnegative(),
+  spendIntentCount: z.number().int().nonnegative(),
+  approvedSpendIntentCount: z.number().int().nonnegative(),
+  receiptCount: z.number().int().nonnegative(),
+  totalAuthorizedBudget: usdcAmountSchema,
+  totalApprovedIntentValue: usdcAmountSchema,
+  totalRecordedPaymentValue: usdcAmountSchema,
+  availableBudget: usdcAmountSchema,
+  walletsWithBudgets: z.number().int().nonnegative(),
+});
+
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type AgentProfile = z.infer<typeof agentProfileSchema>;
 export type AgentVersion = z.infer<typeof agentVersionSchema>;
@@ -494,3 +629,16 @@ export type Erc8183Job = z.infer<typeof erc8183JobSchema>;
 export type AgentAdapterTaskRequest = z.infer<typeof agentAdapterTaskRequestSchema>;
 export type AgentAdapterTaskResponse = z.infer<typeof agentAdapterTaskResponseSchema>;
 export type AgentAdapterRegistration = z.infer<typeof agentAdapterRegistrationSchema>;
+export type NanoBudgetStatus = z.infer<typeof nanoBudgetStatusSchema>;
+export type NanoSpendIntentStatus = z.infer<typeof nanoSpendIntentStatusSchema>;
+export type NanoPayeeType = z.infer<typeof nanoPayeeTypeSchema>;
+export type NanoProofType = z.infer<typeof nanoProofTypeSchema>;
+export type NanoPaymentState = z.infer<typeof nanoPaymentStateSchema>;
+export type NanoPayee = z.infer<typeof nanoPayeeSchema>;
+export type NanoPolicy = z.infer<typeof nanoPolicySchema>;
+export type NanoPaymentProof = z.infer<typeof nanoPaymentProofSchema>;
+export type NanoBudget = z.infer<typeof nanoBudgetSchema>;
+export type NanoSpendIntent = z.infer<typeof nanoSpendIntentSchema>;
+export type NanoSpendReceipt = z.infer<typeof nanoSpendReceiptSchema>;
+export type NanoRunContext = z.infer<typeof nanoRunContextSchema>;
+export type NanoMetrics = z.infer<typeof nanoMetricsSchema>;

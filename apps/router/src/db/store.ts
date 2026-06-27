@@ -1,4 +1,12 @@
-import type { CreateAgentDraft, SettlementReceipt, TaskDetailView } from "@marketplace/shared";
+import type {
+  CreateAgentDraft,
+  NanoBudget,
+  NanoRunContext,
+  NanoSpendIntent,
+  NanoSpendReceipt,
+  SettlementReceipt,
+  TaskDetailView,
+} from "@marketplace/shared";
 import type {
   AdminAuditLogRow,
   AgentCompatibilityCheckRow,
@@ -44,6 +52,10 @@ type StoreSnapshot = {
   blacklistedEndpoints: Array<[string, EndpointBlacklistRow]>;
   moderationFlags: ModerationFlagRow[];
   pausedTasks: Array<[string, TaskPauseRow]>;
+  nanoBudgets: Array<[string, NanoBudget]>;
+  nanoRunContexts: Array<[string, NanoRunContext]>;
+  nanoSpendIntents: Array<[string, NanoSpendIntent]>;
+  nanoSpendReceipts: Array<[string, NanoSpendReceipt]>;
 };
 
 function cloneJson<T>(value: T): T {
@@ -133,6 +145,10 @@ export class InMemoryRegistryStore implements RegistryDatabase {
   blacklistedEndpoints: Map<string, EndpointBlacklistRow>;
   moderationFlags: ModerationFlagRow[];
   pausedTasks: Map<string, TaskPauseRow>;
+  nanoBudgets: Map<string, NanoBudget>;
+  nanoRunContexts: Map<string, NanoRunContext>;
+  nanoSpendIntents: Map<string, NanoSpendIntent>;
+  nanoSpendReceipts: Map<string, NanoSpendReceipt>;
 
   private onChange: () => void;
   private notificationsPaused = false;
@@ -162,6 +178,10 @@ export class InMemoryRegistryStore implements RegistryDatabase {
     this.blacklistedEndpoints = trackMap(new Map(), () => this.notifyChange());
     this.moderationFlags = trackArray([], () => this.notifyChange());
     this.pausedTasks = trackMap(new Map(), () => this.notifyChange());
+    this.nanoBudgets = trackMap(new Map(), () => this.notifyChange());
+    this.nanoRunContexts = trackMap(new Map(), () => this.notifyChange());
+    this.nanoSpendIntents = trackMap(new Map(), () => this.notifyChange());
+    this.nanoSpendReceipts = trackMap(new Map(), () => this.notifyChange());
   }
 
   get leaderboardCache() {
@@ -202,6 +222,10 @@ export class InMemoryRegistryStore implements RegistryDatabase {
       blacklistedEndpoints: [...this.blacklistedEndpoints.entries()],
       moderationFlags: this.moderationFlags,
       pausedTasks: [...this.pausedTasks.entries()],
+      nanoBudgets: [...this.nanoBudgets.entries()],
+      nanoRunContexts: [...this.nanoRunContexts.entries()],
+      nanoSpendIntents: [...this.nanoSpendIntents.entries()],
+      nanoSpendReceipts: [...this.nanoSpendReceipts.entries()],
     });
   }
 
@@ -254,6 +278,14 @@ export class InMemoryRegistryStore implements RegistryDatabase {
       this.moderationFlags.push(...cloneJson(snapshot.moderationFlags ?? []));
       this.pausedTasks.clear();
       for (const [key, value] of snapshot.pausedTasks ?? []) this.pausedTasks.set(key, value);
+      this.nanoBudgets.clear();
+      for (const [key, value] of snapshot.nanoBudgets ?? []) this.nanoBudgets.set(key, value);
+      this.nanoRunContexts.clear();
+      for (const [key, value] of snapshot.nanoRunContexts ?? []) this.nanoRunContexts.set(key, value);
+      this.nanoSpendIntents.clear();
+      for (const [key, value] of snapshot.nanoSpendIntents ?? []) this.nanoSpendIntents.set(key, value);
+      this.nanoSpendReceipts.clear();
+      for (const [key, value] of snapshot.nanoSpendReceipts ?? []) this.nanoSpendReceipts.set(key, value);
     } finally {
       this.notificationsPaused = false;
     }

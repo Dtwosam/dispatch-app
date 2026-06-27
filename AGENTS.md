@@ -1,12 +1,76 @@
 # AGENTS.md
 
+## Required Reading For Dispatch Work
+
+Before future Codex work on Dispatch, read:
+
+- `docs/dispatch-source-of-truth.md`
+- `docs/arc-circle-sources.md`
+- `docs/circle-tool-usage.md`
+- `docs/lepton-dispatch-nano-spec.md`
+- `docs/lepton-dispatch-nano-build-order.md`
+
+Create a TODO checklist before working and follow it.
+
+For Dispatch Nano work, follow the build order. Do not skip phases unless the user explicitly requests it.
+
+## Current Product Direction
+
+Dispatch is a USDC-powered AI work marketplace on Arc Testnet.
+
+Dispatch Nano is the Lepton module: an agent budget router where agents earn from humans, spend from user-funded budgets, pay other agents, and pay creators, sources, and tools per use using tiny USDC payments on Arc.
+
+Current direction:
+
+- Arc
+- Circle
+- USDC
+- Dispatch Nano
+- agent budget routing
+- agent-to-agent payments
+- creator/source/tool payouts
+- visible payment trails
+
+Do not reintroduce older chain/product positioning as the active story.
+
+## Hard Locks
+
+Do not change unless explicitly requested:
+
+- backend routes
+- contracts
+- wallet funding logic
+- settlement logic
+- task lifecycle logic
+- Arc config
+- private keys or env secrets
+- external agent registration logic
+- review/revision/dispute behavior
+
+Do not deploy production unless explicitly asked.
+
+Do not fake:
+
+- payments
+- transaction hashes
+- balances
+- users
+- earnings
+- ratings
+- reviews
+- traction
+- task history
+- completed work
+- endpoint health
+- owner proof
+- compatibility results
+- Nano spend receipts
+
 ## Built-In Default Agent
 
 The built-in default agent exists to solve the marketplace cold-start problem.
 
-It is not the product.
-It is the platform's default launch worker inside a multi-agent marketplace.
-Future Codex work must preserve that distinction.
+It is not the product. It is the platform's default launch worker inside a multi-agent marketplace.
 
 Stable rules:
 
@@ -60,8 +124,6 @@ Stable rules:
 - Prefer incremental improvements to task structuring, evaluation, and polishing over architectural rewrites.
 
 ## Quality Modes
-
-The built-in default agent supports three quality modes.
 
 ### Fast
 
@@ -142,7 +204,6 @@ Stable rules:
 ## Persistence And Benchmarking
 
 The built-in default agent is also the platform benchmark worker.
-Its runs must remain analyzable.
 
 Persist for each run when the infrastructure supports it:
 
@@ -189,16 +250,15 @@ Stable rules:
 - Keep the product marketplace-first: post task, execute work, review result, settle payment, update reputation.
 - Do not collapse Dispatch into a chat assistant or protocol dashboard.
 - Route the Platform Agent through the same review credibility rails as other agents whenever practical.
-- Preserve the Arc contract layer as the anchor for review rounds, review outcome, appeal state, and settlement eligibility.
 - Preserve multi-validator aggregation for AI-backed result verification; do not revert to a single scorer as the source of truth.
 - Preserve the Equivalence Principle: accept different outputs when they solve the task equivalently; avoid brittle exact-match logic.
 - Keep disputes and appeals payout-blocking until review reaches a payout-safe state.
-- Keep the onchain/offchain split honest in code and copy: onchain anchors identity, ERC-20 escrow, result hash, review/finalization, and settlement; offchain handles execution, orchestration, and rich storage.
+- Keep the onchain/offchain split honest in code and copy.
 - Keep the UI simple: surface quality score, confidence, validator agreement, and result state without exposing protocol internals as the primary experience.
 
-## Change Guidance For Future Codex Work
+## Change Guidance
 
-When improving the built-in default agent in the future:
+When improving Dispatch:
 
 - sharpen the existing implementation before proposing replacement architecture
 - preserve marketplace framing
@@ -206,3 +266,5 @@ When improving the built-in default agent in the future:
 - preserve centralized prompt versioning
 - preserve benchmarkability and stage persistence
 - prefer evolutionary changes over wholesale rewrites unless explicitly requested
+- preserve data honesty
+- do not deploy unless explicitly instructed

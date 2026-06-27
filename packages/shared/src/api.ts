@@ -18,6 +18,14 @@ import {
   evaluationRequestSchema,
   healthcheckResponseSchema,
   latencyRangeSchema,
+  nanoBudgetSchema,
+  nanoMetricsSchema,
+  nanoPaymentProofSchema,
+  nanoPayeeSchema,
+  nanoPolicySchema,
+  nanoRunContextSchema,
+  nanoSpendIntentSchema,
+  nanoSpendReceiptSchema,
   recentOutcomePointSchema,
   trustBadgeSchema,
   userTrustSchema,
@@ -748,6 +756,89 @@ export const taskChainSyncResponseSchema = z.object({
   syncedReceipt: chainReceiptViewSchema,
 });
 
+export const nanoPolicyInputSchema = z.object({
+  maxBudgetAmount: z.number().nonnegative().optional(),
+  maxSpendAmount: z.number().nonnegative().optional(),
+  allowedPayeeTypes: z.array(z.enum(["source", "tool", "creator", "agent", "platform"])).min(1).optional(),
+  requireApprovalForEachSpend: z.boolean().optional(),
+  notes: z.array(z.string().max(240)).optional(),
+});
+
+export const nanoBudgetDraftCreateRequestSchema = z.object({
+  ownerWallet: z.string().min(3),
+  goal: z.string().min(3).max(2000),
+  amount: z.number().positive(),
+  policy: nanoPolicyInputSchema.optional(),
+  spendPlanSummary: z.string().max(2000).nullable().optional(),
+});
+
+export const nanoBudgetFundProofRequestSchema = z.object({
+  ownerWallet: z.string().min(3),
+  proof: nanoPaymentProofSchema,
+});
+
+export const nanoSpendIntentCreateRequestSchema = z.object({
+  budgetId: z.string().min(1),
+  ownerWallet: z.string().min(3),
+  payee: nanoPayeeSchema,
+  amount: z.number().positive(),
+  reason: z.string().min(3).max(1000),
+  estimated: z.boolean().default(false),
+});
+
+export const nanoSpendIntentApproveRequestSchema = z.object({
+  ownerWallet: z.string().min(3),
+});
+
+export const nanoSpendPaymentRecordRequestSchema = z.object({
+  ownerWallet: z.string().min(3),
+  proof: nanoPaymentProofSchema,
+  contributionSummary: z.string().min(1).max(1000),
+});
+
+export const nanoArcProofVerifyRequestSchema = z.object({
+  ownerWallet: z.string().min(3),
+  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  payerWallet: z.string().min(3).nullable().optional(),
+  payeeWallet: z.string().min(3).nullable().optional(),
+  expectedAmountUsdc: z.number().positive(),
+  recipientLabel: z.string().min(1).max(120).nullable().optional(),
+});
+
+export const nanoArcProofVerifyResponseSchema = z.object({
+  proofStatus: z.enum(["verified", "pending", "rejected", "unavailable"]),
+  reason: z.string().min(1),
+  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/).nullable(),
+  explorerLink: z.string().url().nullable(),
+  matched: z.object({
+    token: z.string().min(3),
+    from: z.string().min(3),
+    to: z.string().min(3),
+    amountUsdc: z.number().nonnegative(),
+  }).nullable(),
+  receipt: nanoSpendReceiptSchema.nullable().optional(),
+});
+
+export const nanoBudgetActivityResponseSchema = z.object({
+  budget: nanoBudgetSchema,
+  runContext: nanoRunContextSchema,
+  spendIntents: z.array(nanoSpendIntentSchema),
+  receipts: z.array(nanoSpendReceiptSchema),
+  availableBudget: z.number().nonnegative(),
+});
+
+export const nanoRunLedgerResponseSchema = z.object({
+  runContext: nanoRunContextSchema,
+  budgets: z.array(nanoBudgetSchema),
+  spendIntents: z.array(nanoSpendIntentSchema),
+  receipts: z.array(nanoSpendReceiptSchema),
+  metrics: nanoMetricsSchema,
+});
+
+export const nanoBudgetListResponseSchema = z.object({
+  items: z.array(nanoBudgetSchema),
+});
+
 // Backwards-compatible aliases during the GenLayer -> Arc migration.
 export const genLayerChainModeSchema = chainModeSchema;
 export const genLayerReceiptStatusSchema = chainReceiptStatusSchema;
@@ -888,6 +979,17 @@ export type GenLayerTaskWriteRequest = z.infer<typeof genLayerTaskWriteRequestSc
 export type GenLayerTaskWriteResponse = z.infer<typeof genLayerTaskWriteResponseSchema>;
 export type TaskChainSyncRequest = z.infer<typeof taskChainSyncRequestSchema>;
 export type TaskChainSyncResponse = z.infer<typeof taskChainSyncResponseSchema>;
+export type NanoBudgetDraftCreateRequest = z.infer<typeof nanoBudgetDraftCreateRequestSchema>;
+export type NanoPolicyInput = z.infer<typeof nanoPolicyInputSchema>;
+export type NanoBudgetFundProofRequest = z.infer<typeof nanoBudgetFundProofRequestSchema>;
+export type NanoSpendIntentCreateRequest = z.infer<typeof nanoSpendIntentCreateRequestSchema>;
+export type NanoSpendIntentApproveRequest = z.infer<typeof nanoSpendIntentApproveRequestSchema>;
+export type NanoSpendPaymentRecordRequest = z.infer<typeof nanoSpendPaymentRecordRequestSchema>;
+export type NanoArcProofVerifyRequest = z.infer<typeof nanoArcProofVerifyRequestSchema>;
+export type NanoArcProofVerifyResponse = z.infer<typeof nanoArcProofVerifyResponseSchema>;
+export type NanoBudgetActivityResponse = z.infer<typeof nanoBudgetActivityResponseSchema>;
+export type NanoRunLedgerResponse = z.infer<typeof nanoRunLedgerResponseSchema>;
+export type NanoBudgetListResponse = z.infer<typeof nanoBudgetListResponseSchema>;
 export type AdminPauseTaskRequest = z.infer<typeof adminPauseTaskRequestSchema>;
 export type AdminBlacklistEndpointRequest = z.infer<typeof adminBlacklistEndpointRequestSchema>;
 export type AdminAuditLog = z.infer<typeof adminAuditLogSchema>;

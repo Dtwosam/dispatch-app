@@ -22,7 +22,7 @@
 
 The current live-network localhost path is:
 
-1. Set Arc environment values from [C:\Users\dtwof\Desktop\genlayer\New folder\.env.arc.example](C:\Users\dtwof\Desktop\genlayer\New%20folder\.env.arc.example).
+1. Set Arc environment values from `.env.arc.example` or `.env.example`.
 2. Keep `ARC_CHAIN_KEY=arcTestnet`.
 3. Choose one:
    - `ARC_CHAIN_MODE=server_signer_proxy` for operator-maintained writes

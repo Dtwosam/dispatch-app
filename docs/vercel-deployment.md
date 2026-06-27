@@ -1,24 +1,26 @@
 # Vercel Deployment
 
-This repo already includes a root `vercel.json` for the Vercel-hosted frontend.
+This repo includes a root `vercel.json` for the Vercel-hosted frontend.
 
-## Current Deployment
+## Current Deployment Direction
 
-- Frontend on Vercel: `https://dispatch-steel.vercel.app/`
-- GenLayer Bradbury Testnet reviewer route: `https://dispatch-steel.vercel.app/genlayer-demo`
+- Current live app: `https://dispatch-arc.vercel.app`
+- Current product direction: Arc Testnet, Circle tooling, USDC, Dispatch Nano
+
+Do not deploy production unless the user explicitly requests it.
 
 ## Vercel Settings
 
 Use these settings when importing the GitHub repo into Vercel:
 
-- Repository: `https://github.com/Dtwosam/dispatch-genlayer.git`
+- Repository: `https://github.com/Dtwosam/dispatch-app`
 - Framework preset: Other
 - Root directory: leave as repository root
 - Build command: `npm --workspace apps/web run build:static`
 - Output directory: `apps/web/.vercel-static`
 - Install command: `npm install`
 
-The root `vercel.json` already contains:
+The root `vercel.json` contains:
 
 ```json
 {
@@ -41,37 +43,28 @@ Set this when the router is deployed and reachable for the environment you want 
 DISPATCH_API_BASE=https://<your-router-host>
 ```
 
-If the router URL is environment-specific, configure `DISPATCH_API_BASE` for that deployment. The `/genlayer-demo` route remains the reviewer-facing GenLayer Bradbury Testnet route and should continue to explain the Intelligent Contract/evaluator marketplace flow clearly even before a reviewer signs a wallet transaction.
+Use `.env.example` for Arc/Circle/USDC variable names. Do not add secrets to docs.
 
 ## CLI Deployment
 
-From the repository root:
+Local build only:
 
 ```bash
 npm install
 npm --workspace apps/web run build:static
-npx vercel deploy
 ```
 
-For production:
-
-```bash
-npx vercel deploy --prod
-```
+Production deployment must be explicitly requested before running any deploy command.
 
 ## Post-Deployment Checks
 
-After Vercel returns a URL, open:
+After an explicitly requested deployment returns a URL, open:
 
 ```text
-https://dispatch-steel.vercel.app/
-https://dispatch-steel.vercel.app/genlayer-demo
+https://dispatch-arc.vercel.app/
+https://dispatch-arc.vercel.app/agents
+https://dispatch-arc.vercel.app/post-task
+https://dispatch-arc.vercel.app/dashboard
 ```
 
-Then update:
-
-- `README.md` live demo field
-- `SUBMISSION.md` live demo field
-- `docs/demo-flow.md` live demo field
-
-Do not add a guessed Vercel URL before deployment succeeds. The current deployed frontend is already listed above; replace it only after a successful redeploy returns a different production URL.
+Then update docs only with the actual successful URL. Do not add guessed URLs.

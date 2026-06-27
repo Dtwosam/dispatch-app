@@ -1,87 +1,83 @@
-# GenLayer Submission
+# Lepton Submission Notes
 
 ## Reviewer Essentials
 
-- Project: Dispatch GenLayer
-- GitHub Repository: `https://github.com/Dtwosam/dispatch-genlayer.git`
-- Live Demo: `https://dispatch-steel.vercel.app/`
-- GenLayer Bradbury Testnet Route: `https://dispatch-steel.vercel.app/genlayer-demo`
-- Intelligent Contract: `contracts/marketplace/marketplace.py`
-- Reviewer-facing route: `/genlayer-demo`
-- Local frontend command: `npm run dev:web`
-- Contract artifact check: `npm run contracts:prepare`
-- Web build check: `npm --workspace apps/web run build`
-- Web smoke test: `npm --workspace apps/web run test`
-- Contract direct tests: `npm run contracts:test`
+- Project: Dispatch
+- Repository: `https://github.com/Dtwosam/dispatch-app`
+- Live app: `https://dispatch-arc.vercel.app`
+- Current direction: Arc Testnet, Circle tooling, USDC, Dispatch Nano
+- Nano spec: `docs/lepton-dispatch-nano-spec.md`
+- Nano demo flow: `docs/lepton-demo-flow.md`
+- Arc/Circle source map: `docs/arc-circle-sources.md`
+- Build order: `docs/lepton-dispatch-nano-build-order.md`
 
-## What This Submission Demonstrates
+## What Dispatch Demonstrates
 
-Dispatch is a marketplace for AI agent work. A buyer posts a funded task, an agent executes, validators review the result, and settlement becomes eligible only after the GenLayer Intelligent Contract records a payout-safe outcome.
+Dispatch is a marketplace for AI agent work. A user posts a funded task, an agent executes, the user reviews the result, and payment is released only after approval.
 
-The submission is GenLayer-first:
+Dispatch Nano extends that story with agent budget routing:
 
-- `contracts/marketplace/marketplace.py` is the GenLayer Intelligent Contract for the Bradbury Testnet marketplace path.
-- `packages/contracts/marketplace/task_escrow.py` and `packages/contracts/marketplace/agent_registry.py` are the fuller contract package.
-- `/genlayer-demo` shows the reviewer-facing Bradbury Testnet marketplace flow from funded task to review and settlement eligibility.
-- `docs/demo-flow.md` gives a reviewer walkthrough.
-- `docs/vercel-deployment.md` gives exact frontend deployment steps.
+- user-funded USDC budgets
+- agent spend plans
+- agent-to-agent payments
+- creator/source/tool payouts
+- visible payment trails
 
-## GenLayer Fit
+## Lepton Fit
 
-- Intelligent Contract: anchors task, agent, result hash, review outcome, appeal state, and settlement eligibility.
-- Optimistic Democracy: review finalization requires multiple validator inputs and aggregates score, agreement, and confidence.
-- Equivalence Principle: validator inputs judge whether the result meaningfully solves the task, not whether text matches exactly.
-- Disputes and appeals: rejected, disputed, or unresolved tasks pause settlement and can enter appeal.
-- Future of Work: the Platform Agent is the launch worker, while external agents can later compete through the same marketplace rails.
-
-## Live Deployment
-
-Live demo URL:
-
-```text
-https://dispatch-steel.vercel.app/
-```
-
-Reviewer route:
-
-```text
-https://dispatch-steel.vercel.app/genlayer-demo
-```
+- Agentic sophistication: agents can plan budgeted spend instead of only producing text.
+- Circle tool usage: Arc/Circle/USDC are the current direction, with Circle Agent Stack, Gateway, Nanopayments, x402, and Wallets planned where source-backed.
+- Innovation: Nano turns AI work into inspectable payment trails.
+- Traction: Dispatch must show only real or clearly local/demo-visible metrics.
 
 ## Implementation Status
 
 Implemented:
 
-- GenLayer Intelligent Contract implementation at `contracts/marketplace/marketplace.py`.
-- Marketplace frontend with a reviewer-facing `/genlayer-demo` route for the working Bradbury Testnet flow.
-- Platform Agent marketplace framing.
-- Multi-validator/evaluator review model in the app architecture.
-- Contract direct tests and artifact verification scripts.
+- Dispatch marketplace UI
+- Arc Testnet/USDC direction
+- browser-wallet task funding path where configured
+- task review, revision, dispute, and release surfaces
+- dashboard and builder flows
+- platform/default agent marketplace framing
 
-Reviewer-facing route:
+Planned:
 
-- The deployed `/genlayer-demo` route showcases the GenLayer Bradbury Testnet marketplace flow without forcing reviewers to provide wallet credentials before they can inspect the product.
-- It presents funded task, agent assignment, result hash submission, evaluator review, and settlement eligibility as the Intelligent Contract/evaluator flow used by the marketplace.
+- `/nano`
+- Nano budget records
+- spend intents
+- receipt model
+- agent-to-agent/source/tool payout proof
+- Circle Gateway/Nanopayments/x402 integration if feasible
 
-Credential or environment-specific actions:
+## Required Honesty
 
-- Publishing a specific Bradbury contract address for a reviewer environment.
-- Running write transactions with a funded Bradbury wallet.
-- Running GenLayer integration smoke tests against a configured GenLayer environment.
+Do not claim:
 
-## Secondary Rails Note
+- live Nano payments
+- Circle Gateway settlement
+- x402 access
+- fake transaction hashes
+- fake balances
+- fake users
+- fake earnings
+- fake ratings
+- fake reviews
+- fake traction
 
-If older Arc or Circle wording appears elsewhere in historical docs or implementation paths, treat it as secondary/future payment or compatibility work. The GenLayer Bradbury Testnet submission path is the Intelligent Contract and `/genlayer-demo` flow listed above.
+If a receipt is local or proof is pending, label it clearly.
 
-## Resubmission Checklist
+## Checks
 
-- Confirm GitHub repo points to `https://github.com/Dtwosam/dispatch-genlayer.git`.
-- Confirm `contracts/marketplace/marketplace.py` is visible in the repo.
-- Confirm `/genlayer-demo` works locally or on the deployed site.
-- Run `npm --workspace apps/web run build`.
-- Run `npm --workspace apps/web run test`.
-- Run `npm run contracts:test`.
-- Run `npm run contracts:prepare`.
-- Open `https://dispatch-steel.vercel.app/`.
-- Open `https://dispatch-steel.vercel.app/genlayer-demo`.
-- Submit the GitHub repo link, live demo link, Intelligent Contract path, and reviewer-facing Bradbury Testnet route.
+For Phase 0 docs:
+
+```bash
+git diff --check
+npm --workspace apps/web run build
+```
+
+For later implementation phases, use the checks specified in `docs/lepton-dispatch-nano-build-order.md`.
+
+## Deployment
+
+Do not deploy production unless explicitly requested.

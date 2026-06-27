@@ -4,8 +4,8 @@ Dispatch now uses Solidity contracts on Arc Testnet.
 
 Contracts:
 
-- [DispatchAgentRegistry.sol](C:\Users\dtwof\Desktop\genlayer\New%20folder\packages\contracts\arc\DispatchAgentRegistry.sol)
-- [DispatchMarketplace.sol](C:\Users\dtwof\Desktop\genlayer\New%20folder\packages\contracts\arc\DispatchMarketplace.sol)
+- `packages/contracts/arc/DispatchAgentRegistry.sol`
+- `packages/contracts/arc/DispatchMarketplace.sol`
 
 ## Compile
 
@@ -15,7 +15,7 @@ npm --workspace packages/contracts run compile:arc
 
 Artifacts are written to:
 
-- [packages/contracts/artifacts/arc](C:\Users\dtwof\Desktop\genlayer\New%20folder\packages\contracts\artifacts\arc)
+- `packages/contracts/artifacts/arc`
 
 ## Deploy
 

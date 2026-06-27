@@ -1,23 +1,13 @@
-# Testing Notes
+# Retired Contract Testing Notes
 
-The GenLayer docs point to Studio and the `genlayer-project-boilerplate` for end-to-end contract testing with pytest.
+This package-level testing note is retired for the current Lepton Arc/Circle/USDC direction.
 
-In this workspace, the tests under `packages/contracts/tests` are local domain tests that validate:
+Current Dispatch work should follow:
 
-- access control
-- strict task-state transitions
-- escrow funding checks
-- submission rules
-- rejection and refund logic
-- dispute pause logic
-- registry updates
+- `docs/dispatch-source-of-truth.md`
+- `docs/arc-circle-sources.md`
+- `docs/lepton-dispatch-nano-build-order.md`
 
-These tests are intended to catch product logic regressions before chain integration.
+Legacy tests and scripts in this package may still exist and should be reviewed in a later explicit cleanup phase.
 
-## Recommended next verification layer
-
-1. Load the contracts into GenLayer Studio.
-2. Validate constructor detection and public method signatures.
-3. Deploy with `genlayer deploy` or the deploy scripts.
-4. Validate payable paths on Bradbury or another non-Studio environment, because the Studio limitations page says native token transfers are not supported there.
-5. Add end-to-end pytest coverage using the official project boilerplate against Studio or localnet.
+Do not change contract source, deployment scripts, task lifecycle logic, wallet funding logic, settlement logic, or Arc config during Phase 0 docs cleanup.

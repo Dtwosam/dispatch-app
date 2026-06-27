@@ -10,7 +10,7 @@ Dispatch should run with:
 
 Run:
 
-- [supabase/sql/001_dispatch_state_snapshots.sql](C:\Users\dtwof\Desktop\genlayer\New%20folder\supabase\sql\001_dispatch_state_snapshots.sql)
+- `supabase/sql/001_dispatch_state_snapshots.sql`
 
 Then copy a Postgres connection string from Supabase.
 
@@ -25,7 +25,7 @@ Official docs:
 
 ## 2. Create Render services
 
-Use the repo-root [render.yaml](C:\Users\dtwof\Desktop\genlayer\New%20folder\render.yaml).
+Use the repo-root `render.yaml`.
 
 It defines:
 

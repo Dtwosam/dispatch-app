@@ -27,6 +27,12 @@ import {
   buildTaskStatusDisplayModel,
   buildTaskTemplateBrief,
   buildWalletScopedDashboardModel,
+  buildNanoBudgetStatusModel,
+  buildNanoMetricsModel,
+  buildNanoPaymentActionModel,
+  buildNanoReceiptStatusModel,
+  buildNanoRecipientWalletModel,
+  buildNanoSpendIntentStatusModel,
   getTaskBriefTemplate,
   taskBriefTemplates,
 } from "./ui-models.js";
@@ -368,6 +374,123 @@ test("builder dashboard summary uses real agent performance data only", () => {
   assert.equal(summary.paidTasksCompleted, 2);
   assert.equal(summary.paidEarningsDisplay, "30 USDC");
   assert.equal(summary.ownershipNote, "Use wallet-linked tasks and agents for builder dashboard totals.");
+});
+
+test("Nano budget draft status does not imply funding or payment", () => {
+  const model = buildNanoBudgetStatusModel({ status: "draft" });
+
+  assert.equal(model.label, "Budget draft");
+  assert.match(model.helper, /Record funding proof/);
+});
+
+test("Nano approved spend intent is labeled as not paid without a receipt", () => {
+  const model = buildNanoSpendIntentStatusModel({ status: "approved" }, null);
+
+  assert.equal(model.label, "Approved, not paid yet");
+  assert.match(model.helper, /no payment proof/i);
+});
+
+test("Nano recipient wallet model requires a valid EVM address", () => {
+  const missing = buildNanoRecipientWalletModel("");
+  const invalid = buildNanoRecipientWalletModel("0x1234");
+  const valid = buildNanoRecipientWalletModel("0x1111111111111111111111111111111111111111");
+
+  assert.equal(missing.valid, false);
+  assert.match(missing.helper, /Attach a recipient wallet/);
+  assert.equal(invalid.valid, false);
+  assert.match(invalid.helper, /valid Arc recipient wallet/);
+  assert.equal(valid.valid, true);
+  assert.equal(valid.label, "0x1111...1111");
+});
+
+test("Nano pay action is enabled only for approved spends with a valid recipient wallet", () => {
+  const baseIntent = {
+    status: "approved",
+    payee: {
+      walletAddress: null,
+    },
+  };
+  const missing = buildNanoPaymentActionModel(baseIntent, null);
+  const invalid = buildNanoPaymentActionModel({ ...baseIntent, payee: { walletAddress: "0x1234" } }, null);
+  const proposed = buildNanoPaymentActionModel({
+    status: "proposed",
+    payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
+  }, null);
+  const paid = buildNanoPaymentActionModel({
+    status: "approved",
+    payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
+  }, {
+    receiptId: "receipt",
+    proof: {
+      proofType: "arc_tx",
+      txHash: `0x${"a".repeat(64)}`,
+    },
+  });
+  const localProof = buildNanoPaymentActionModel({
+    status: "approved",
+    payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
+  }, {
+    receiptId: "local_receipt",
+    proof: {
+      proofType: "local",
+    },
+  });
+  const ready = buildNanoPaymentActionModel({
+    status: "approved",
+    payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
+  }, null);
+
+  assert.equal(missing.enabled, false);
+  assert.match(missing.reason, /Attach a recipient wallet/);
+  assert.equal(invalid.enabled, false);
+  assert.match(invalid.reason, /valid Arc recipient wallet/);
+  assert.equal(proposed.enabled, false);
+  assert.match(proposed.reason, /Approve this planned spend/);
+  assert.equal(paid.enabled, false);
+  assert.equal(paid.label, "Paid with proof");
+  assert.match(paid.reason, /verified proof/);
+  assert.equal(localProof.enabled, false);
+  assert.equal(localProof.label, "Local proof");
+  assert.doesNotMatch(localProof.reason, /verified proof/);
+  assert.equal(ready.enabled, true);
+  assert.match(ready.reason, /only marks this spend paid after/);
+});
+
+test("Nano local receipts are not labeled as settled payments", () => {
+  const model = buildNanoReceiptStatusModel({
+    paymentState: "recorded",
+    proof: {
+      proofType: "local",
+      paymentState: "recorded",
+      txHash: null,
+    },
+  });
+
+  assert.equal(model.label, "Local proof");
+  assert.match(model.helper, /not settlement/i);
+});
+
+test("Nano Arc receipts are labeled paid only when verified proof exists", () => {
+  const txHash = `0x${"d".repeat(64)}`;
+  const model = buildNanoReceiptStatusModel({
+    paymentState: "recorded",
+    proof: {
+      proofType: "arc_tx",
+      paymentState: "recorded",
+      txHash,
+    },
+  });
+
+  assert.equal(model.label, "Paid with proof");
+  assert.match(model.helper, /Verified Arc Testnet USDC proof/);
+});
+
+test("Nano metrics use zero fallbacks without inventing payment data", () => {
+  const model = buildNanoMetricsModel(null);
+
+  assert.equal(model.budgetCount, "0");
+  assert.equal(model.totalAuthorizedBudget, "0 USDC");
+  assert.equal(model.totalRecordedPaymentValue, "0 USDC");
 });
 
 test("wallet-scoped dashboard separates buyer tasks owned agents and owned-agent earnings", () => {

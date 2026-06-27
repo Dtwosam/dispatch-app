@@ -85,7 +85,7 @@ export function setChrome(el, eyebrow, title, sidebarTitle, sidebarLead, progres
 }
 
 export function renderNav(el, routes, isActive, state) {
-  const primaryOrder = ["/", "/agents", "/post-task", "/dashboard"];
+  const primaryOrder = ["/", "/agents", "/post-task", "/nano", "/dashboard"];
   const secondaryOrder = ["/connect-agent", "/create-agent"];
   const byPath = new Map(routes);
   const primaryRoutes = primaryOrder.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
@@ -139,7 +139,7 @@ export function renderNav(el, routes, isActive, state) {
 
 export function renderAppFooter(el, routes) {
   if (!el.appFooter) return;
-  const footerPaths = ["/", "/agents", "/post-task", "/dashboard", "/connect-agent", "/create-agent"];
+  const footerPaths = ["/", "/agents", "/post-task", "/nano", "/dashboard", "/connect-agent", "/create-agent"];
   const byPath = new Map(routes);
   const footerRoutes = footerPaths.filter((path) => byPath.has(path)).map((path) => [path, byPath.get(path)]);
   el.appFooter.innerHTML = `

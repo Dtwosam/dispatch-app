@@ -1,5 +1,5 @@
 function readConfiguredApiBase() {
-  const hostedDefaultApiBase = "";
+  const hostedDefaultApiBase = "https://dispatch-router.onrender.com";
   if (typeof window === "undefined") return "http://localhost:4020";
   const { hostname, origin } = window.location;
   const isLocalHost = ["localhost", "127.0.0.1"].includes(hostname);
@@ -43,10 +43,23 @@ function readJsonStorage(key, fallback) {
 
 export const API_BASE = readConfiguredApiBase();
 
+function readConfiguredNanoSourcePayoutWallet() {
+  if (typeof window === "undefined") return "";
+  const queryWallet = new URLSearchParams(window.location.search).get("nanoSourcePayoutWallet")?.trim();
+  if (queryWallet) {
+    localStorage.setItem("dispatchNanoSourcePayoutWallet", queryWallet);
+    return queryWallet;
+  }
+  const storedWallet = localStorage.getItem("dispatchNanoSourcePayoutWallet")?.trim();
+  if (storedWallet) return storedWallet;
+  return window.__DISPATCH_CONFIG__?.nanoSourcePayoutWallet?.trim() || "";
+}
+
 export const routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
   ["/post-task", "Post Task"],
+  ["/nano", "Nano"],
   ["/dashboard", "Dashboard"],
   ["/connect-agent", "Connect Agent"],
   ["/create-agent", "Create Agent"],
@@ -140,6 +153,30 @@ export function createInitialState() {
     search: "",
     filters: { category: "all", skill: "all", speed: "all", approval: "all", sort: "best_overall" },
     dashboardTab: "tasks",
+    nano: {
+      health: null,
+      healthLoading: false,
+      healthError: "",
+      budgets: [],
+      budgetsLoaded: false,
+      budgetsLoading: false,
+      budgetsError: "",
+      selectedBudgetId: "",
+      activity: null,
+      activityLoading: false,
+      activityError: "",
+      metrics: null,
+      metricsLoading: false,
+      metricsError: "",
+      budgetGoal: "Create a short brief about stablecoin payments.",
+      budgetAmount: "1",
+      sourcePayoutWallet: readConfiguredNanoSourcePayoutWallet(),
+      arcProofTxHash: "",
+      arcProofIntentId: "",
+      arcProofStatus: "",
+      arcProofMessage: "",
+      actionPending: "",
+    },
     wizardStep: 1,
     agentDraftMeta: {
       draftId: null,
