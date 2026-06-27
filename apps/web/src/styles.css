@@ -2252,6 +2252,30 @@ button[data-open-dispute] {
   line-height: 1.45;
 }
 
+.nano-recipient-summary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.052);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nano-recipient-summary span {
+  color: var(--text-subtle);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.nano-recipient-summary strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
 .nano-page--simple .nano-result-copy {
   padding: 18px;
 }

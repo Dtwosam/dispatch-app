@@ -29,7 +29,9 @@ import {
   buildWalletScopedDashboardModel,
   buildNanoBudgetStatusModel,
   buildNanoMetricsModel,
+  buildNanoPaymentActionModel,
   buildNanoReceiptStatusModel,
+  buildNanoRecipientWalletModel,
   buildNanoSpendIntentStatusModel,
   getTaskBriefTemplate,
   taskBriefTemplates,
@@ -386,6 +388,72 @@ test("Nano approved spend intent is labeled as not paid without a receipt", () =
 
   assert.equal(model.label, "Approved, not paid yet");
   assert.match(model.helper, /no payment proof/i);
+});
+
+test("Nano recipient wallet model requires a valid EVM address", () => {
+  const missing = buildNanoRecipientWalletModel("");
+  const invalid = buildNanoRecipientWalletModel("0x1234");
+  const valid = buildNanoRecipientWalletModel("0x1111111111111111111111111111111111111111");
+
+  assert.equal(missing.valid, false);
+  assert.match(missing.helper, /Attach a recipient wallet/);
+  assert.equal(invalid.valid, false);
+  assert.match(invalid.helper, /valid Arc recipient wallet/);
+  assert.equal(valid.valid, true);
+  assert.equal(valid.label, "0x1111...1111");
+});
+
+test("Nano pay action is enabled only for approved spends with a valid recipient wallet", () => {
+  const baseIntent = {
+    status: "approved",
+    payee: {
+      walletAddress: null,
+    },
+  };
+  const missing = buildNanoPaymentActionModel(baseIntent, null);
+  const invalid = buildNanoPaymentActionModel({ ...baseIntent, payee: { walletAddress: "0x1234" } }, null);
+  const proposed = buildNanoPaymentActionModel({
+    status: "proposed",
+    payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
+  }, null);
+  const paid = buildNanoPaymentActionModel({
+    status: "approved",
+    payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
+  }, {
+    receiptId: "receipt",
+    proof: {
+      proofType: "arc_tx",
+      txHash: `0x${"a".repeat(64)}`,
+    },
+  });
+  const localProof = buildNanoPaymentActionModel({
+    status: "approved",
+    payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
+  }, {
+    receiptId: "local_receipt",
+    proof: {
+      proofType: "local",
+    },
+  });
+  const ready = buildNanoPaymentActionModel({
+    status: "approved",
+    payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
+  }, null);
+
+  assert.equal(missing.enabled, false);
+  assert.match(missing.reason, /Attach a recipient wallet/);
+  assert.equal(invalid.enabled, false);
+  assert.match(invalid.reason, /valid Arc recipient wallet/);
+  assert.equal(proposed.enabled, false);
+  assert.match(proposed.reason, /Approve this planned spend/);
+  assert.equal(paid.enabled, false);
+  assert.equal(paid.label, "Paid with proof");
+  assert.match(paid.reason, /verified proof/);
+  assert.equal(localProof.enabled, false);
+  assert.equal(localProof.label, "Local proof");
+  assert.doesNotMatch(localProof.reason, /verified proof/);
+  assert.equal(ready.enabled, true);
+  assert.match(ready.reason, /only marks this spend paid after/);
 });
 
 test("Nano local receipts are not labeled as settled payments", () => {

@@ -43,6 +43,18 @@ function readJsonStorage(key, fallback) {
 
 export const API_BASE = readConfiguredApiBase();
 
+function readConfiguredNanoSourcePayoutWallet() {
+  if (typeof window === "undefined") return "";
+  const queryWallet = new URLSearchParams(window.location.search).get("nanoSourcePayoutWallet")?.trim();
+  if (queryWallet) {
+    localStorage.setItem("dispatchNanoSourcePayoutWallet", queryWallet);
+    return queryWallet;
+  }
+  const storedWallet = localStorage.getItem("dispatchNanoSourcePayoutWallet")?.trim();
+  if (storedWallet) return storedWallet;
+  return window.__DISPATCH_CONFIG__?.nanoSourcePayoutWallet?.trim() || "";
+}
+
 export const routes = [
   ["/", "Explore"],
   ["/agents", "Agents"],
@@ -158,6 +170,7 @@ export function createInitialState() {
       metricsError: "",
       budgetGoal: "Create a short brief about stablecoin payments.",
       budgetAmount: "1",
+      sourcePayoutWallet: readConfiguredNanoSourcePayoutWallet(),
       arcProofTxHash: "",
       arcProofIntentId: "",
       arcProofStatus: "",

@@ -12,6 +12,81 @@ export function shortWallet(wallet) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
+export function isValidEvmAddress(value) {
+  return /^0x[a-fA-F0-9]{40}$/.test(String(value || "").trim());
+}
+
+export function buildNanoRecipientWalletModel(value) {
+  const wallet = String(value || "").trim();
+  if (!wallet) {
+    return {
+      wallet: "",
+      valid: false,
+      label: "No recipient wallet",
+      helper: "Attach a recipient wallet to pay on Arc.",
+    };
+  }
+  if (!isValidEvmAddress(wallet)) {
+    return {
+      wallet,
+      valid: false,
+      label: "Invalid recipient wallet",
+      helper: "Enter a valid Arc recipient wallet address.",
+    };
+  }
+  return {
+    wallet,
+    valid: true,
+    label: shortWallet(wallet),
+    helper: "Recipient wallet attached.",
+  };
+}
+
+export function buildNanoPaymentActionModel(intent, receipt) {
+  const recipient = buildNanoRecipientWalletModel(intent?.payee?.walletAddress || "");
+  if (!intent) {
+    return {
+      enabled: false,
+      label: "Pay source on Arc",
+      reason: "Create and approve a planned spend first.",
+      recipient,
+    };
+  }
+  if (receipt) {
+    const receiptStatus = buildNanoReceiptStatusModel(receipt);
+    return {
+      enabled: false,
+      label: receiptStatus.label,
+      reason: receiptStatus.label === "Paid with proof"
+        ? "This planned spend already has verified proof."
+        : receiptStatus.helper,
+      recipient,
+    };
+  }
+  if (intent.status !== "approved") {
+    return {
+      enabled: false,
+      label: "Pay source on Arc",
+      reason: "Approve this planned spend before paying on Arc.",
+      recipient,
+    };
+  }
+  if (!recipient.valid) {
+    return {
+      enabled: false,
+      label: "Pay source on Arc",
+      reason: recipient.helper,
+      recipient,
+    };
+  }
+  return {
+    enabled: true,
+    label: "Pay source on Arc",
+    reason: "Dispatch only marks this spend paid after the Arc USDC transfer matches the planned spend.",
+    recipient,
+  };
+}
+
 export function formatNanoUsdc(value) {
   const amount = Number(value || 0);
   if (!Number.isFinite(amount)) return "0 USDC";
