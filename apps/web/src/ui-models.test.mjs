@@ -28,13 +28,19 @@ import {
   buildTaskTemplateBrief,
   buildWalletScopedDashboardModel,
   buildNanoBudgetStatusModel,
+  buildNanoCurrentStepModel,
   buildNanoMetricsModel,
   buildNanoPaymentActionModel,
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
+  buildNanoResetDraftState,
+  buildNanoSpendPlanPresentation,
   buildNanoSpendIntentStatusModel,
   getTaskBriefTemplate,
+  nanoBudgetPresets,
+  nanoApiUnavailableMessage,
   taskBriefTemplates,
+  validateNanoBudgetAmount,
   walletNetworkSnapshotsEqual,
 } from "./ui-models.js";
 
@@ -391,17 +397,88 @@ test("Nano approved spend intent is labeled as not paid without a receipt", () =
   assert.match(model.helper, /no payment proof/i);
 });
 
+test("Nano budget presets and custom amount validation stay inside guided limits", () => {
+  assert.deepEqual(nanoBudgetPresets, ["0.25", "0.50", "1.00", "2.50"]);
+  ["0.25", "0.50", "1.00", "2.50", "0.10", "5.00", "1"].forEach((value) => {
+    assert.equal(validateNanoBudgetAmount(value).valid, true, `${value} should pass`);
+  });
+  [
+    ["", "Enter a budget amount."],
+    ["0", "Minimum Nano budget is 0.10 USDC."],
+    ["-1", "Use a valid USDC amount."],
+    ["abc", "Use a valid USDC amount."],
+    ["5.01", "Maximum Nano budget is 5.00 USDC for this flow."],
+    ["1.999", "Use up to 2 decimal places."],
+  ].forEach(([value, message]) => {
+    const result = validateNanoBudgetAmount(value);
+    assert.equal(result.valid, false, `${value} should reject`);
+    assert.equal(result.message, message);
+  });
+});
+
 test("Nano recipient wallet model requires a valid EVM address", () => {
   const missing = buildNanoRecipientWalletModel("");
   const invalid = buildNanoRecipientWalletModel("0x1234");
   const valid = buildNanoRecipientWalletModel("0x1111111111111111111111111111111111111111");
 
   assert.equal(missing.valid, false);
-  assert.match(missing.helper, /Attach a recipient wallet/);
+  assert.match(missing.helper, /Add a recipient wallet/);
   assert.equal(invalid.valid, false);
-  assert.match(invalid.helper, /valid Arc recipient wallet/);
+  assert.match(invalid.helper, /valid 0x recipient wallet/);
   assert.equal(valid.valid, true);
+  assert.equal(valid.helper, "Recipient wallet ready.");
   assert.equal(valid.label, "0x1111...1111");
+});
+
+test("Nano current step changes across wallet budget spend and proof states", () => {
+  assert.equal(buildNanoCurrentStepModel({ walletConnected: false }).currentStep, "Choose budget");
+  assert.equal(buildNanoCurrentStepModel({ walletConnected: true, budgetAmountValid: true }).currentStep, "Create budget");
+  assert.equal(buildNanoCurrentStepModel({ walletConnected: true, hasBudget: true }).currentStep, "Review spend plan");
+  assert.equal(buildNanoCurrentStepModel({ walletConnected: true, hasBudget: true, hasSpendPlan: true }).currentStep, "Approve spend");
+  assert.equal(buildNanoCurrentStepModel({ walletConnected: true, hasBudget: true, hasSpendPlan: true, hasApprovedSpend: true }).currentStep, "Pay on Arc");
+  assert.equal(buildNanoCurrentStepModel({ walletConnected: true, hasProofPending: true }).currentStep, "Verify proof");
+  assert.equal(buildNanoCurrentStepModel({ walletConnected: true, hasVerifiedReceipt: true }).currentStep, "View receipts");
+});
+
+test("Nano start new budget resets draft state without disconnecting wallet", () => {
+  const current = {
+    selectedBudgetId: "budget_1",
+    activity: { receipts: [] },
+    budgetGoal: "Keep this goal",
+    budgetAmount: "2.50",
+    budgetPreset: "2.50",
+    customBudgetAmount: "3",
+    sourcePayoutWallet: "0x1111111111111111111111111111111111111111",
+    arcProofTxHash: `0x${"a".repeat(64)}`,
+    actionPending: "arcProof",
+  };
+  const reset = buildNanoResetDraftState(current);
+
+  assert.equal(reset.selectedBudgetId, "");
+  assert.equal(reset.activity, null);
+  assert.equal(reset.budgetAmount, "1.00");
+  assert.equal(reset.budgetPreset, "1.00");
+  assert.equal(reset.customBudgetAmount, "");
+  assert.equal(reset.arcProofTxHash, "");
+  assert.equal(reset.actionPending, "");
+  assert.equal(reset.sourcePayoutWallet, "0x1111111111111111111111111111111111111111");
+  assert.equal(reset.budgetGoal, "Keep this goal");
+});
+
+test("Nano spend plan labels distinguish starter from active state", () => {
+  const starter = buildNanoSpendPlanPresentation({ hasBudget: false });
+  const active = buildNanoSpendPlanPresentation({ hasBudget: true });
+
+  assert.equal(starter.label, "Starter spend plan");
+  assert.match(starter.helper, /Create a budget to activate/);
+  assert.match(starter.recipientHelper, /needed later/);
+  assert.equal(active.label, "Active spend plan");
+  assert.match(active.helper, /Review and approve/);
+  assert.match(active.recipientHelper, /approved source\/tool\/agent payout/);
+});
+
+test("Nano API unavailable copy explains router dependency", () => {
+  assert.equal(nanoApiUnavailableMessage(), "Nano API is unavailable. Budget creation and proof checks need the router API.");
 });
 
 test("wallet network snapshots compare stable connected wallet state", () => {
@@ -460,22 +537,22 @@ test("Nano pay action is enabled only for approved spends with a valid recipient
   }, null);
 
   assert.equal(missing.enabled, false);
-  assert.match(missing.reason, /Attach a recipient wallet/);
+  assert.match(missing.reason, /Add a recipient wallet/);
   assert.equal(invalid.enabled, false);
-  assert.match(invalid.reason, /valid Arc recipient wallet/);
+  assert.match(invalid.reason, /valid 0x recipient wallet/);
   assert.equal(proposed.enabled, false);
-  assert.match(proposed.reason, /Approve this planned spend/);
+  assert.match(proposed.reason, /Approve the planned spend/);
   assert.equal(paid.enabled, false);
   assert.equal(paid.label, "Paid with proof");
   assert.match(paid.reason, /verified proof/);
   assert.equal(localProof.enabled, false);
-  assert.equal(localProof.label, "Local proof");
+  assert.equal(localProof.label, "Local receipt");
   assert.doesNotMatch(localProof.reason, /verified proof/);
   assert.equal(ready.enabled, true);
   assert.match(ready.reason, /only marks this spend paid after/);
 });
 
-test("Nano local receipts are not labeled as settled payments", () => {
+test("Nano local receipts are not labeled as paid with proof", () => {
   const model = buildNanoReceiptStatusModel({
     paymentState: "recorded",
     proof: {
@@ -485,8 +562,9 @@ test("Nano local receipts are not labeled as settled payments", () => {
     },
   });
 
-  assert.equal(model.label, "Local proof");
+  assert.equal(model.label, "Local receipt");
   assert.match(model.helper, /not settlement/i);
+  assert.notEqual(model.label, "Paid with proof");
 });
 
 test("Nano Arc receipts are labeled paid only when verified proof exists", () => {
@@ -502,6 +580,50 @@ test("Nano Arc receipts are labeled paid only when verified proof exists", () =>
 
   assert.equal(model.label, "Paid with proof");
   assert.match(model.helper, /Verified Arc Testnet USDC proof/);
+});
+
+test("Nano rejected proof does not show Paid with proof", () => {
+  const model = buildNanoReceiptStatusModel({
+    paymentState: "failed",
+    proof: {
+      proofType: "arc_tx",
+      paymentState: "failed",
+      txHash: `0x${"e".repeat(64)}`,
+    },
+  });
+
+  assert.equal(model.label, "Proof rejected");
+  assert.notEqual(model.label, "Paid with proof");
+});
+
+test("Gateway and x402 proof labels remain planned-only", () => {
+  const gateway = buildNanoReceiptStatusModel({
+    paymentState: "recorded",
+    proof: { proofType: "circle_gateway", paymentState: "recorded", txHash: null },
+  });
+  const x402 = buildNanoReceiptStatusModel({
+    paymentState: "recorded",
+    proof: { proofType: "x402", paymentState: "recorded", txHash: null },
+  });
+
+  assert.equal(gateway.label, "Gateway proof metadata");
+  assert.equal(gateway.tone, "pending");
+  assert.match(gateway.helper, /planned next/);
+  assert.equal(x402.label, "x402 proof metadata");
+  assert.equal(x402.tone, "pending");
+  assert.match(x402.helper, /planned next/);
+});
+
+test("agent display fallbacks do not fake paid history or reviews", () => {
+  const display = buildAgentDisplayModel({
+    profile: { agentId: "new", publicName: "New Agent", slug: "new-agent", originType: "platform", category: "research" },
+    performanceSummary: {},
+  }, {});
+
+  assert.equal(display.completedTasksDisplay, "0");
+  assert.equal(display.totalEarnedDisplay, "0 USDC");
+  assert.equal(display.approvalRateDisplay, "Not enough data yet");
+  assert.equal(display.reviewsDisplay, "No reviews yet");
 });
 
 test("Nano metrics use zero fallbacks without inventing payment data", () => {

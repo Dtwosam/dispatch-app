@@ -2048,6 +2048,79 @@ button[data-open-dispute] {
   gap: 8px;
 }
 
+.nano-step-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nano-step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.nano-step-pill strong {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-subtle);
+  font-size: 0.68rem;
+}
+
+.nano-step-pill--current {
+  border-color: rgba(142, 255, 240, 0.2);
+  background: rgba(150, 255, 240, 0.055);
+  color: var(--text);
+}
+
+.nano-step-pill--current strong,
+.nano-step-pill--complete strong {
+  background: var(--brand-strong);
+  color: #031018;
+}
+
+.nano-step-pill--complete {
+  color: rgba(244, 251, 255, 0.78);
+}
+
+.nano-budget-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.nano-preset {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid rgba(142, 255, 240, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.nano-preset.is-active {
+  border-color: rgba(142, 255, 240, 0.26);
+  background: rgba(150, 255, 240, 0.08);
+  color: var(--text);
+}
+
 .nano-how-grid,
 .nano-two-col,
 .nano-bottom-grid {
@@ -2108,7 +2181,7 @@ button[data-open-dispute] {
 
 .nano-demo-facts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-top: 16px;
 }
@@ -2154,6 +2227,35 @@ button[data-open-dispute] {
 .nano-two-col,
 .nano-bottom-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.nano-form-grid--compact {
+  margin-top: 14px;
+}
+
+.nano-field--inline {
+  margin-top: 12px;
+}
+
+.nano-field--inline input {
+  min-width: 0;
+}
+
+.nano-spend-row small {
+  color: var(--text-subtle);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.nano-limit-note {
+  margin: 0;
+  padding: 14px 18px;
+  border: 1px solid rgba(142, 255, 240, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.014);
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .nano-page--simple .nano-section-head {
@@ -2315,6 +2417,16 @@ button[data-open-dispute] {
   .nano-how-grid,
   .nano-demo-facts {
     grid-template-columns: 1fr;
+  }
+
+  .nano-step-rail {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+
+  .nano-step-pill {
+    flex: 0 0 auto;
   }
 
   .nano-panel,

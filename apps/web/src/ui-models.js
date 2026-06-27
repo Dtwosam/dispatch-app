@@ -43,7 +43,7 @@ export function buildNanoRecipientWalletModel(value) {
       wallet: "",
       valid: false,
       label: "No recipient wallet",
-      helper: "Attach a recipient wallet to pay on Arc.",
+      helper: "Add a recipient wallet before paying on Arc.",
     };
   }
   if (!isValidEvmAddress(wallet)) {
@@ -51,14 +51,14 @@ export function buildNanoRecipientWalletModel(value) {
       wallet,
       valid: false,
       label: "Invalid recipient wallet",
-      helper: "Enter a valid Arc recipient wallet address.",
+      helper: "Enter a valid 0x recipient wallet before paying on Arc.",
     };
   }
   return {
     wallet,
     valid: true,
     label: shortWallet(wallet),
-    helper: "Recipient wallet attached.",
+    helper: "Recipient wallet ready.",
   };
 }
 
@@ -87,7 +87,7 @@ export function buildNanoPaymentActionModel(intent, receipt) {
     return {
       enabled: false,
       label: "Pay source on Arc",
-      reason: "Approve this planned spend before paying on Arc.",
+      reason: "Approve the planned spend before payment.",
       recipient,
     };
   }
@@ -105,6 +105,123 @@ export function buildNanoPaymentActionModel(intent, receipt) {
     reason: "Dispatch only marks this spend paid after the Arc USDC transfer matches the planned spend.",
     recipient,
   };
+}
+
+export const nanoBudgetPresets = ["0.25", "0.50", "1.00", "2.50"];
+
+export function validateNanoBudgetAmount(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return { valid: false, amount: null, normalized: "", message: "Enter a budget amount." };
+  }
+  if (!/^\d+(\.\d+)?$/.test(raw)) {
+    return { valid: false, amount: null, normalized: raw, message: "Use a valid USDC amount." };
+  }
+  const decimalPart = raw.split(".")[1] || "";
+  if (decimalPart.length > 2) {
+    return { valid: false, amount: null, normalized: raw, message: "Use up to 2 decimal places." };
+  }
+  const amount = Number(raw);
+  if (!Number.isFinite(amount)) {
+    return { valid: false, amount: null, normalized: raw, message: "Use a valid USDC amount." };
+  }
+  if (amount < 0.1) {
+    return { valid: false, amount, normalized: raw, message: "Minimum Nano budget is 0.10 USDC." };
+  }
+  if (amount > 5) {
+    return { valid: false, amount, normalized: raw, message: "Maximum Nano budget is 5.00 USDC for this flow." };
+  }
+  return {
+    valid: true,
+    amount,
+    normalized: amount.toFixed(2),
+    message: "",
+  };
+}
+
+export function buildNanoCurrentStepModel({
+  walletConnected = false,
+  budgetAmountValid = true,
+  hasBudget = false,
+  hasSpendPlan = false,
+  hasApprovedSpend = false,
+  hasPendingApprovedSpend = false,
+  hasValidRecipientWallet = false,
+  hasProofPending = false,
+  hasVerifiedReceipt = false,
+} = {}) {
+  const steps = [
+    "Choose budget",
+    "Create budget",
+    "Review spend plan",
+    "Approve spend",
+    "Pay on Arc",
+    "Verify proof",
+    "View receipts",
+  ];
+  let currentStep = "Choose budget";
+  if (hasVerifiedReceipt) {
+    currentStep = "View receipts";
+  } else if (hasProofPending) {
+    currentStep = "Verify proof";
+  } else if (hasApprovedSpend || (hasPendingApprovedSpend && hasValidRecipientWallet) || (hasPendingApprovedSpend && !hasValidRecipientWallet)) {
+    currentStep = "Pay on Arc";
+  } else if (hasSpendPlan) {
+    currentStep = "Approve spend";
+  } else if (hasBudget) {
+    currentStep = "Review spend plan";
+  } else if (walletConnected && budgetAmountValid) {
+    currentStep = "Create budget";
+  }
+  const currentIndex = steps.indexOf(currentStep);
+  return {
+    currentStep,
+    currentIndex,
+    steps: steps.map((label, index) => ({
+      label,
+      number: String(index + 1),
+      state: index < currentIndex ? "complete" : index === currentIndex ? "current" : "future",
+    })),
+  };
+}
+
+export function buildNanoResetDraftState(current = {}) {
+  return {
+    ...current,
+    budgets: [],
+    budgetsLoaded: false,
+    budgetsError: "",
+    selectedBudgetId: "",
+    activity: null,
+    activityError: "",
+    budgetPreset: "1.00",
+    customBudgetAmount: "",
+    budgetAmount: "1.00",
+    budgetAmountError: "",
+    arcProofTxHash: "",
+    arcProofIntentId: "",
+    arcProofStatus: "",
+    arcProofMessage: "",
+    actionPending: "",
+  };
+}
+
+export function buildNanoSpendPlanPresentation({ hasBudget = false } = {}) {
+  return hasBudget
+    ? {
+      label: "Active spend plan",
+      helper: "Review and approve each planned spend before payment.",
+      recipientHelper: "This is where the approved source/tool/agent payout will be sent on Arc Testnet.",
+    }
+    : {
+      label: "Starter spend plan",
+      helper: "This starter plan shows how an agent may split a small USDC budget. Create a budget to activate the plan and approve payments.",
+      recipientHelper: "Recipient wallet is needed later when an approved spend is ready to pay on Arc.",
+    };
+}
+
+export function nanoApiUnavailableMessage() {
+  return "Nano API is unavailable. Budget creation and proof checks need the router API.";
 }
 
 export function formatNanoUsdc(value) {
@@ -171,7 +288,7 @@ export function buildNanoSpendIntentStatusModel(intent, receipt) {
   }
   if (status === "payment_recorded") {
     return {
-      label: "Proof recorded",
+      label: "Proof pending",
       tone: "good",
       helper: "A receipt exists for this spend.",
     };
@@ -184,7 +301,7 @@ export function buildNanoSpendIntentStatusModel(intent, receipt) {
     };
   }
   return {
-    label: "Proposed",
+    label: "Planned",
     tone: "pending",
     helper: "The user must approve this spend before proof can be recorded.",
   };
@@ -202,7 +319,7 @@ export function buildNanoReceiptStatusModel(receipt) {
   }
   if (paymentState === "failed") {
     return {
-      label: "Payment failed",
+      label: "Proof rejected",
       tone: "warn",
       helper: "The recorded proof says this spend failed.",
     };
@@ -216,20 +333,20 @@ export function buildNanoReceiptStatusModel(receipt) {
   }
   if (proofType === "circle_gateway") {
     return {
-      label: "Circle proof recorded",
-      tone: "good",
-      helper: "Circle proof metadata is recorded.",
+      label: "Gateway proof metadata",
+      tone: "pending",
+      helper: "Gateway settlement is planned next; do not treat this as live settlement.",
     };
   }
   if (proofType === "x402") {
     return {
-      label: "x402 proof recorded",
-      tone: "good",
-      helper: "x402 proof metadata is recorded.",
+      label: "x402 proof metadata",
+      tone: "pending",
+      helper: "x402 settlement is planned next; do not treat this as live settlement.",
     };
   }
   return {
-    label: "Local proof",
+    label: "Local receipt",
     tone: "pending",
     helper: "Development proof only; this is not settlement.",
   };
