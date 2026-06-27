@@ -80,6 +80,7 @@ import {
   getTaskBriefTemplate,
   shortWallet,
   taskBriefTemplates,
+  walletNetworkSnapshotsEqual,
 } from "./ui-models.js";
 const state = createInitialState();
 const el = getAppElements();
@@ -88,6 +89,7 @@ let attachmentIngestionModulePromise = null;
 let initialMarketHydrationPromise = null;
 let postTaskReadinessPromise = null;
 let postTaskReadinessLastAttemptAt = 0;
+let nanoAutoRefreshWalletKey = "";
 const pendingTaskAutoChecks = new Set();
 const pendingTaskReviewActions = new Set();
 let activeTaskDetailRenderToken = 0;
@@ -135,6 +137,7 @@ function persistDisputeRecords() {
 }
 
 function resetNanoDataForWallet() {
+  nanoAutoRefreshWalletKey = "";
   state.nano.budgets = [];
   state.nano.budgetsLoaded = false;
   state.nano.budgetsError = "";
@@ -214,9 +217,16 @@ watchInjectedWallet({
   onAccountsChanged: (accounts) => {
     const nextWallet = accounts[0] || "";
     const nextProviderLabel = nextWallet ? getInjectedWalletProviderLabel() : "";
-    if (state.wallet !== nextWallet) resetNanoDataForWallet();
+    const walletChanged = state.wallet.trim().toLowerCase() !== nextWallet.trim().toLowerCase();
+    const nextConnectionType = nextWallet ? "injected" : "manual";
+    const connectionChanged = state.walletConnectionType !== nextConnectionType || state.walletProviderLabel !== nextProviderLabel;
+    if (!walletChanged && !connectionChanged) {
+      void refreshWalletNetworkState();
+      return;
+    }
+    if (walletChanged) resetNanoDataForWallet();
     state.wallet = nextWallet;
-    state.walletConnectionType = nextWallet ? "injected" : "manual";
+    state.walletConnectionType = nextConnectionType;
     state.walletProviderLabel = nextProviderLabel;
     localStorage.setItem("activeWallet", nextWallet);
     localStorage.setItem("walletConnectionType", state.walletConnectionType);
@@ -367,16 +377,24 @@ async function settleWithin(promise, timeoutMs, message) {
 async function refreshWalletNetworkState() {
   if (!state.wallet.trim()) return null;
   try {
-    state.walletNetwork = { ...state.walletNetwork, loading: true, error: "" };
+    if (!state.walletNetwork.loading || state.walletNetwork.error) {
+      state.walletNetwork = { ...state.walletNetwork, loading: true, error: "" };
+    }
     const snapshot = await settleWithin(chainClient.getWalletNetworkSnapshot(), 4500, "Wallet network check timed out.");
-    state.walletNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+    const nextNetwork = { ...state.walletNetwork, ...snapshot, loading: false, error: "" };
+    if (!walletNetworkSnapshotsEqual(state.walletNetwork, nextNetwork) || state.walletNetwork.loading || state.walletNetwork.error) {
+      state.walletNetwork = nextNetwork;
+    }
     return snapshot;
   } catch (error) {
-    state.walletNetwork = {
+    const nextNetwork = {
       ...state.walletNetwork,
       loading: false,
       error: statusMessage(error, "Wallet network check failed."),
     };
+    if (!walletNetworkSnapshotsEqual(state.walletNetwork, nextNetwork) || state.walletNetwork.loading || state.walletNetwork.error !== nextNetwork.error) {
+      state.walletNetwork = nextNetwork;
+    }
     return null;
   }
 }
@@ -2521,7 +2539,10 @@ async function refreshNanoData() {
 }
 
 function startNanoRefresh() {
-  if (!state.wallet.trim() || state.nano.budgetsLoading) return;
+  const walletKey = state.wallet.trim().toLowerCase();
+  if (!walletKey || state.nano.budgetsLoading) return;
+  if (nanoAutoRefreshWalletKey === walletKey) return;
+  nanoAutoRefreshWalletKey = walletKey;
   void refreshNanoData().finally(() => {
     if (window.location.pathname === "/nano") safeRender("Nano refresh render failed");
   });

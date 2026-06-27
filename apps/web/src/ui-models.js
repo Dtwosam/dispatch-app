@@ -12,6 +12,26 @@ export function shortWallet(wallet) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
+function normalizeComparableWallet(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeComparableValue(value) {
+  return value == null ? "" : String(value);
+}
+
+export function walletNetworkSnapshotsEqual(left = {}, right = {}) {
+  return normalizeComparableWallet(left.walletAddress) === normalizeComparableWallet(right.walletAddress)
+    && normalizeComparableValue(left.chainId) === normalizeComparableValue(right.chainId)
+    && normalizeComparableValue(left.expectedChainId) === normalizeComparableValue(right.expectedChainId)
+    && Boolean(left.isArcTestnet) === Boolean(right.isArcTestnet)
+    && normalizeComparableValue(left.usdcBalance) === normalizeComparableValue(right.usdcBalance)
+    && normalizeComparableValue(left.nativeGasBalance) === normalizeComparableValue(right.nativeGasBalance)
+    && normalizeComparableValue(left.tokenDecimals) === normalizeComparableValue(right.tokenDecimals)
+    && normalizeComparableValue(left.message) === normalizeComparableValue(right.message)
+    && normalizeComparableValue(left.error) === normalizeComparableValue(right.error);
+}
+
 export function isValidEvmAddress(value) {
   return /^0x[a-fA-F0-9]{40}$/.test(String(value || "").trim());
 }

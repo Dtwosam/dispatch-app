@@ -35,6 +35,7 @@ import {
   buildNanoSpendIntentStatusModel,
   getTaskBriefTemplate,
   taskBriefTemplates,
+  walletNetworkSnapshotsEqual,
 } from "./ui-models.js";
 
 test("platform agents expose the Platform Agent badge for marketplace rendering", () => {
@@ -401,6 +402,24 @@ test("Nano recipient wallet model requires a valid EVM address", () => {
   assert.match(invalid.helper, /valid Arc recipient wallet/);
   assert.equal(valid.valid, true);
   assert.equal(valid.label, "0x1111...1111");
+});
+
+test("wallet network snapshots compare stable connected wallet state", () => {
+  const snapshot = {
+    walletAddress: "0x1111111111111111111111111111111111111111",
+    chainId: 5042002,
+    expectedChainId: 5042002,
+    isArcTestnet: true,
+    usdcBalance: "1.000000",
+    nativeGasBalance: "0.5",
+    tokenDecimals: 6,
+    message: "Arc Testnet wallet is ready for testnet USDC funding.",
+    error: "",
+  };
+
+  assert.equal(walletNetworkSnapshotsEqual(snapshot, { ...snapshot, walletAddress: snapshot.walletAddress.toUpperCase() }), true);
+  assert.equal(walletNetworkSnapshotsEqual(snapshot, { ...snapshot, usdcBalance: "0.5" }), false);
+  assert.equal(walletNetworkSnapshotsEqual(snapshot, { ...snapshot, chainId: 1, isArcTestnet: false }), false);
 });
 
 test("Nano pay action is enabled only for approved spends with a valid recipient wallet", () => {
