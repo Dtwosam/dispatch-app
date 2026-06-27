@@ -198,3 +198,136 @@ export function validateOnchainTaskResponse(payload) {
   assertString(root.taskId, "onchain task response.taskId");
   return root;
 }
+
+function validateNanoPaymentProof(proof, label) {
+  const row = assertObject(proof, label);
+  assertString(row.proofType, `${label}.proofType`);
+  assertString(row.paymentState, `${label}.paymentState`);
+  assertNullableString(row.txHash, `${label}.txHash`);
+  assertString(row.proofReference, `${label}.proofReference`);
+  assertString(row.recordedAt, `${label}.recordedAt`);
+  assertArray(row.notes, `${label}.notes`);
+  return row;
+}
+
+function validateNanoPayee(payee, label) {
+  const row = assertObject(payee, label);
+  assertString(row.payeeId, `${label}.payeeId`);
+  assertString(row.type, `${label}.type`);
+  assertString(row.label, `${label}.label`);
+  return row;
+}
+
+function validateNanoBudget(budget, label = "nano budget") {
+  const row = assertObject(budget, label);
+  assertString(row.budgetId, `${label}.budgetId`);
+  assertString(row.ownerWallet, `${label}.ownerWallet`);
+  assertString(row.runId, `${label}.runId`);
+  assertString(row.goal, `${label}.goal`);
+  assertNumber(row.amount, `${label}.amount`);
+  assertString(row.tokenSymbol, `${label}.tokenSymbol`);
+  assertString(row.network, `${label}.network`);
+  assertString(row.status, `${label}.status`);
+  if (row.fundingProof !== null) validateNanoPaymentProof(row.fundingProof, `${label}.fundingProof`);
+  return row;
+}
+
+function validateNanoRunContext(runContext, label = "nano run context") {
+  const row = assertObject(runContext, label);
+  assertString(row.runId, `${label}.runId`);
+  assertString(row.budgetId, `${label}.budgetId`);
+  assertString(row.ownerWallet, `${label}.ownerWallet`);
+  assertString(row.goal, `${label}.goal`);
+  assertNullableString(row.spendPlanSummary, `${label}.spendPlanSummary`);
+  return row;
+}
+
+function validateNanoSpendIntent(intent, label = "nano spend intent") {
+  const row = assertObject(intent, label);
+  assertString(row.intentId, `${label}.intentId`);
+  assertString(row.budgetId, `${label}.budgetId`);
+  assertString(row.runId, `${label}.runId`);
+  assertString(row.ownerWallet, `${label}.ownerWallet`);
+  validateNanoPayee(row.payee, `${label}.payee`);
+  assertNumber(row.amount, `${label}.amount`);
+  assertString(row.reason, `${label}.reason`);
+  assertString(row.status, `${label}.status`);
+  return row;
+}
+
+function validateNanoSpendReceipt(receipt, label = "nano spend receipt") {
+  const row = assertObject(receipt, label);
+  assertString(row.receiptId, `${label}.receiptId`);
+  assertString(row.intentId, `${label}.intentId`);
+  assertString(row.budgetId, `${label}.budgetId`);
+  assertString(row.runId, `${label}.runId`);
+  assertString(row.ownerWallet, `${label}.ownerWallet`);
+  validateNanoPayee(row.payee, `${label}.payee`);
+  assertNumber(row.amount, `${label}.amount`);
+  assertString(row.paymentState, `${label}.paymentState`);
+  validateNanoPaymentProof(row.proof, `${label}.proof`);
+  assertString(row.contributionSummary, `${label}.contributionSummary`);
+  return row;
+}
+
+export function validateNanoHealthResponse(payload) {
+  const root = assertObject(payload, "nano health response");
+  if (!(typeof root.ok === "boolean")) {
+    throw contractError("nano health response.ok must be a boolean");
+  }
+  assertString(root.service, "nano health response.service");
+  assertString(root.mode, "nano health response.mode");
+  assertString(root.payments, "nano health response.payments");
+  return root;
+}
+
+export function validateNanoBudgetDraftResponse(payload) {
+  const root = assertObject(payload, "nano budget draft response");
+  validateNanoBudget(root.budget, "nano budget draft response.budget");
+  validateNanoRunContext(root.runContext, "nano budget draft response.runContext");
+  return root;
+}
+
+export function validateNanoBudgetListResponse(payload) {
+  const root = assertObject(payload, "nano budget list response");
+  const items = assertArray(root.items, "nano budget list response.items");
+  items.forEach((item, index) => validateNanoBudget(item, `nano budget list response.items[${index}]`));
+  return root;
+}
+
+export function validateNanoBudgetActivityResponse(payload) {
+  const root = assertObject(payload, "nano budget activity response");
+  validateNanoBudget(root.budget, "nano budget activity response.budget");
+  validateNanoRunContext(root.runContext, "nano budget activity response.runContext");
+  assertArray(root.spendIntents, "nano budget activity response.spendIntents")
+    .forEach((item, index) => validateNanoSpendIntent(item, `nano budget activity response.spendIntents[${index}]`));
+  assertArray(root.receipts, "nano budget activity response.receipts")
+    .forEach((item, index) => validateNanoSpendReceipt(item, `nano budget activity response.receipts[${index}]`));
+  assertNumber(root.availableBudget, "nano budget activity response.availableBudget");
+  return root;
+}
+
+export function validateNanoSpendIntentResponse(payload) {
+  return validateNanoSpendIntent(payload, "nano spend intent response");
+}
+
+export function validateNanoSpendReceiptResponse(payload) {
+  return validateNanoSpendReceipt(payload, "nano spend receipt response");
+}
+
+export function validateNanoMetricsResponse(payload) {
+  const root = assertObject(payload, "nano metrics response");
+  assertString(root.generatedAt, "nano metrics response.generatedAt");
+  [
+    "budgetCount",
+    "spendIntentCount",
+    "approvedSpendIntentCount",
+    "receiptCount",
+    "totalAuthorizedBudget",
+    "totalApprovedIntentValue",
+    "totalRecordedPaymentValue",
+    "availableBudget",
+    "walletsWithBudgets",
+  ].forEach((key) => assertNumber(root[key], `nano metrics response.${key}`));
+  return root;
+}

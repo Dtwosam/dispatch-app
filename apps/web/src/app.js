@@ -50,6 +50,13 @@ import {
 import {
   validateAgentListResponse,
   validateLeaderboardResponse,
+  validateNanoBudgetActivityResponse,
+  validateNanoBudgetDraftResponse,
+  validateNanoBudgetListResponse,
+  validateNanoHealthResponse,
+  validateNanoMetricsResponse,
+  validateNanoSpendIntentResponse,
+  validateNanoSpendReceiptResponse,
   validateSettlementHistoryResponse,
   validateTaskDraftCreateResponse,
   validateTaskDetailResponse,
@@ -59,9 +66,14 @@ import {
   buildPostTaskChecklist,
   buildReviewPanelModel,
   buildTaskDisputeDisplayModel,
+  buildNanoBudgetStatusModel,
+  buildNanoMetricsModel,
+  buildNanoReceiptStatusModel,
+  buildNanoSpendIntentStatusModel,
   buildTaskResultModel,
   buildTaskRevisionDisplayModel,
   buildTaskTemplateBrief,
+  formatNanoUsdc,
   getTaskBriefTemplate,
   shortWallet,
   taskBriefTemplates,
@@ -76,6 +88,40 @@ let postTaskReadinessLastAttemptAt = 0;
 const pendingTaskAutoChecks = new Set();
 const pendingTaskReviewActions = new Set();
 let activeTaskDetailRenderToken = 0;
+const nanoDemoSpendPlan = [
+  {
+    payeeId: "source_unlock",
+    type: "source",
+    label: "Source unlock",
+    amount: 0.05,
+    reason: "Adds source-backed context.",
+    contributionSummary: "Unlocked source context for the final brief.",
+  },
+  {
+    payeeId: "summarizer_agent",
+    type: "agent",
+    label: "Summarizer agent",
+    amount: 0.03,
+    reason: "Turns notes into a short summary.",
+    contributionSummary: "Compressed source notes into a concise signal summary.",
+  },
+  {
+    payeeId: "claim_check_agent",
+    type: "agent",
+    label: "Claim-check agent",
+    amount: 0.04,
+    reason: "Checks the strongest claims.",
+    contributionSummary: "Flagged claims that need cautious wording.",
+  },
+  {
+    payeeId: "hook_agent",
+    type: "agent",
+    label: "Hook agent",
+    amount: 0.02,
+    reason: "Makes the brief easier to read.",
+    contributionSummary: "Generated the opening angle used in the final brief.",
+  },
+];
 
 function persistRevisionRequests() {
   localStorage.setItem("dispatchRevisionRequests", JSON.stringify(state.revisionRequests || {}));
@@ -83,6 +129,17 @@ function persistRevisionRequests() {
 
 function persistDisputeRecords() {
   localStorage.setItem("dispatchDisputeRecords", JSON.stringify(state.disputeRecords || {}));
+}
+
+function resetNanoDataForWallet() {
+  state.nano.budgets = [];
+  state.nano.budgetsLoaded = false;
+  state.nano.budgetsError = "";
+  state.nano.selectedBudgetId = "";
+  state.nano.activity = null;
+  state.nano.activityError = "";
+  state.nano.metrics = null;
+  state.nano.metricsError = "";
 }
 
 function loadAttachmentIngestionModule() {
@@ -154,6 +211,7 @@ watchInjectedWallet({
   onAccountsChanged: (accounts) => {
     const nextWallet = accounts[0] || "";
     const nextProviderLabel = nextWallet ? getInjectedWalletProviderLabel() : "";
+    if (state.wallet !== nextWallet) resetNanoDataForWallet();
     state.wallet = nextWallet;
     state.walletConnectionType = nextWallet ? "injected" : "manual";
     state.walletProviderLabel = nextProviderLabel;
@@ -229,6 +287,7 @@ function renderWalletSheet(open) {
       try {
         const wallet = await connectBrowserWallet();
         const providerLabel = getInjectedWalletProviderLabel();
+        if (state.wallet !== wallet) resetNanoDataForWallet();
         state.wallet = wallet;
         state.walletConnectionType = "injected";
         state.walletProviderLabel = providerLabel;
@@ -245,6 +304,7 @@ function renderWalletSheet(open) {
       }
     },
     onDisconnect: () => {
+      resetNanoDataForWallet();
       state.wallet = "";
       state.walletConnectionType = "manual";
       state.walletProviderLabel = "";
@@ -2334,6 +2394,775 @@ function renderDashboard() {
   renderDashboardPage({ el, state, onNavigate: navigate, rerender: renderDashboard });
 }
 
+function nanoWalletParam() {
+  return encodeURIComponent(state.wallet.trim());
+}
+
+function selectedNanoBudget() {
+  return state.nano.activity?.budget
+    || state.nano.budgets.find((budget) => budget.budgetId === state.nano.selectedBudgetId)
+    || state.nano.budgets[0]
+    || null;
+}
+
+function selectedNanoReceiptsByIntent() {
+  return new Map((state.nano.activity?.receipts || []).map((receipt) => [receipt.intentId, receipt]));
+}
+
+function makeNanoLocalProof(label, notes = []) {
+  return {
+    proofType: "local",
+    paymentState: "recorded",
+    txHash: null,
+    proofReference: `local:${label}:${Date.now()}`,
+    recordedAt: new Date().toISOString(),
+    notes,
+  };
+}
+
+async function refreshNanoActivity(budgetId = state.nano.selectedBudgetId) {
+  if (!budgetId || !state.wallet.trim()) {
+    state.nano.activity = null;
+    return null;
+  }
+  state.nano.activityLoading = true;
+  state.nano.activityError = "";
+  try {
+    const activity = await getJson(
+      `/api/nano/budgets/${encodeURIComponent(budgetId)}/activity?wallet=${nanoWalletParam()}`,
+      validateNanoBudgetActivityResponse,
+    );
+    state.nano.activity = activity;
+    state.nano.selectedBudgetId = activity.budget.budgetId;
+    return activity;
+  } catch (error) {
+    state.nano.activityError = statusMessage(error, "This Nano section is temporarily unavailable. Please try again shortly.");
+    return null;
+  } finally {
+    state.nano.activityLoading = false;
+  }
+}
+
+async function refreshNanoData() {
+  if (!state.wallet.trim()) {
+    state.nano.budgets = [];
+    state.nano.budgetsLoaded = false;
+    state.nano.activity = null;
+    state.nano.metrics = null;
+    return;
+  }
+  state.nano.healthLoading = true;
+  state.nano.budgetsLoading = true;
+  state.nano.metricsLoading = true;
+  state.nano.healthError = "";
+  state.nano.budgetsError = "";
+  state.nano.metricsError = "";
+  try {
+    const [healthResult, budgetsResult, metricsResult] = await Promise.allSettled([
+      getJson("/api/nano/health", validateNanoHealthResponse),
+      getJson(`/api/nano/budgets?wallet=${nanoWalletParam()}`, validateNanoBudgetListResponse),
+      getJson(`/api/nano/metrics?wallet=${nanoWalletParam()}`, validateNanoMetricsResponse),
+    ]);
+    if (healthResult.status === "fulfilled") {
+      state.nano.health = healthResult.value;
+    } else {
+      state.nano.healthError = statusMessage(healthResult.reason, "Nano status is temporarily unavailable.");
+    }
+    if (budgetsResult.status === "fulfilled") {
+      state.nano.budgets = budgetsResult.value.items || [];
+      state.nano.budgetsLoaded = true;
+      if (!state.nano.selectedBudgetId || !state.nano.budgets.some((budget) => budget.budgetId === state.nano.selectedBudgetId)) {
+        state.nano.selectedBudgetId = state.nano.budgets[0]?.budgetId || "";
+      }
+    } else {
+      state.nano.budgetsError = statusMessage(budgetsResult.reason, "Nano budgets are temporarily unavailable.");
+    }
+    if (metricsResult.status === "fulfilled") {
+      state.nano.metrics = metricsResult.value;
+    } else {
+      state.nano.metricsError = statusMessage(metricsResult.reason, "Nano metrics are temporarily unavailable.");
+    }
+    if (state.nano.selectedBudgetId) {
+      await refreshNanoActivity(state.nano.selectedBudgetId);
+    }
+  } finally {
+    state.nano.healthLoading = false;
+    state.nano.budgetsLoading = false;
+    state.nano.metricsLoading = false;
+  }
+}
+
+function startNanoRefresh() {
+  if (!state.wallet.trim() || state.nano.budgetsLoading) return;
+  void refreshNanoData().finally(() => {
+    if (window.location.pathname === "/nano") safeRender("Nano refresh render failed");
+  });
+}
+
+function renderNanoBudgetOptions() {
+  if (!state.nano.budgets.length) return "";
+  return `
+    <label class="nano-field nano-field--compact">
+      <span>Active budget</span>
+      <select id="nanoBudgetSelect">
+        ${state.nano.budgets.map((budget) => `
+          <option value="${escapeHtml(budget.budgetId)}" ${budget.budgetId === state.nano.selectedBudgetId ? "selected" : ""}>
+            ${escapeHtml(formatNanoUsdc(budget.amount))} - ${escapeHtml(buildNanoBudgetStatusModel(budget).label)}
+          </option>
+        `).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function renderNanoPage() {
+  setChrome(
+    "Dispatch Nano",
+    "Dispatch Nano",
+    "Route a user-funded USDC budget through agents, tools, and sources.",
+    "Tiny Arc Testnet payment trails for agent work, without fake settlement claims.",
+    90,
+  );
+
+  if (state.wallet.trim() && !state.nano.budgetsLoaded && !state.nano.budgetsLoading) {
+    startNanoRefresh();
+  }
+
+  const walletConnected = Boolean(state.wallet.trim());
+  const budget = selectedNanoBudget();
+  const budgetStatus = buildNanoBudgetStatusModel(budget);
+  const activity = state.nano.activity;
+  const intents = activity?.spendIntents || [];
+  const receipts = activity?.receipts || [];
+  const receiptsByIntent = selectedNanoReceiptsByIntent();
+  const metricsModel = buildNanoMetricsModel(state.nano.metrics);
+  const spendTotal = nanoDemoSpendPlan.reduce((total, item) => total + item.amount, 0);
+  const mainAgentRemainder = Math.max(0, Number(((budget?.amount || 1) - spendTotal).toFixed(6)));
+  const hasFullDemoPlan = nanoDemoSpendPlan.every((plan) => intents.some((intent) => intent.payee.payeeId === plan.payeeId));
+  const allIntentsApproved = intents.length > 0 && intents.every((intent) => ["approved", "payment_recorded"].includes(intent.status));
+  const allReceiptsRecorded = intents.length > 0 && intents.every((intent) => receiptsByIntent.has(intent.intentId));
+  const canCreatePlan = Boolean(budget) && !hasFullDemoPlan;
+  const canRecordFundingProof = Boolean(budget) && !budget.fundingProof;
+  const canApproveAny = Boolean(budget?.fundingProof) && intents.some((intent) => intent.status === "proposed");
+  const canRecordAnyReceipt = intents.some((intent) => intent.status === "approved" && !receiptsByIntent.has(intent.intentId));
+
+  el.appRoot.innerHTML = `
+    <section data-structure="nano-budget-router" class="nano-page">
+      <header class="nano-hero reveal-on-scroll is-visible">
+        <p class="mini-label">Dispatch Nano</p>
+        <h1>Give an agent a USDC budget.</h1>
+        <p>Dispatch Nano lets an agent propose tiny payments to sources, tools, and other agents, then shows the payment trail.</p>
+        <div class="nano-hero__actions">
+          ${walletConnected
+            ? `<span class="meta-pill">Wallet ${escapeHtml(shortWallet(state.wallet))}</span>`
+            : `<button class="hero-primary" type="button" data-wallet="open">Connect wallet</button>`}
+          <button class="hero-secondary" type="button" data-route="/post-task">Post funded task</button>
+        </div>
+      </header>
+
+      ${!walletConnected ? `
+        <section class="empty-state nano-wallet-state reveal-on-scroll">
+          <span class="empty-state__mark" aria-hidden="true"></span>
+          <div>
+            <strong>Connect wallet to start Nano.</strong>
+            <p>Your Nano budgets, spend intents, and receipts are linked to your wallet.</p>
+            <div class="empty-state-actions">
+              <button class="hero-primary" type="button" data-wallet="open">Connect wallet</button>
+            </div>
+          </div>
+        </section>
+      ` : `
+        <section class="nano-flow reveal-on-scroll">
+          ${[
+            ["01", "Budget", "Create a 1 USDC budget"],
+            ["02", "Plan", "Agent proposes spend intents"],
+            ["03", "Proof", "Record honest payment proof"],
+            ["04", "Trail", "Review receipts and result"],
+          ].map(([number, title, helper]) => `
+            <article>
+              <strong>${number}</strong>
+              <h3>${title}</h3>
+              <p>${helper}</p>
+            </article>
+          `).join("")}
+        </section>
+
+        <section class="nano-layout">
+          <div class="nano-main">
+            <article class="nano-panel nano-budget-panel reveal-on-scroll">
+              <div class="nano-section-head">
+                <div>
+                  <p class="mini-label">Budget</p>
+                  <h2>Create a Nano budget</h2>
+                  <p>Start with a 1 USDC budget draft. Funding proof is recorded separately.</p>
+                </div>
+                <span class="status-chip ${budgetStatus.tone === "good" ? "good" : budgetStatus.tone === "warn" ? "warn" : "pending"}">${escapeHtml(budgetStatus.label)}</span>
+              </div>
+              <div class="nano-form-grid">
+                <label class="nano-field nano-field--wide">
+                  <span>Agent goal</span>
+                  <textarea id="nanoGoal" rows="4" placeholder="Create a short research-backed brief.">${escapeHtml(state.nano.budgetGoal)}</textarea>
+                </label>
+                <label class="nano-field">
+                  <span>Budget amount</span>
+                  <input id="nanoBudgetAmount" type="number" min="0.01" step="0.01" value="${escapeHtml(state.nano.budgetAmount)}" />
+                  <small>Use 1 USDC for the Lepton demo flow.</small>
+                </label>
+                ${renderNanoBudgetOptions()}
+              </div>
+              <div class="nano-action-row">
+                <button class="hero-primary" type="button" id="nanoCreateBudget" ${state.nano.actionPending ? "disabled" : ""}>Create 1 USDC budget</button>
+                <button class="hero-secondary" type="button" id="nanoRefresh" ${state.nano.budgetsLoading ? "disabled" : ""}>Refresh</button>
+              </div>
+              ${state.nano.budgetsLoading ? `<p class="nano-helper">Loading your Nano budgets...</p>` : ""}
+              ${state.nano.budgetsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.budgetsError)}</p>` : ""}
+              <p class="nano-helper">${escapeHtml(budgetStatus.helper)}</p>
+            </article>
+
+            <article class="nano-panel reveal-on-scroll">
+              <div class="nano-section-head">
+                <div>
+                  <p class="mini-label">Spend plan</p>
+                  <h2>Agent spend intents</h2>
+                  <p>The agent proposes tiny USDC spends. Approval reserves budget; it is not payment.</p>
+                </div>
+                <span class="meta-pill">${escapeHtml(formatNanoUsdc(spendTotal))} planned</span>
+              </div>
+              <div class="nano-spend-plan">
+                ${nanoDemoSpendPlan.map((plan) => {
+                  const intent = intents.find((item) => item.payee.payeeId === plan.payeeId);
+                  const receipt = intent ? receiptsByIntent.get(intent.intentId) : null;
+                  const status = intent ? buildNanoSpendIntentStatusModel(intent, receipt) : { label: "Not proposed", tone: "pending", helper: "Create the spend plan to add this intent." };
+                  return `
+                    <article class="nano-spend-row">
+                      <div>
+                        <span class="nano-payee-type">${escapeHtml(labelize(plan.type))}</span>
+                        <strong>${escapeHtml(plan.label)}</strong>
+                        <p>${escapeHtml(plan.reason)}</p>
+                      </div>
+                      <div class="nano-spend-row__meta">
+                        <strong>${escapeHtml(formatNanoUsdc(plan.amount))}</strong>
+                        <span class="status-chip ${status.tone === "good" ? "good" : status.tone === "warn" ? "warn" : "pending"}">${escapeHtml(status.label)}</span>
+                      </div>
+                    </article>
+                  `;
+                }).join("")}
+                <article class="nano-spend-row nano-spend-row--quiet">
+                  <div>
+                    <span class="nano-payee-type">Platform</span>
+                    <strong>Main agent earnings</strong>
+                    <p>Remaining budget after source, tool, and agent spend intents.</p>
+                  </div>
+                  <div class="nano-spend-row__meta">
+                    <strong>${escapeHtml(formatNanoUsdc(mainAgentRemainder))}</strong>
+                    <span class="status-chip pending">Planned remainder</span>
+                  </div>
+                </article>
+              </div>
+              <div class="nano-action-row">
+                <button class="hero-primary" type="button" id="nanoCreatePlan" ${!canCreatePlan || state.nano.actionPending ? "disabled" : ""}>Create spend plan</button>
+                <button class="hero-secondary" type="button" id="nanoRecordFundingProof" ${!canRecordFundingProof || state.nano.actionPending ? "disabled" : ""}>Record local funding proof</button>
+                <button class="hero-secondary" type="button" id="nanoApproveSpend" ${!canApproveAny || state.nano.actionPending ? "disabled" : ""}>Approve spend intents</button>
+              </div>
+              <p class="nano-helper">Local proof is for development only; it does not settle funds.</p>
+            </article>
+
+            <article class="nano-panel reveal-on-scroll">
+              <div class="nano-section-head">
+                <div>
+                  <p class="mini-label">Payment trail</p>
+                  <h2>Receipts and proof</h2>
+                  <p>Only recorded receipts appear here. Missing proof stays visible.</p>
+                </div>
+                <span class="meta-pill">${receipts.length} receipt${receipts.length === 1 ? "" : "s"}</span>
+              </div>
+              <div class="nano-receipt-list">
+                ${intents.length ? intents.map((intent) => {
+                  const receipt = receiptsByIntent.get(intent.intentId);
+                  const status = receipt ? buildNanoReceiptStatusModel(receipt) : buildNanoSpendIntentStatusModel(intent, null);
+                  return `
+                    <article class="nano-receipt-row">
+                      <div>
+                        <strong>${escapeHtml(intent.payee.label)}</strong>
+                        <p>${escapeHtml(receipt?.contributionSummary || intent.reason)}</p>
+                      </div>
+                      <div>
+                        <span>${escapeHtml(formatNanoUsdc(intent.amount))}</span>
+                        <span class="status-chip ${status.tone === "good" ? "good" : status.tone === "warn" ? "warn" : "pending"}">${escapeHtml(status.label)}</span>
+                      </div>
+                    </article>
+                  `;
+                }).join("") : `
+                  <div class="empty-inline">
+                    <span class="empty-inline__mark" aria-hidden="true"></span>
+                    <div><strong>No spend intents yet.</strong><p>Create a budget and spend plan to see the payment trail.</p></div>
+                  </div>
+                `}
+              </div>
+              <div class="nano-action-row">
+                <button class="hero-primary" type="button" id="nanoRecordReceipts" ${!canRecordAnyReceipt || state.nano.actionPending ? "disabled" : ""}>Record local receipts</button>
+              </div>
+              <p class="nano-helper">No fake transaction hashes are created. Arc/Circle proof comes in a later phase.</p>
+            </article>
+
+            <article class="nano-panel nano-result-panel reveal-on-scroll">
+              <div class="nano-section-head">
+                <div>
+                  <p class="mini-label">Result preview</p>
+                  <h2>Final brief</h2>
+                  <p>The final output explains how each recorded source, tool, or agent contributed.</p>
+                </div>
+                <span class="status-chip ${allReceiptsRecorded ? "good" : allIntentsApproved ? "pending" : "pending"}">${allReceiptsRecorded ? "Receipts recorded" : allIntentsApproved ? "Awaiting receipts" : "Draft preview"}</span>
+              </div>
+              <div class="nano-result-copy">
+                <strong>Research-backed launch brief</strong>
+                <p>Position Dispatch Nano as the budget router for agent work: a user approves a USDC budget, the agent proposes small spends, and every source, helper agent, and tool contribution is visible in the payment trail.</p>
+                <ul>
+                  <li>Lead with budget control: the user sees exactly what the agent wants to spend.</li>
+                  <li>Keep payment proof honest: local proof is recorded metadata, not settlement.</li>
+                  <li>Make the trail judge-readable: payee, reason, amount, and proof state sit together.</li>
+                </ul>
+              </div>
+            </article>
+          </div>
+
+          <aside class="nano-side">
+            <article class="nano-panel nano-checkout-panel reveal-on-scroll">
+              <p class="mini-label">Run state</p>
+              <h2>${budget ? escapeHtml(formatNanoUsdc(budget.amount)) : "No budget yet"}</h2>
+              <div class="nano-summary-list">
+                <div><span>Wallet</span><strong>${escapeHtml(shortWallet(state.wallet))}</strong></div>
+                <div><span>Network</span><strong>Arc Testnet</strong></div>
+                <div><span>Token</span><strong>USDC</strong></div>
+                <div><span>Budget status</span><strong>${escapeHtml(budgetStatus.label)}</strong></div>
+                <div><span>Available</span><strong>${escapeHtml(formatNanoUsdc(activity?.availableBudget || 0))}</strong></div>
+              </div>
+              ${state.nano.activityError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.activityError)}</p>` : ""}
+            </article>
+
+            <article class="nano-panel reveal-on-scroll">
+              <p class="mini-label">Metrics</p>
+              <h2>Run metrics</h2>
+              <div class="nano-metrics-grid">
+                <div><strong>${escapeHtml(metricsModel.budgetCount)}</strong><span>Budgets</span></div>
+                <div><strong>${escapeHtml(metricsModel.spendIntentCount)}</strong><span>Spend intents</span></div>
+                <div><strong>${escapeHtml(metricsModel.receiptCount)}</strong><span>Receipts</span></div>
+                <div><strong>${escapeHtml(metricsModel.totalRecordedPaymentValue)}</strong><span>Recorded value</span></div>
+              </div>
+              ${state.nano.metricsLoading ? `<p class="nano-helper">Loading Nano metrics...</p>` : ""}
+              ${state.nano.metricsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.metricsError)}</p>` : ""}
+            </article>
+
+            <article class="nano-panel nano-note-panel reveal-on-scroll">
+              <p class="mini-label">Honesty note</p>
+              <h2>Proof-aware demo</h2>
+              <p>Phase 2 records budget and receipt metadata only. Real Arc/Circle payment proof is planned for Phase 3.</p>
+            </article>
+          </aside>
+        </section>
+      `}
+    </section>
+  `;
+
+  document.getElementById("nanoGoal")?.addEventListener("input", (event) => {
+    state.nano.budgetGoal = event.target.value;
+  });
+  document.getElementById("nanoBudgetAmount")?.addEventListener("input", (event) => {
+    state.nano.budgetAmount = event.target.value;
+  });
+  document.getElementById("nanoBudgetSelect")?.addEventListener("change", async (event) => {
+    state.nano.selectedBudgetId = event.target.value;
+    state.nano.activity = null;
+    renderNanoPage();
+    await refreshNanoActivity(event.target.value);
+    renderNanoPage();
+  });
+  document.getElementById("nanoRefresh")?.addEventListener("click", async () => {
+    await withNanoAction("refresh", refreshNanoData);
+  });
+  document.getElementById("nanoCreateBudget")?.addEventListener("click", async () => {
+    await withNanoAction("budget", createNanoBudgetDraft);
+  });
+  document.getElementById("nanoCreatePlan")?.addEventListener("click", async () => {
+    await withNanoAction("plan", createNanoSpendPlan);
+  });
+  document.getElementById("nanoRecordFundingProof")?.addEventListener("click", async () => {
+    await withNanoAction("fundingProof", recordNanoFundingProof);
+  });
+  document.getElementById("nanoApproveSpend")?.addEventListener("click", async () => {
+    await withNanoAction("approve", approveNanoSpendIntents);
+  });
+  document.getElementById("nanoRecordReceipts")?.addEventListener("click", async () => {
+    await withNanoAction("receipts", recordNanoReceipts);
+  });
+  revealSections(el.appRoot);
+}
+
+function renderNanoPageSimplified() {
+  setChrome(
+    "Dispatch Nano",
+    "Dispatch Nano",
+    "Agent budget router for small USDC payments.",
+    "Give an agent a budget, review its planned spend, and keep proof states honest.",
+    90,
+  );
+
+  if (state.wallet.trim() && !state.nano.budgetsLoaded && !state.nano.budgetsLoading) {
+    startNanoRefresh();
+  }
+
+  const walletConnected = Boolean(state.wallet.trim());
+  const budget = selectedNanoBudget();
+  const budgetStatus = buildNanoBudgetStatusModel(budget);
+  const activity = state.nano.activity;
+  const intents = activity?.spendIntents || [];
+  const receipts = activity?.receipts || [];
+  const receiptsByIntent = selectedNanoReceiptsByIntent();
+  const metricsModel = buildNanoMetricsModel(state.nano.metrics);
+  const spendTotal = nanoDemoSpendPlan.reduce((total, item) => total + item.amount, 0);
+  const mainAgentRemainder = Math.max(0, Number(((budget?.amount || 1) - spendTotal).toFixed(6)));
+  const hasFullDemoPlan = nanoDemoSpendPlan.every((plan) => intents.some((intent) => intent.payee.payeeId === plan.payeeId));
+  const canRecordFundingProof = Boolean(budget) && !budget.fundingProof;
+  const canApproveAny = Boolean(budget?.fundingProof) && intents.some((intent) => intent.status === "proposed");
+  const canRecordAnyReceipt = intents.some((intent) => intent.status === "approved" && !receiptsByIntent.has(intent.intentId));
+  const primaryAction = !walletConnected
+    ? { label: "Connect wallet", wallet: true, disabled: false }
+    : !budget
+      ? { label: "Create budget", wallet: false, disabled: Boolean(state.nano.actionPending) }
+      : !hasFullDemoPlan
+        ? { label: "Show spend plan", wallet: false, disabled: Boolean(state.nano.actionPending) }
+        : { label: "Review payment trail", wallet: false, disabled: false };
+
+  el.appRoot.innerHTML = `
+    <section data-structure="nano-budget-router" class="nano-page nano-page--simple">
+      <header class="nano-hero reveal-on-scroll is-visible">
+        <div>
+          <p class="mini-label">Dispatch Nano</p>
+          <h1>Agent Budget Router</h1>
+          <p>Give an agent a small USDC budget. It plans the spend, pays for useful work, and shows you every receipt.</p>
+        </div>
+        <div class="nano-badge-row" aria-label="Nano highlights">
+          <span class="meta-pill">Arc Testnet</span>
+          <span class="meta-pill">USDC Budget</span>
+          <span class="meta-pill">Proof-aware receipts</span>
+        </div>
+        <div class="nano-hero__actions">
+          <button class="hero-primary" type="button" ${primaryAction.wallet ? 'data-wallet="open"' : 'id="nanoPrimaryAction"'} ${primaryAction.disabled ? "disabled" : ""}>${escapeHtml(primaryAction.label)}</button>
+          <button class="hero-secondary" type="button" id="nanoRefresh" ${state.nano.budgetsLoading ? "disabled" : ""}>Refresh</button>
+        </div>
+      </header>
+
+      <section class="nano-panel nano-how reveal-on-scroll">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">How it works</p>
+            <h2>Three steps, one visible trail.</h2>
+          </div>
+        </div>
+        <div class="nano-how-grid">
+          ${[
+            ["1", "Fund a small budget", "Start with 1 USDC on Arc Testnet."],
+            ["2", "Agent chooses what to pay for", "The agent proposes source, tool, and agent spends."],
+            ["3", "Review the trail", "You see what was proposed, approved, and proven."],
+          ].map(([number, title, helper]) => `
+            <article>
+              <strong>${number}</strong>
+              <h3>${title}</h3>
+              <p>${helper}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+
+      <section class="nano-panel nano-demo-card reveal-on-scroll">
+        <div>
+          <p class="mini-label">Start demo</p>
+          <h2>Create a short brief about stablecoin payments.</h2>
+          <div class="nano-demo-facts">
+            <div><span>Budget</span><strong>1.00 USDC</strong></div>
+            <div><span>Wallet</span><strong>${walletConnected ? escapeHtml(shortWallet(state.wallet)) : "Not connected"}</strong></div>
+            <div><span>Status</span><strong>${escapeHtml(budgetStatus.label)}</strong></div>
+          </div>
+        </div>
+        <div class="nano-demo-action">
+          <button class="hero-primary" type="button" ${primaryAction.wallet ? 'data-wallet="open"' : 'id="nanoStartDemo"'} ${primaryAction.disabled ? "disabled" : ""}>${escapeHtml(primaryAction.label)}</button>
+          <p>${walletConnected ? "Demo data is scoped to your connected wallet." : "Connect wallet to create a wallet-scoped budget."}</p>
+        </div>
+      </section>
+
+      <section class="nano-two-col">
+        <article class="nano-panel nano-budget-panel reveal-on-scroll">
+          <div class="nano-section-head">
+            <div>
+              <p class="mini-label">Budget</p>
+              <h2>Budget card</h2>
+            </div>
+            <span class="status-chip ${budgetStatus.tone === "good" ? "good" : budgetStatus.tone === "warn" ? "warn" : "pending"}">${escapeHtml(budgetStatus.label)}</span>
+          </div>
+          <div class="nano-form-grid">
+            <label class="nano-field nano-field--wide">
+              <span>Demo goal</span>
+              <textarea id="nanoGoal" rows="3">${escapeHtml(state.nano.budgetGoal)}</textarea>
+            </label>
+            <label class="nano-field">
+              <span>Budget</span>
+              <input id="nanoBudgetAmount" type="number" min="0.01" step="0.01" value="${escapeHtml(state.nano.budgetAmount)}" />
+            </label>
+            ${renderNanoBudgetOptions()}
+          </div>
+          ${state.nano.budgetsLoading ? `<p class="nano-helper">Loading your Nano budgets...</p>` : ""}
+          ${state.nano.budgetsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.budgetsError)}</p>` : ""}
+          <p class="nano-helper">${escapeHtml(budget ? budgetStatus.helper : "Create a budget before the agent plans spend.")}</p>
+        </article>
+
+        <article class="nano-panel reveal-on-scroll" id="nanoSpendPlan">
+          <div class="nano-section-head">
+            <div>
+              <p class="mini-label">Planned spend</p>
+              <h2>Spend plan</h2>
+            </div>
+            <span class="meta-pill">${escapeHtml(formatNanoUsdc(spendTotal))} planned</span>
+          </div>
+          <div class="nano-spend-plan">
+            ${nanoDemoSpendPlan.map((plan) => {
+              const intent = intents.find((item) => item.payee.payeeId === plan.payeeId);
+              const receipt = intent ? receiptsByIntent.get(intent.intentId) : null;
+              const status = intent ? buildNanoSpendIntentStatusModel(intent, receipt) : { label: "Waiting for proof", tone: "pending" };
+              return `
+                <article class="nano-spend-row">
+                  <div>
+                    <strong>${escapeHtml(plan.label)}</strong>
+                    <p>${escapeHtml(plan.reason)}</p>
+                  </div>
+                  <div class="nano-spend-row__meta">
+                    <strong>${escapeHtml(formatNanoUsdc(plan.amount))}</strong>
+                    <span class="status-chip ${status.tone === "good" ? "good" : status.tone === "warn" ? "warn" : "pending"}">${escapeHtml(status.label)}</span>
+                  </div>
+                </article>
+              `;
+            }).join("")}
+            <article class="nano-spend-row nano-spend-row--quiet">
+              <div>
+                <strong>Main agent keeps remaining budget</strong>
+                <p>Remaining budget after helper spends.</p>
+              </div>
+              <div class="nano-spend-row__meta">
+                <strong>${escapeHtml(formatNanoUsdc(mainAgentRemainder))}</strong>
+                <span class="status-chip pending">Remainder</span>
+              </div>
+            </article>
+          </div>
+          <div class="nano-quiet-actions">
+            <button type="button" id="nanoRecordFundingProof" ${!canRecordFundingProof || state.nano.actionPending ? "disabled" : ""}>Record local proof</button>
+            <button type="button" id="nanoApproveSpend" ${!canApproveAny || state.nano.actionPending ? "disabled" : ""}>Approve planned spends</button>
+          </div>
+          <p class="nano-helper">Local proof is a Phase 2 demo record, not settlement.</p>
+        </article>
+      </section>
+
+      <article class="nano-panel reveal-on-scroll" id="nanoPaymentTrail">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">Payment trail</p>
+            <h2>Payment trail</h2>
+            <p>Nothing is marked paid without proof.</p>
+          </div>
+          <span class="meta-pill">${receipts.length} proof record${receipts.length === 1 ? "" : "s"}</span>
+        </div>
+        ${intents.length ? `
+          <div class="nano-trail-table">
+            <div class="nano-trail-head"><span>Action</span><span>Recipient</span><span>Amount</span><span>Status</span></div>
+            ${intents.map((intent) => {
+              const receipt = receiptsByIntent.get(intent.intentId);
+              const status = receipt ? buildNanoReceiptStatusModel(receipt) : buildNanoSpendIntentStatusModel(intent, null);
+              return `
+                <article class="nano-trail-row">
+                  <span>${receipt ? "Proof recorded" : "Planned spend"}</span>
+                  <strong>${escapeHtml(intent.payee.label)}</strong>
+                  <span>${escapeHtml(formatNanoUsdc(intent.amount))}</span>
+                  <span class="status-chip ${status.tone === "good" ? "good" : status.tone === "warn" ? "warn" : "pending"}">${escapeHtml(status.label)}</span>
+                </article>
+              `;
+            }).join("")}
+          </div>
+        ` : `
+          <div class="empty-inline">
+            <span class="empty-inline__mark" aria-hidden="true"></span>
+            <div><strong>No payment trail yet.</strong><p>Create a budget to start.</p></div>
+          </div>
+        `}
+        <div class="nano-quiet-actions">
+          <button type="button" id="nanoRecordReceipts" ${!canRecordAnyReceipt || state.nano.actionPending ? "disabled" : ""}>Record local proof</button>
+        </div>
+        ${state.nano.activityError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.activityError)}</p>` : ""}
+      </article>
+
+      <section class="nano-bottom-grid">
+        <article class="nano-panel nano-result-panel reveal-on-scroll">
+          <div class="nano-section-head">
+            <div>
+              <p class="mini-label">Result preview</p>
+              <h2>Result preview</h2>
+              <p>Demo preview. Final generated work comes after the payment proof phase.</p>
+            </div>
+            <span class="status-chip ${receipts.length ? "good" : "pending"}">${receipts.length ? "Proof records visible" : "Preview only"}</span>
+          </div>
+          <div class="nano-result-copy">
+            <strong>Stablecoin payments brief</strong>
+            <p>Stablecoin payments are useful when work needs clear budgets, fast review, and visible proof. Dispatch Nano shows what an agent planned to spend and what proof exists for each step.</p>
+          </div>
+        </article>
+
+        <article class="nano-panel reveal-on-scroll">
+          <p class="mini-label">Nano activity</p>
+          <h2>Nano activity</h2>
+          <div class="nano-metrics-grid">
+            <div><strong>${escapeHtml(metricsModel.budgetCount)}</strong><span>Budgets</span></div>
+            <div><strong>${escapeHtml(metricsModel.spendIntentCount)}</strong><span>Planned spends</span></div>
+            <div><strong>${escapeHtml(metricsModel.approvedSpendIntentCount)}</strong><span>Approved spends</span></div>
+            <div><strong>${escapeHtml(metricsModel.receiptCount)}</strong><span>Proof records</span></div>
+          </div>
+          ${state.nano.metricsLoading ? `<p class="nano-helper">Loading Nano activity...</p>` : ""}
+          ${state.nano.metricsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.metricsError)}</p>` : ""}
+        </article>
+      </section>
+    </section>
+  `;
+
+  document.getElementById("nanoGoal")?.addEventListener("input", (event) => {
+    state.nano.budgetGoal = event.target.value;
+  });
+  document.getElementById("nanoBudgetAmount")?.addEventListener("input", (event) => {
+    state.nano.budgetAmount = event.target.value;
+  });
+  document.getElementById("nanoBudgetSelect")?.addEventListener("change", async (event) => {
+    state.nano.selectedBudgetId = event.target.value;
+    state.nano.activity = null;
+    renderNanoPageSimplified();
+    await refreshNanoActivity(event.target.value);
+    renderNanoPageSimplified();
+  });
+  document.getElementById("nanoRefresh")?.addEventListener("click", async () => {
+    await withNanoAction("refresh", refreshNanoData);
+  });
+  document.querySelectorAll("#nanoPrimaryAction, #nanoStartDemo").forEach((node) => {
+    node.addEventListener("click", async () => {
+      if (!budget) {
+        await withNanoAction("budget", createNanoBudgetDraft);
+        return;
+      }
+      if (!hasFullDemoPlan) {
+        await withNanoAction("plan", createNanoSpendPlan);
+        return;
+      }
+      document.getElementById("nanoPaymentTrail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  document.getElementById("nanoRecordFundingProof")?.addEventListener("click", async () => {
+    await withNanoAction("fundingProof", recordNanoFundingProof);
+  });
+  document.getElementById("nanoApproveSpend")?.addEventListener("click", async () => {
+    await withNanoAction("approve", approveNanoSpendIntents);
+  });
+  document.getElementById("nanoRecordReceipts")?.addEventListener("click", async () => {
+    await withNanoAction("receipts", recordNanoReceipts);
+  });
+  revealSections(el.appRoot);
+}
+
+async function withNanoAction(actionName, action) {
+  try {
+    state.nano.actionPending = actionName;
+    renderNanoPageSimplified();
+    await action();
+    await refreshNanoData();
+    updateStatus("Nano updated", "Nano budget state refreshed.", "success");
+  } catch (error) {
+    updateStatus("Nano action failed", statusMessage(error, "Nano action failed."), "warn");
+  } finally {
+    state.nano.actionPending = "";
+    renderNanoPageSimplified();
+  }
+}
+
+async function createNanoBudgetDraft() {
+  requireWallet();
+  const amount = Number(state.nano.budgetAmount || 1);
+  if (!(amount > 0)) throw new Error("Enter a positive USDC budget.");
+  const response = await sendJson("/api/nano/budgets/draft", "POST", {
+    ownerWallet: state.wallet,
+    goal: state.nano.budgetGoal.trim() || "Create a short research-backed launch brief.",
+    amount,
+    spendPlanSummary: "Lepton demo spend plan: source unlock, summarizer agent, claim-check agent, hook agent, main agent remainder.",
+    policy: {
+      maxBudgetAmount: amount,
+      maxSpendAmount: amount,
+      allowedPayeeTypes: ["source", "tool", "creator", "agent", "platform"],
+      requireApprovalForEachSpend: true,
+      notes: ["Phase 2 UI records proof metadata only; it does not execute payments."],
+    },
+  }, validateNanoBudgetDraftResponse);
+  state.nano.selectedBudgetId = response.budget.budgetId;
+}
+
+async function createNanoSpendPlan() {
+  requireWallet();
+  const budget = selectedNanoBudget();
+  if (!budget) throw new Error("Create a Nano budget first.");
+  const existing = new Set((state.nano.activity?.spendIntents || []).map((intent) => intent.payee.payeeId));
+  for (const plan of nanoDemoSpendPlan) {
+    if (existing.has(plan.payeeId)) continue;
+    await sendJson("/api/nano/spend-intents", "POST", {
+      budgetId: budget.budgetId,
+      ownerWallet: state.wallet,
+      payee: {
+        payeeId: plan.payeeId,
+        type: plan.type,
+        label: plan.label,
+        walletAddress: null,
+        externalRef: `lepton_demo:${plan.payeeId}`,
+      },
+      amount: plan.amount,
+      reason: plan.reason,
+      estimated: false,
+    }, validateNanoSpendIntentResponse);
+  }
+}
+
+async function recordNanoFundingProof() {
+  requireWallet();
+  const budget = selectedNanoBudget();
+  if (!budget) throw new Error("Create a Nano budget first.");
+  await sendJson(`/api/nano/budgets/${encodeURIComponent(budget.budgetId)}/fund-proof`, "POST", {
+    ownerWallet: state.wallet,
+    proof: makeNanoLocalProof("funding", ["Local funding proof only; no chain settlement is claimed."]),
+  });
+}
+
+async function approveNanoSpendIntents() {
+  requireWallet();
+  const intents = state.nano.activity?.spendIntents || [];
+  for (const intent of intents.filter((item) => item.status === "proposed")) {
+    await sendJson(`/api/nano/spend-intents/${encodeURIComponent(intent.intentId)}/approve`, "POST", {
+      ownerWallet: state.wallet,
+    }, validateNanoSpendIntentResponse);
+  }
+}
+
+async function recordNanoReceipts() {
+  requireWallet();
+  const receiptsByIntent = selectedNanoReceiptsByIntent();
+  const intents = state.nano.activity?.spendIntents || [];
+  for (const intent of intents.filter((item) => item.status === "approved" && !receiptsByIntent.has(item.intentId))) {
+    const plan = nanoDemoSpendPlan.find((item) => item.payeeId === intent.payee.payeeId);
+    await sendJson(`/api/nano/spend-intents/${encodeURIComponent(intent.intentId)}/record-payment`, "POST", {
+      ownerWallet: state.wallet,
+      proof: makeNanoLocalProof(intent.payee.payeeId, ["Local receipt only; real Arc/Circle proof is not implemented in Phase 2."]),
+      contributionSummary: plan?.contributionSummary || `Recorded local proof for ${intent.payee.label}.`,
+    }, validateNanoSpendReceiptResponse);
+  }
+}
+
 async function renderAdmin() {
   setChrome(
     "Admin Panel",
@@ -2554,6 +3383,7 @@ async function render() {
   if (path === "/agents") return renderAgentsPage();
   if (path.startsWith("/agents/")) return renderAgentProfile(path.split("/")[2]);
   if (path === "/post-task") return renderPostTaskPage();
+  if (path === "/nano") return renderNanoPageSimplified();
   if (path === "/arc-demo") return renderArcDemoRemoved();
   if (path.startsWith("/tasks/")) return renderTaskDetail(path.split("/")[2]);
   if (path === "/create-agent") return renderCreateAgent();
@@ -2604,6 +3434,7 @@ async function syncInjectedWalletFromBrowser() {
   }
 
   const providerLabel = getInjectedWalletProviderLabel();
+  if (state.wallet !== wallet) resetNanoDataForWallet();
   state.wallet = wallet;
   state.walletConnectionType = "injected";
   state.walletProviderLabel = providerLabel;

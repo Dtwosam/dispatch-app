@@ -12,6 +12,147 @@ export function shortWallet(wallet) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
+export function formatNanoUsdc(value) {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return "0 USDC";
+  return `${amount.toLocaleString(undefined, { minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: 6 })} USDC`;
+}
+
+export function buildNanoBudgetStatusModel(budget) {
+  const status = String(budget?.status || "").toLowerCase();
+  if (!budget) {
+    return {
+      label: "No budget yet",
+      tone: "pending",
+      helper: "Create a 1 USDC budget draft to start.",
+    };
+  }
+  if (status === "draft") {
+    return {
+      label: "Budget draft",
+      tone: "pending",
+      helper: "Record funding proof before approving spend intents.",
+    };
+  }
+  if (status === "funding_proof_recorded") {
+    return {
+      label: "Funding proof recorded",
+      tone: "good",
+      helper: "Proof is recorded; spend intents can be approved.",
+    };
+  }
+  if (status === "spending") {
+    return {
+      label: "Spending",
+      tone: "good",
+      helper: "Approved spend is reserved from the budget.",
+    };
+  }
+  if (status === "completed") {
+    return {
+      label: "Completed",
+      tone: "good",
+      helper: "This Nano run is complete.",
+    };
+  }
+  return {
+    label: "Unavailable",
+    tone: "warn",
+    helper: "Budget state is temporarily unavailable.",
+  };
+}
+
+export function buildNanoSpendIntentStatusModel(intent, receipt) {
+  const status = String(intent?.status || "").toLowerCase();
+  if (receipt) {
+    return buildNanoReceiptStatusModel(receipt);
+  }
+  if (status === "approved") {
+    return {
+      label: "Approved, not paid yet",
+      tone: "pending",
+      helper: "Budget is reserved; no payment proof has been recorded.",
+    };
+  }
+  if (status === "payment_recorded") {
+    return {
+      label: "Proof recorded",
+      tone: "good",
+      helper: "A receipt exists for this spend.",
+    };
+  }
+  if (status === "failed") {
+    return {
+      label: "Failed",
+      tone: "warn",
+      helper: "Payment proof was recorded as failed.",
+    };
+  }
+  return {
+    label: "Proposed",
+    tone: "pending",
+    helper: "The user must approve this spend before proof can be recorded.",
+  };
+}
+
+export function buildNanoReceiptStatusModel(receipt) {
+  const proofType = String(receipt?.proof?.proofType || "").toLowerCase();
+  const paymentState = String(receipt?.paymentState || receipt?.proof?.paymentState || "").toLowerCase();
+  if (!receipt) {
+    return {
+      label: "No receipt",
+      tone: "pending",
+      helper: "No payment proof has been recorded.",
+    };
+  }
+  if (paymentState === "failed") {
+    return {
+      label: "Payment failed",
+      tone: "warn",
+      helper: "The recorded proof says this spend failed.",
+    };
+  }
+  if (proofType === "arc_tx") {
+    return {
+      label: "Arc proof recorded",
+      tone: "good",
+      helper: receipt.proof?.txHash ? "Valid Arc transaction hash recorded." : "Arc proof is missing a valid transaction hash.",
+    };
+  }
+  if (proofType === "circle_gateway") {
+    return {
+      label: "Circle proof recorded",
+      tone: "good",
+      helper: "Circle proof metadata is recorded.",
+    };
+  }
+  if (proofType === "x402") {
+    return {
+      label: "x402 proof recorded",
+      tone: "good",
+      helper: "x402 proof metadata is recorded.",
+    };
+  }
+  return {
+    label: "Local proof",
+    tone: "pending",
+    helper: "Development proof only; this is not settlement.",
+  };
+}
+
+export function buildNanoMetricsModel(metrics) {
+  return {
+    budgetCount: String(metrics?.budgetCount || 0),
+    spendIntentCount: String(metrics?.spendIntentCount || 0),
+    approvedSpendIntentCount: String(metrics?.approvedSpendIntentCount || 0),
+    receiptCount: String(metrics?.receiptCount || 0),
+    totalAuthorizedBudget: formatNanoUsdc(metrics?.totalAuthorizedBudget || 0),
+    totalApprovedIntentValue: formatNanoUsdc(metrics?.totalApprovedIntentValue || 0),
+    totalRecordedPaymentValue: formatNanoUsdc(metrics?.totalRecordedPaymentValue || 0),
+    availableBudget: formatNanoUsdc(metrics?.availableBudget || 0),
+  };
+}
+
 export function buildHomeSnapshot({ tasks, agents }) {
   return {
     openCount: tasks?.allOpenTasks?.length || 0,
