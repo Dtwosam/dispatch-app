@@ -2432,6 +2432,22 @@ function selectedNanoArcProofIntent(intents, receiptsByIntent) {
     || null;
 }
 
+function nanoApiErrorMessage(error, fallback = "Nano API is unavailable.") {
+  const message = statusMessage(error, fallback);
+  if (/Request failed for \/api\/nano|Failed to fetch|NetworkError|404|not found/i.test(message)) {
+    return fallback;
+  }
+  return message;
+}
+
+function nanoArcProofErrorMessage(error) {
+  const message = statusMessage(error, "Arc proof verification is temporarily unavailable.");
+  if (/Request failed for \/api\/nano|Failed to fetch|NetworkError|404|not found/i.test(message)) {
+    return "Arc proof verification is temporarily unavailable.";
+  }
+  return message;
+}
+
 async function refreshNanoActivity(budgetId = state.nano.selectedBudgetId) {
   if (!budgetId || !state.wallet.trim()) {
     state.nano.activity = null;
@@ -2448,7 +2464,7 @@ async function refreshNanoActivity(budgetId = state.nano.selectedBudgetId) {
     state.nano.selectedBudgetId = activity.budget.budgetId;
     return activity;
   } catch (error) {
-    state.nano.activityError = statusMessage(error, "This Nano section is temporarily unavailable. Please try again shortly.");
+    state.nano.activityError = nanoApiErrorMessage(error, "Nano API is unavailable.");
     return null;
   } finally {
     state.nano.activityLoading = false;
@@ -2478,7 +2494,7 @@ async function refreshNanoData() {
     if (healthResult.status === "fulfilled") {
       state.nano.health = healthResult.value;
     } else {
-      state.nano.healthError = statusMessage(healthResult.reason, "Nano status is temporarily unavailable.");
+      state.nano.healthError = nanoApiErrorMessage(healthResult.reason);
     }
     if (budgetsResult.status === "fulfilled") {
       state.nano.budgets = budgetsResult.value.items || [];
@@ -2487,12 +2503,12 @@ async function refreshNanoData() {
         state.nano.selectedBudgetId = state.nano.budgets[0]?.budgetId || "";
       }
     } else {
-      state.nano.budgetsError = statusMessage(budgetsResult.reason, "Nano budgets are temporarily unavailable.");
+      state.nano.budgetsError = nanoApiErrorMessage(budgetsResult.reason);
     }
     if (metricsResult.status === "fulfilled") {
       state.nano.metrics = metricsResult.value;
     } else {
-      state.nano.metricsError = statusMessage(metricsResult.reason, "Nano metrics are temporarily unavailable.");
+      state.nano.metricsError = nanoApiErrorMessage(metricsResult.reason);
     }
     if (state.nano.selectedBudgetId) {
       await refreshNanoActivity(state.nano.selectedBudgetId);
@@ -3246,19 +3262,26 @@ async function verifyNanoArcProof() {
     state.nano.arcProofMessage = "Proof rejected. Enter a valid Arc transaction hash.";
     throw new Error("Enter a valid Arc transaction hash.");
   }
-  const result = await sendJson(
-    `/api/nano/spend-intents/${encodeURIComponent(intent.intentId)}/verify-arc-proof`,
-    "POST",
-    {
-      ownerWallet: state.wallet,
-      txHash,
-      payerWallet: state.wallet,
-      payeeWallet: intent.payee.walletAddress || null,
-      expectedAmountUsdc: intent.amount,
-      recipientLabel: intent.payee.label,
-    },
-    validateNanoArcProofVerifyResponse,
-  );
+  let result;
+  try {
+    result = await sendJson(
+      `/api/nano/spend-intents/${encodeURIComponent(intent.intentId)}/verify-arc-proof`,
+      "POST",
+      {
+        ownerWallet: state.wallet,
+        txHash,
+        payerWallet: state.wallet,
+        payeeWallet: intent.payee.walletAddress || null,
+        expectedAmountUsdc: intent.amount,
+        recipientLabel: intent.payee.label,
+      },
+      validateNanoArcProofVerifyResponse,
+    );
+  } catch (error) {
+    state.nano.arcProofStatus = "unavailable";
+    state.nano.arcProofMessage = nanoArcProofErrorMessage(error);
+    throw new Error(state.nano.arcProofMessage);
+  }
   state.nano.arcProofStatus = result.proofStatus;
   state.nano.arcProofMessage = result.proofStatus === "verified" ? "Paid with proof." : result.reason;
   if (result.proofStatus !== "verified") {

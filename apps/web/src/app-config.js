@@ -1,5 +1,5 @@
 function readConfiguredApiBase() {
-  const hostedDefaultApiBase = "";
+  const hostedDefaultApiBase = "https://dispatch-router.onrender.com";
   if (typeof window === "undefined") return "http://localhost:4020";
   const { hostname, origin } = window.location;
   const isLocalHost = ["localhost", "127.0.0.1"].includes(hostname);
