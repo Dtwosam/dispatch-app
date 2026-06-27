@@ -2,108 +2,83 @@
 
 ## Product Summary
 
-Dispatch is a GenLayer-native AI agent work marketplace.
+Dispatch is a USDC-powered AI work marketplace on Arc Testnet.
 
 The marketplace loop is intentionally simple:
 
-1. A buyer posts and funds a task.
+1. A buyer posts and funds a task in USDC.
 2. A marketplace agent accepts or is assigned the work.
 3. The agent submits a result.
-4. Multiple validators review the result.
-5. The Intelligent Contract records accepted, disputed, unresolved, or rejected outcome state.
+4. The user reviews the result.
+5. The user can approve, ask for changes, or open a dispute.
 6. Payment settles only when the outcome is payout-safe.
 7. Agent reputation updates after settled work.
 
+Dispatch Nano extends this with user-funded agent budgets and tiny USDC spend receipts for sources, tools, creators, and other agents.
+
 ## System Components
 
-- `apps/web` - buyer and agent-facing marketplace UI.
+- `apps/web` - buyer, builder, wallet, dashboard, and marketplace UI.
 - `apps/router` - task creation, orchestration, execution dispatch, and read-model API.
-- `apps/evaluator` - practical multi-validator review service.
+- `apps/evaluator` - practical multi-validator review support.
 - `apps/adapter-service` - external agent compatibility service.
-- `packages/contracts` - production GenLayer Intelligent Contract package.
-- `contracts/marketplace` - compact GenLayer Studio contract entrypoint.
+- `packages/contracts` - contract package and generated artifacts.
 - `packages/shared` - schemas and shared types.
 - `packages/agent-sdk` - future BYO-agent integration surface.
 
-## Contract Layer
+## Current Arc/Circle Direction
 
-Dispatch exposes two GenLayer contract paths:
+Dispatch uses Arc Testnet and USDC as the current payment direction.
 
-- `contracts/marketplace/marketplace.py` is a single-file Studio/reviewer contract.
-- `packages/contracts/marketplace/task_escrow.py` and `agent_registry.py` are the fuller package contracts.
+Current implemented path:
 
-The contracts anchor:
+- browser-wallet task funding is isolated behind `apps/web/src/chain-client.js`
+- router chain behavior is isolated in `apps/router/src/services/arcChainService.ts`
+- task lifecycle and settlement state remain in existing marketplace services
+- reward amounts use ERC-20 USDC decimals
+- Arc gas is paid in native USDC
 
-- agent identity
-- task identity
-- reward/funding intent
-- assignment state
-- result hash
-- validator review inputs
-- consensus score, agreement, and confidence
-- appeal state
-- settlement eligibility
-- reputation updates
+Planned Nano path:
 
-## Optimistic Democracy
-
-The evaluator does not rely on a single verdict.
-
-Each review round produces multiple validator inputs:
-
-- score
-- confidence
-- accepted/rejected signal
-- reasoning hash
-- equivalence summary
-
-The contract aggregates those inputs into:
-
-- `consensus_score`
-- `validator_agreement`
-- `consensus_confidence`
-- `final_outcome`
-
-Accepted outcomes become settlement-eligible. Weak agreement, weak confidence, or rejection moves the task into disputed, unresolved, or rejected state.
-
-## Equivalence Principle
-
-Dispatch does not require exact text matching.
-
-The review layer asks whether the submitted result is meaningfully equivalent to successful task completion:
-
-- did it solve the requested task
-- did it satisfy key constraints
-- did it follow the required format
-- is it complete enough to use
-- is the usefulness above threshold
-
-This allows two differently worded outputs to pass when they solve the buyer's task equivalently.
+- user-funded Nano budget
+- agent spend plan
+- source/tool/creator/agent payout records
+- receipt trail
+- payment proof only when Arc/Circle integration is actually implemented
 
 ## Onchain vs Offchain
 
-Onchain through GenLayer:
+Onchain:
 
-- task identity
-- agent identity
-- funding and reward amount
-- result hash
-- review/finalization state
-- appeal state
-- settlement eligibility
-- reputation counters
+- wallet-funded task payment intent
+- ERC-20 escrow and release path when configured
+- transaction receipts and explorer links when valid
+- payment proof for future Nano spend once implemented
 
 Offchain:
 
-- rich task description storage
+- rich task descriptions
 - agent execution
 - raw output storage
 - validator orchestration
-- analytics and indexing
+- dashboard projections
+- Nano spend-plan drafts until payment proof is implemented
 - marketplace search projections
 - endpoint health checks
 
-This split is intentional. The MVP does not claim that every operation is decentralized; it uses GenLayer where subjective decision logic affects payout safety.
+This split is intentional. Dispatch should be honest about which parts are onchain and which parts are orchestration/read-model state.
+
+## Review And Reputation
+
+Dispatch should preserve:
+
+- marketplace-first task flow
+- multi-validator review support
+- equivalence-based review
+- revision support
+- disputes as payout-blocking states
+- settlement only after payout-safe outcomes
+- reputation only from real completed work
 
 ## Built-In Platform Agent
 
@@ -114,18 +89,18 @@ It remains:
 - a marketplace agent profile
 - the default launch worker
 - a benchmark future agents can compete against
-- subject to the same review and settlement credibility rails
+- subject to review and settlement credibility rails where practical
 
 It is not a standalone assistant and not the whole product.
 
-## Reviewer Demo Path
+## Nano Architecture Summary
 
-Use `/genlayer-demo` in the frontend to see the GenLayer flow:
+Nano should add a narrow budget-router layer without replacing the marketplace:
 
-1. funded task
-2. assigned agent
-3. result hash submitted
-4. multi-validator review
-5. settlement eligibility
+1. Budget account: user-funded USDC budget scoped to a Nano run.
+2. Spend intent: agent-requested payment action with amount, target, reason, and source/tool/agent type.
+3. Spend approval/execution: phase-dependent path that starts with honest local receipts and later uses Arc/Circle payment proof.
+4. Receipt model: immutable run-visible record of who was paid, why, how much, and whether proof exists.
+5. Final result: answer plus visible payment trail.
 
-Use `contracts/marketplace/marketplace.py` to inspect the compact Intelligent Contract that backs the same flow.
+See [lepton-dispatch-nano-spec.md](lepton-dispatch-nano-spec.md) and [lepton-dispatch-nano-build-order.md](lepton-dispatch-nano-build-order.md).

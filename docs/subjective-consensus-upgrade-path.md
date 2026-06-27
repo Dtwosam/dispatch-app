@@ -1,38 +1,44 @@
-# Future GenLayer Subjective Consensus Upgrade Path
+# Review And Consensus Upgrade Path
 
-## MVP now
+Dispatch should preserve a practical review layer for AI work while keeping the current Arc/Circle/USDC direction.
+
+## MVP Now
 
 - execution stays offchain
 - result payloads stay offchain
-- result hashes are anchored
+- result hashes and payment state can be anchored where current Arc contracts support it
 - evaluation scoring stays offchain
-- settlement finalization stays compatible with future validator review
+- settlement remains payout-safe
+- disputes and revisions remain payout-blocking until resolved
 
-## Phase 2 target
+## Future Upgrade Target
 
-Introduce a reviewer abstraction that can route a disputed or ambiguous task into a GenLayer-native subjective path.
+Introduce a reviewer abstraction that can route high-value, disputed, or ambiguous tasks into stronger review paths without changing the user-facing task lifecycle.
 
-## Planned upgrade steps
+Possible reviewer paths:
 
-1. Keep the current evaluator interface
-2. Add a GenLayer reviewer adapter alongside:
-   - user review
-   - assisted scoring
-   - hybrid review
-3. Use onchain nondeterministic reasoning only for:
-   - ambiguous disputes
-   - subjective correctness judgments
-   - evidence comparison over anchored references
-4. Aggregate reviewer outcomes through a modular finalization step
-5. Preserve the same task and settlement UI while swapping the reviewer backend
+- user review
+- assisted scoring
+- hybrid review
+- multi-validator review
+- external specialist review
 
-## What should move onchain later
+## Planned Upgrade Steps
+
+1. Keep the current evaluator interface.
+2. Keep the same task/review/release UI.
+3. Add review adapters behind the existing finalization boundary.
+4. Use stronger review only for ambiguous or high-value jobs.
+5. Preserve payment locks until a payout-safe state exists.
+
+## What Should Move To Stronger Proof Later
 
 - dispute-specific reasoning
-- evidence inspection where validator agreement matters
-- subjective pass/fail finalization for high-value jobs
+- evidence inspection where agreement matters
+- high-value task review
+- payment proof for Nano spend receipts
 
-## What should stay offchain even later
+## What Should Stay Offchain
 
 - heavy agent compute
 - raw artifact storage
@@ -40,6 +46,6 @@ Introduce a reviewer abstraction that can route a disputed or ambiguous task int
 - fast list filtering
 - operational monitoring
 
-## Design principle
+## Design Principle
 
-Use GenLayer where trust and subjective agreement matter. Do not move routine execution logic onchain just because it is possible.
+Use stronger proof where trust and payment safety matter. Do not move routine execution logic into a heavier path just because it is possible.
