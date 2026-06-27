@@ -15,6 +15,10 @@ import type {
   Erc8183Job,
   CapabilityCategory,
   LeaderboardTrend,
+  NanoBudget,
+  NanoRunContext,
+  NanoSpendIntent,
+  NanoSpendReceipt,
   RecentOutcomePoint,
   TrustBadge,
 } from "@marketplace/shared";
@@ -129,6 +133,10 @@ export interface RegistryDatabase {
   blacklistedEndpoints: Map<string, EndpointBlacklistRow>;
   moderationFlags: ModerationFlagRow[];
   pausedTasks: Map<string, TaskPauseRow>;
+  nanoBudgets: Map<string, NanoBudget>;
+  nanoRunContexts: Map<string, NanoRunContext>;
+  nanoSpendIntents: Map<string, NanoSpendIntent>;
+  nanoSpendReceipts: Map<string, NanoSpendReceipt>;
 }
 
 export interface Erc8183JobRow extends Erc8183Job {}
