@@ -107,7 +107,46 @@ export function buildNanoPaymentActionModel(intent, receipt) {
   };
 }
 
-export const nanoBudgetPresets = ["0.25", "0.50", "1.00", "2.50"];
+export const nanoBudgetPresets = ["0.10", "0.25", "0.50", "1.00"];
+
+export const nanoSourcePaymentSpendPlanRows = [
+  {
+    payeeId: "source_unlock",
+    type: "source",
+    label: "Source unlock",
+    amount: 0.01,
+    reason: "Adds source-backed context for the final result.",
+    contributionSummary: "Unlocked source context for the final brief.",
+    primary: true,
+  },
+  {
+    payeeId: "summarizer_agent",
+    type: "agent",
+    label: "Summarizer helper",
+    amount: 0.01,
+    reason: "Turns notes into a short summary.",
+    contributionSummary: "Compressed source notes into a concise signal summary.",
+    starterOnly: true,
+  },
+  {
+    payeeId: "claim_check_agent",
+    type: "agent",
+    label: "Claim-check helper",
+    amount: 0.01,
+    reason: "Checks the strongest claims.",
+    contributionSummary: "Flagged claims that need cautious wording.",
+    starterOnly: true,
+  },
+  {
+    payeeId: "hook_agent",
+    type: "agent",
+    label: "Hook helper",
+    amount: 0.01,
+    reason: "Makes the brief easier to read.",
+    contributionSummary: "Generated the opening angle used in the final brief.",
+    starterOnly: true,
+  },
+];
 
 export function validateNanoBudgetAmount(value) {
   const raw = String(value ?? "").trim();
@@ -194,9 +233,9 @@ export function buildNanoResetDraftState(current = {}) {
     selectedBudgetId: "",
     activity: null,
     activityError: "",
-    budgetPreset: "1.00",
+    budgetPreset: "0.10",
     customBudgetAmount: "",
-    budgetAmount: "1.00",
+    budgetAmount: "0.10",
     budgetAmountError: "",
     arcProofTxHash: "",
     arcProofIntentId: "",
@@ -211,13 +250,128 @@ export function buildNanoSpendPlanPresentation({ hasBudget = false } = {}) {
     ? {
       label: "Active spend plan",
       helper: "Review and approve each planned spend before payment.",
-      recipientHelper: "This is where the approved source/tool/agent payout will be sent on Arc Testnet.",
+      recipientHelper: "This is where the approved source/tool payout will be sent on Arc Testnet.",
     }
     : {
       label: "Starter spend plan",
-      helper: "This starter plan shows how an agent may split a small USDC budget. Create a budget to activate the plan and approve payments.",
+      helper: "This starter plan shows how an agent may use a small USDC budget. Create a budget to activate the plan and approve payments.",
       recipientHelper: "Recipient wallet is needed later when an approved spend is ready to pay on Arc.",
     };
+}
+
+export function buildNanoAgentDecisionPresentation({ hasBudget = false, intent = null, receipt = null } = {}) {
+  const receiptStatus = receipt ? buildNanoReceiptStatusModel(receipt) : null;
+  const intentStatus = intent ? buildNanoSpendIntentStatusModel(intent, receipt) : null;
+  const statusLabel = receiptStatus?.label
+    || (intent?.status === "approved" ? "Approved" : null)
+    || (hasBudget ? "Waiting for approval" : "Starter decision");
+  const tone = receiptStatus?.tone
+    || (intent?.status === "approved" ? "pending" : null)
+    || (hasBudget ? "pending" : "pending");
+  return {
+    label: hasBudget ? "Active decision" : "Starter decision",
+    title: "Agent decision",
+    copy: "The agent chose a paid source/tool because the goal needs grounded context.",
+    resource: "Source unlock",
+    costLabel: "Source unlock",
+    reason: "Adds source-backed context for the final result.",
+    expectedValue: "Better grounded answer",
+    decision: "Pay once, reuse in final brief",
+    status: statusLabel,
+    tone,
+    helper: hasBudget
+      ? "Review this source payment before approving it."
+      : "Starter decision only. Create a budget to activate the spend.",
+  };
+}
+
+export function buildNanoSourceUnlockPresentation({ intent = null, receipt = null, recipientWalletModel = null } = {}) {
+  const receiptStatus = receipt ? buildNanoReceiptStatusModel(receipt) : null;
+  const intentStatus = intent ? buildNanoSpendIntentStatusModel(intent, receipt) : null;
+  const unlocked = receiptStatus?.label === "Paid with proof";
+  const status = receiptStatus || intentStatus || { label: "Planned", tone: "pending" };
+  const recipient = recipientWalletModel?.valid
+    ? recipientWalletModel.label
+    : intent?.payee?.walletAddress
+      ? shortWallet(intent.payee.walletAddress)
+      : (recipientWalletModel?.label || "No recipient wallet");
+  return {
+    unlocked,
+    title: unlocked ? "Source insight unlocked" : "Source insight locked",
+    copy: unlocked
+      ? "This paid source is now available for the result preview."
+      : "The agent wants to unlock this source because the final result needs grounded context.",
+    status: status.label,
+    tone: status.tone,
+    priceLabel: intent?.amount != null ? formatNanoUsdc(intent.amount) : "0.01 USDC",
+    recipient,
+    reason: "Adds source-backed context for the final result.",
+    insightLabel: "Starter source insight",
+    insight: "Stablecoins became the default settlement layer for crypto-native payments because they allow fast dollar-denominated transfers without waiting on traditional banking rails.",
+  };
+}
+
+export function buildNanoRunProgressPresentation({
+  hasBudget = false,
+  hasSpendPlan = false,
+  hasApprovedSpend = false,
+  hasProofPending = false,
+  hasVerifiedSourceProof = false,
+} = {}) {
+  const labels = [
+    "Budget not created",
+    "Source decision ready",
+    "Waiting for approval",
+    "Payment proof pending",
+    "Source unlocked",
+    "Result ready",
+  ];
+  let currentIndex = 0;
+  let currentCopy = "Create a Nano budget to start this run.";
+  if (hasVerifiedSourceProof) {
+    currentIndex = 5;
+    currentCopy = "Source payment verified. Result preview is ready.";
+  } else if (hasProofPending) {
+    currentIndex = 3;
+    currentCopy = "Waiting for Arc proof to confirm the payment.";
+  } else if (hasApprovedSpend) {
+    currentIndex = 3;
+    currentCopy = "Approved source spend is ready for payment.";
+  } else if (hasSpendPlan) {
+    currentIndex = 2;
+    currentCopy = "The agent decision is active. Review the source payment before approving.";
+  } else if (hasBudget) {
+    currentIndex = 1;
+    currentCopy = "The agent decision is active. Review the source payment before approving.";
+  }
+  return {
+    title: "Agent run progress",
+    subtitle: "Track what the agent is doing from budget to result.",
+    currentCopy,
+    currentStep: labels[currentIndex],
+    steps: labels.map((label, index) => ({
+      label,
+      number: String(index + 1),
+      state: index < currentIndex ? "complete" : index === currentIndex ? "current" : "future",
+    })),
+  };
+}
+
+export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourceProof = false } = {}) {
+  return {
+    title: "Result preview",
+    subtitle: "See what this Nano run produced and which paid source supported it.",
+    status: hasVerifiedSourceProof ? "Source-backed preview" : "Waiting for source proof",
+    tone: hasVerifiedSourceProof ? "good" : "pending",
+    cta: hasVerifiedSourceProof ? "Review result" : "View result",
+    goal: goal || "Create a short brief about stablecoin payments.",
+    paidSourceUsed: hasVerifiedSourceProof ? "Starter source insight" : "Waiting for verified source proof",
+    proofStatus: hasVerifiedSourceProof ? "Paid with proof" : "Not paid yet",
+    body: hasVerifiedSourceProof
+      ? "Stablecoins quietly became one of crypto's most useful products because they make dollar payments fast, programmable, and global. For agents, that matters because tiny payments can now happen per source, per API call, or per task without forcing users into subscriptions."
+      : "The result preview is waiting for source proof.",
+    label: "Starter brief preview",
+  };
 }
 
 export function nanoApiUnavailableMessage() {
@@ -236,7 +390,7 @@ export function buildNanoBudgetStatusModel(budget) {
     return {
       label: "No budget yet",
       tone: "pending",
-      helper: "Create a 1 USDC budget draft to start.",
+      helper: "Create a 0.10 USDC budget draft to start.",
     };
   }
   if (status === "draft") {
@@ -325,10 +479,17 @@ export function buildNanoReceiptStatusModel(receipt) {
     };
   }
   if (proofType === "arc_tx") {
+    if (!buildArcTransactionLink(receipt.proof?.txHash)) {
+      return {
+        label: "Proof pending",
+        tone: "pending",
+        helper: "Arc proof needs a valid transaction hash before this spend is marked paid.",
+      };
+    }
     return {
       label: "Paid with proof",
       tone: "good",
-      helper: receipt.proof?.txHash ? "Verified Arc Testnet USDC proof recorded." : "Arc proof is missing a valid transaction hash.",
+      helper: "Verified Arc Testnet USDC proof recorded.",
     };
   }
   if (proofType === "circle_gateway") {

@@ -27,6 +27,7 @@ import {
   buildTaskStatusDisplayModel,
   buildTaskTemplateBrief,
   buildWalletScopedDashboardModel,
+  buildNanoAgentDecisionPresentation,
   buildNanoBudgetStatusModel,
   buildNanoCurrentStepModel,
   buildNanoMetricsModel,
@@ -34,11 +35,15 @@ import {
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
   buildNanoResetDraftState,
+  buildNanoResultPreviewPresentation,
+  buildNanoRunProgressPresentation,
+  buildNanoSourceUnlockPresentation,
   buildNanoSpendPlanPresentation,
   buildNanoSpendIntentStatusModel,
   getTaskBriefTemplate,
   nanoBudgetPresets,
   nanoApiUnavailableMessage,
+  nanoSourcePaymentSpendPlanRows,
   taskBriefTemplates,
   validateNanoBudgetAmount,
   walletNetworkSnapshotsEqual,
@@ -398,8 +403,8 @@ test("Nano approved spend intent is labeled as not paid without a receipt", () =
 });
 
 test("Nano budget presets and custom amount validation stay inside guided limits", () => {
-  assert.deepEqual(nanoBudgetPresets, ["0.25", "0.50", "1.00", "2.50"]);
-  ["0.25", "0.50", "1.00", "2.50", "0.10", "5.00", "1"].forEach((value) => {
+  assert.deepEqual(nanoBudgetPresets, ["0.10", "0.25", "0.50", "1.00"]);
+  ["0.10", "0.25", "0.50", "1.00", "5.00", "1"].forEach((value) => {
     assert.equal(validateNanoBudgetAmount(value).valid, true, `${value} should pass`);
   });
   [
@@ -445,8 +450,8 @@ test("Nano start new budget resets draft state without disconnecting wallet", ()
     selectedBudgetId: "budget_1",
     activity: { receipts: [] },
     budgetGoal: "Keep this goal",
-    budgetAmount: "2.50",
-    budgetPreset: "2.50",
+    budgetAmount: "1.00",
+    budgetPreset: "1.00",
     customBudgetAmount: "3",
     sourcePayoutWallet: "0x1111111111111111111111111111111111111111",
     arcProofTxHash: `0x${"a".repeat(64)}`,
@@ -456,8 +461,8 @@ test("Nano start new budget resets draft state without disconnecting wallet", ()
 
   assert.equal(reset.selectedBudgetId, "");
   assert.equal(reset.activity, null);
-  assert.equal(reset.budgetAmount, "1.00");
-  assert.equal(reset.budgetPreset, "1.00");
+  assert.equal(reset.budgetAmount, "0.10");
+  assert.equal(reset.budgetPreset, "0.10");
   assert.equal(reset.customBudgetAmount, "");
   assert.equal(reset.arcProofTxHash, "");
   assert.equal(reset.actionPending, "");
@@ -474,7 +479,124 @@ test("Nano spend plan labels distinguish starter from active state", () => {
   assert.match(starter.recipientHelper, /needed later/);
   assert.equal(active.label, "Active spend plan");
   assert.match(active.helper, /Review and approve/);
-  assert.match(active.recipientHelper, /approved source\/tool\/agent payout/);
+  assert.match(active.recipientHelper, /approved source\/tool payout/);
+});
+
+test("Nano source payment plan keeps source unlock primary with safe 2-decimal amounts", () => {
+  const [source, ...helpers] = nanoSourcePaymentSpendPlanRows;
+
+  assert.equal(source.payeeId, "source_unlock");
+  assert.equal(source.primary, true);
+  assert.equal(source.amount, 0.01);
+  assert.equal(validateNanoBudgetAmount("0.005").valid, false);
+  assert.equal(validateNanoBudgetAmount("0.005").message, "Use up to 2 decimal places.");
+  helpers.forEach((helper) => {
+    assert.equal(helper.starterOnly, true);
+    assert.equal(helper.amount, 0.01);
+  });
+});
+
+test("Nano agent decision presentation separates starter and active decision states", () => {
+  const starter = buildNanoAgentDecisionPresentation({ hasBudget: false });
+  const active = buildNanoAgentDecisionPresentation({ hasBudget: true });
+
+  assert.equal(starter.label, "Starter decision");
+  assert.equal(starter.status, "Starter decision");
+  assert.match(starter.helper, /Starter decision only/);
+  assert.equal(active.label, "Active decision");
+  assert.equal(active.status, "Waiting for approval");
+  assert.match(active.helper, /Review this source payment/);
+});
+
+test("Nano approved source spend is not paid", () => {
+  const decision = buildNanoAgentDecisionPresentation({
+    hasBudget: true,
+    intent: { status: "approved" },
+  });
+  const source = buildNanoSourceUnlockPresentation({
+    intent: { status: "approved", amount: 0.01, payee: { walletAddress: null } },
+    receipt: null,
+  });
+
+  assert.equal(decision.status, "Approved");
+  assert.equal(source.unlocked, false);
+  assert.equal(source.status, "Approved, not paid yet");
+});
+
+test("Nano source insight remains locked before verified proof", () => {
+  const missing = buildNanoSourceUnlockPresentation({
+    intent: { status: "proposed", amount: 0.01, payee: { walletAddress: null } },
+    receipt: null,
+  });
+
+  assert.equal(missing.title, "Source insight locked");
+  assert.equal(missing.unlocked, false);
+  assert.equal(missing.status, "Planned");
+});
+
+test("Nano source insight unlocks only after verified Arc proof", () => {
+  const receipt = {
+    paymentState: "recorded",
+    proof: {
+      proofType: "arc_tx",
+      paymentState: "recorded",
+      txHash: `0x${"a".repeat(64)}`,
+    },
+  };
+  const source = buildNanoSourceUnlockPresentation({
+    intent: { status: "approved", amount: 0.01, payee: { walletAddress: "0x1111111111111111111111111111111111111111" } },
+    receipt,
+  });
+
+  assert.equal(source.title, "Source insight unlocked");
+  assert.equal(source.unlocked, true);
+  assert.equal(source.status, "Paid with proof");
+  assert.match(source.insight, /Stablecoins became/);
+});
+
+test("Nano local receipt does not unlock source insight as Paid with proof", () => {
+  const source = buildNanoSourceUnlockPresentation({
+    intent: { status: "approved", amount: 0.01, payee: { walletAddress: null } },
+    receipt: {
+      paymentState: "recorded",
+      proof: { proofType: "local", paymentState: "recorded" },
+    },
+  });
+
+  assert.equal(source.unlocked, false);
+  assert.equal(source.status, "Local receipt");
+});
+
+test("Nano result preview waits for source proof before verified payment", () => {
+  const preview = buildNanoResultPreviewPresentation({
+    goal: "Create a short brief about stablecoin payments.",
+    hasVerifiedSourceProof: false,
+  });
+
+  assert.equal(preview.status, "Waiting for source proof");
+  assert.equal(preview.proofStatus, "Not paid yet");
+  assert.match(preview.body, /waiting for source proof/i);
+});
+
+test("Nano result preview references unlocked source after verified proof", () => {
+  const preview = buildNanoResultPreviewPresentation({
+    goal: "Create a short brief about stablecoin payments.",
+    hasVerifiedSourceProof: true,
+  });
+
+  assert.equal(preview.status, "Source-backed preview");
+  assert.equal(preview.paidSourceUsed, "Starter source insight");
+  assert.equal(preview.proofStatus, "Paid with proof");
+  assert.match(preview.body, /tiny payments/);
+});
+
+test("Nano run progress follows budget approval proof and result states", () => {
+  assert.equal(buildNanoRunProgressPresentation({}).currentStep, "Budget not created");
+  assert.equal(buildNanoRunProgressPresentation({ hasBudget: true }).currentStep, "Source decision ready");
+  assert.equal(buildNanoRunProgressPresentation({ hasBudget: true, hasSpendPlan: true }).currentStep, "Waiting for approval");
+  assert.equal(buildNanoRunProgressPresentation({ hasApprovedSpend: true }).currentStep, "Payment proof pending");
+  assert.equal(buildNanoRunProgressPresentation({ hasProofPending: true }).currentCopy, "Waiting for Arc proof to confirm the payment.");
+  assert.equal(buildNanoRunProgressPresentation({ hasVerifiedSourceProof: true }).currentStep, "Result ready");
 });
 
 test("Nano API unavailable copy explains router dependency", () => {
@@ -580,6 +702,21 @@ test("Nano Arc receipts are labeled paid only when verified proof exists", () =>
 
   assert.equal(model.label, "Paid with proof");
   assert.match(model.helper, /Verified Arc Testnet USDC proof/);
+});
+
+test("Nano Arc receipt without a valid tx hash is not Paid with proof", () => {
+  const model = buildNanoReceiptStatusModel({
+    paymentState: "recorded",
+    proof: {
+      proofType: "arc_tx",
+      paymentState: "recorded",
+      txHash: null,
+    },
+  });
+
+  assert.equal(model.label, "Proof pending");
+  assert.notEqual(model.label, "Paid with proof");
+  assert.match(model.helper, /valid transaction hash/);
 });
 
 test("Nano rejected proof does not show Paid with proof", () => {

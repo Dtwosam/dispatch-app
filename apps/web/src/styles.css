@@ -2224,6 +2224,73 @@ button[data-open-dispute] {
   line-height: 1.4;
 }
 
+.nano-decision-grid,
+.nano-source-facts,
+.nano-result-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.nano-decision-grid div,
+.nano-source-facts div,
+.nano-result-fields div {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.052);
+  border-radius: 16px;
+  padding: 12px 13px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nano-decision-grid span,
+.nano-source-facts span,
+.nano-result-fields span {
+  display: block;
+  color: var(--text-subtle);
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.nano-decision-grid strong,
+.nano-source-facts strong,
+.nano-result-fields strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.nano-source-card {
+  border-color: rgba(142, 255, 240, 0.13);
+}
+
+.nano-unlocked-insight {
+  margin-top: 14px;
+  border: 1px solid rgba(54, 211, 153, 0.16);
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(54, 211, 153, 0.055);
+}
+
+.nano-unlocked-insight span {
+  color: var(--brand-strong);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nano-unlocked-insight p {
+  margin: 8px 0 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
 .nano-two-col,
 .nano-bottom-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2245,6 +2312,13 @@ button[data-open-dispute] {
   color: var(--text-subtle);
   font-size: 0.76rem;
   overflow-wrap: anywhere;
+}
+
+.nano-spend-row--primary {
+  border-color: rgba(142, 255, 240, 0.18);
+  background:
+    linear-gradient(135deg, rgba(150, 255, 240, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.02);
 }
 
 .nano-limit-note {
@@ -2321,14 +2395,33 @@ button[data-open-dispute] {
   overflow-wrap: anywhere;
 }
 
-.nano-trail-row > span:not(.status-chip) {
+.nano-trail-row > span:not(.status-chip),
+.nano-trail-row small {
   color: var(--text-muted);
   font-size: 0.88rem;
 }
 
 .nano-trail-row strong {
+  display: block;
   color: var(--text);
   font-size: 0.95rem;
+}
+
+.nano-trail-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-subtle);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.nano-trail-row a {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--brand-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .nano-proof-box {
@@ -2386,6 +2479,61 @@ button[data-open-dispute] {
   margin-bottom: 0;
 }
 
+.nano-progress-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.nano-progress-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.052);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--text-muted);
+}
+
+.nano-progress-item span {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-subtle);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.nano-progress-item strong {
+  color: inherit;
+  font-size: 0.88rem;
+}
+
+.nano-progress-item--current {
+  border-color: rgba(142, 255, 240, 0.18);
+  background: rgba(150, 255, 240, 0.055);
+  color: var(--text);
+}
+
+.nano-progress-item--complete {
+  color: rgba(244, 251, 255, 0.78);
+}
+
+.nano-progress-item--complete span,
+.nano-progress-item--current span {
+  background: var(--brand-strong);
+  color: #031018;
+}
+
+.nano-result-cta {
+  margin-top: 14px;
+}
+
 @media (max-width: 980px) {
   .nano-flow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2398,6 +2546,12 @@ button[data-open-dispute] {
   .nano-demo-card,
   .nano-two-col,
   .nano-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nano-decision-grid,
+  .nano-source-facts,
+  .nano-result-fields {
     grid-template-columns: 1fr;
   }
 }
