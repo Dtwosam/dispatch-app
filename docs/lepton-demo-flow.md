@@ -4,7 +4,7 @@ This is the planned Dispatch Nano judge demo.
 
 ## Demo Goal
 
-Show that Dispatch can route a user-funded USDC budget through an AI agent, let the agent pay other agents/sources/tools, and show a visible payment trail.
+Show that Dispatch Nano lets an AI agent request a tiny USDC payment for a source/tool, get user approval, pay on Arc, verify proof, and show how the paid source/tool improved the final result.
 
 ## Demo Script
 
@@ -12,12 +12,13 @@ Show that Dispatch can route a user-funded USDC budget through an AI agent, let 
 2. Connect wallet.
 3. Create a 1 USDC budget.
 4. Ask the main agent to create a short research-backed brief.
-5. Agent creates a spend plan.
-6. Agent pays a source/tool/agent path.
-7. Final brief appears.
-8. Payment trail is visible.
-9. User reviews the result.
-10. Metrics update from the run.
+5. Agent decides that a source/tool unlock improves the result.
+6. User approves the tiny source/tool spend.
+7. User pays on Arc and proof is verified.
+8. Final brief appears with the unlocked source/tool value.
+9. Payment trail is visible.
+10. User reviews the result.
+11. Metrics update only from real or clearly labeled local/session run state.
 
 ## Demo Spend Plan
 
@@ -31,6 +32,12 @@ Planned spend:
 - hook agent: `0.02 USDC`
 - main agent earnings: remaining budget
 
+Judge framing:
+
+- the source unlock is the primary product story
+- helper-agent spends are starter examples unless real helper-agent payout proof exists
+- the budget is the control mechanism, not the product headline
+
 ## What Judges Should See
 
 - the budget amount
@@ -41,6 +48,7 @@ Planned spend:
 - final output
 - review state
 - metrics based on real run data
+- how the unlocked source/tool improved the final result
 
 ## Honesty Notes
 
@@ -49,6 +57,10 @@ Do not show fake transaction hashes.
 Do not claim Gateway/Nanopayments/x402 settlement unless implemented and verified.
 
 If a receipt is local or simulated for a development phase, label it clearly.
+
+Do not present Nano as a generic budget dashboard.
+
+Do not claim full helper-agent marketplace payouts unless the repo proves them.
 
 ## Success Criteria
 

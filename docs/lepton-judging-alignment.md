@@ -4,44 +4,51 @@
 
 What Dispatch Nano shows:
 
-- an agent receives a goal and a budget
-- the agent decides how to allocate small USDC spend
-- the agent can pay sources, tools, creators, and other agents
-- final output includes payment reasoning and receipts
+- an agent receives a user goal and a small USDC budget
+- the agent decides a source/tool unlock would improve the result
+- the user approves a tiny source/tool payment
+- Arc proof gates the paid label
+- final output explains how the paid source/tool improved the result
 
 How it appears in the demo:
 
-- `/nano` spend plan
+- `/nano` judge run
+- agent decision
 - source unlock
-- summarizer agent
-- claim-check agent
-- hook agent
+- planned spend approval
+- recipient wallet
+- Pay on Arc
+- proof gate
 - final brief
 
 How it appears in the repo:
 
 - Nano spec and demo docs in `docs/`
+- source-payment architecture in `docs/lepton-nano-source-payment-architecture.md`
 - future backend/API plan in build order
 - existing marketplace task/execution services to reuse
 
 Evidence judges can verify:
 
-- spend plan amounts
+- source/tool spend amount
+- user approval state
 - receipt states
+- proof-gated paid label
 - final output
 - code paths once implemented
 
 Still planned:
 
 - live Circle/Gateway/x402 proof
-- agent-to-agent payout execution
+- full agent-to-agent payout execution
+- real source marketplace
 
 ## Traction
 
 What Dispatch Nano shows:
 
-- a clear marketplace use case: humans fund work, agents earn, agents spend
-- visible payment trails for work and source/tool usage
+- a clear source-payment use case: humans fund work, agents request source/tool unlocks, and receipts explain value
+- visible payment trails for source/tool usage
 
 How it appears in the demo:
 
@@ -58,6 +65,7 @@ Evidence judges can verify:
 
 - no fake users or fake volume
 - metrics are local/demo-visible unless real data exists
+- source/tool unlock claims are separated from planned helper-agent payouts
 
 Still planned:
 
@@ -72,11 +80,12 @@ What Dispatch Nano shows:
 - USDC-first task funding
 - Arc Testnet direction
 - future Circle Agent Stack, Gateway, Nanopayments, x402, and Wallets usage
+- Arc proof for source/tool payment where repo support exists
 
 How it appears in the demo:
 
 - wallet-connected budget
-- USDC spend plan
+- USDC source/tool spend plan
 - receipt trail with proof states
 
 How it appears in the repo:
@@ -103,15 +112,15 @@ Still planned:
 
 What Dispatch Nano shows:
 
-- agents do not just answer; they manage tiny budgets
-- agent payments become inspectable
-- sources/tools/creators can be paid per use
-- marketplace work can include downstream spend
+- agents do not just answer; they request paid source/tool unlocks when useful
+- source/tool payments become inspectable
+- users see approval, proof, and contribution in one receipt trail
+- marketplace work can include downstream source/tool spend
 
 How it appears in the demo:
 
-- one user budget turns into multiple small payouts
-- final result includes a visible payment trail
+- one user goal turns into an agent decision and a tiny source/tool payment
+- final result includes a visible payment trail and contribution note
 - user can review the result and receipts
 
 How it appears in the repo:

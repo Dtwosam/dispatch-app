@@ -2,6 +2,28 @@
 
 Future Codex work must follow this build order and must not skip phases unless the user explicitly requests it.
 
+## Active Nano Direction
+
+Dispatch Nano is now documented as AI agent source/tool unlock with Arc USDC proof.
+
+The source of truth for the active Nano direction is [lepton-nano-source-payment-architecture.md](lepton-nano-source-payment-architecture.md).
+
+Budget, spend intent, and receipt models remain implementation architecture. Do not present Nano as a generic budget dashboard.
+
+Current source-payment build order:
+
+- Phase 0: Stabilize current Nano UX
+- Phase 1: Add this source-of-truth doc
+- Phase 2: Source Payment Judge Run UI
+- Phase 3: Source Unlock State Model
+- Phase 4: Real Arc Source Payment Path
+- Phase 5: Honest usage/traction surface
+- Phase 6: Preview deployment
+- Phase 7: User testing sprint
+- Phase 8: Submission polish
+
+Do not claim Gateway/x402, full agent-to-agent payouts, a real source marketplace, or production traction until the repo proves them.
+
 ## Phase 0 - Story/source/docs cleanup
 
 Goal:
@@ -9,6 +31,7 @@ Goal:
 - make Arc/Circle/USDC and Dispatch Nano the active product story
 - remove old active positioning from current-facing docs
 - create source-backed Nano planning docs
+- keep source/tool unlock with Arc proof as the active Nano product story
 
 Allowed scope:
 
@@ -29,6 +52,7 @@ Files likely changed:
 - `docs/lepton-demo-flow.md`
 - `docs/lepton-judging-alignment.md`
 - `docs/lepton-dispatch-nano-build-order.md`
+- `docs/lepton-nano-source-payment-architecture.md`
 
 Hard locks:
 
@@ -46,6 +70,7 @@ Acceptance checklist:
 - source-of-truth updated
 - official Arc/Circle sources listed
 - Nano spec created
+- Nano source-payment architecture created
 - build order created
 - README points to current docs
 - no fake integration claims
@@ -72,7 +97,7 @@ What must not be touched:
 
 Goal:
 
-- add Nano data structures and API surfaces for budget, spend intents, receipts, and run state
+- add Nano data structures and API surfaces for budget, source/tool spend intents, receipts, and run state
 
 Allowed scope:
 
@@ -115,6 +140,7 @@ Stop conditions:
 - API shape requires contract changes
 - payment proof cannot be represented honestly
 - existing task lifecycle would be altered
+- source/tool unlock would require fake proof or fake recipients
 
 What must not be touched:
 
@@ -125,7 +151,7 @@ What must not be touched:
 
 Goal:
 
-- create `/nano` UI flow for wallet, budget, spend plan, receipts, final result, and review
+- create `/nano` UI flow for judge run intro, goal, budget, agent decision, source unlock, approval, recipient wallet, Pay on Arc, proof gate, result preview, and payment trail
 
 Allowed scope:
 
@@ -153,7 +179,7 @@ Acceptance checklist:
 - `/nano` route
 - wallet-required state
 - 1 USDC budget UI
-- spend plan UI
+- source/tool unlock spend plan UI
 - visible receipt trail
 - honest proof labels
 - mobile-safe flow
@@ -169,6 +195,7 @@ Stop conditions:
 
 - UI needs unsupported payment claims
 - shared wallet behavior would need changes
+- Nano drifts into a generic budget dashboard
 
 What must not be touched:
 
@@ -179,7 +206,7 @@ What must not be touched:
 
 Goal:
 
-- connect Nano spend receipts to real Arc/Circle payment proof where feasible
+- connect Nano source/tool spend receipts to real Arc/Circle payment proof where feasible
 
 Allowed scope:
 
@@ -209,6 +236,7 @@ Acceptance checklist:
 - invalid/missing proof fallback
 - source-backed Circle/Arc implementation notes
 - tests for failure/unavailable paths
+- proof-gated paid label only after valid proof
 
 Required checks:
 
@@ -232,7 +260,7 @@ What must not be touched:
 
 Goal:
 
-- add honest Nano metrics and connect reviewed Nano work to reputation only where supported
+- add honest Nano source-payment metrics and connect reviewed Nano work to reputation only where supported
 
 Allowed scope:
 

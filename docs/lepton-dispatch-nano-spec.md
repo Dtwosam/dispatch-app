@@ -2,9 +2,21 @@
 
 ## Concept
 
-Dispatch Nano is an agent budget router for Dispatch.
+Dispatch Nano is an AI agent source-payment layer for Dispatch.
 
-It lets a user fund a small USDC budget, let an AI agent decide how to spend it, and see a payment trail for every agent, creator, source, or tool paid during the run.
+It lets a user give an AI agent a small USDC budget, approve a tiny payment for a source/tool, pay on Arc, verify payment proof, and see how the paid source/tool improved the final result.
+
+One-line pitch:
+
+> Dispatch Nano lets AI agents request tiny USDC payments for sources/tools, get user approval, pay on Arc, verify proof, and show how the paid source improved the final result.
+
+Judge flow:
+
+> User goal -> agent decision -> tiny USDC source/tool payment -> Arc proof -> unlocked source/tool value -> final result -> receipt trail.
+
+Nano is not a generic budget dashboard, a full autonomous agent economy, or a fake helper-agent marketplace.
+
+Budget, spend intent, and receipt models remain the implementation architecture.
 
 Nano extends Dispatch's marketplace flow. It does not replace funded tasks, review, revision, dispute, or payment release.
 
@@ -14,23 +26,25 @@ Nano extends Dispatch's marketplace flow. It does not replace funded tasks, revi
 2. User connects wallet.
 3. User creates a small USDC budget.
 4. User gives the agent a goal.
-5. Agent proposes a spend plan.
-6. User starts the run.
-7. Agent spends from the approved budget.
-8. Final result appears with a payment trail.
-9. User reviews the result and receipts.
+5. Agent decides a source/tool unlock would improve the result.
+6. User approves the planned source/tool spend.
+7. User pays on Arc and proof is verified.
+8. Final result explains how the unlocked source/tool helped.
+9. User reviews the result and receipt trail.
 
 ## Agent Flow
 
 1. Read the task goal and budget.
-2. Decide which sources, tools, or agents are useful.
-3. Create spend intents with amount, recipient, and reason.
-4. Execute approved spend intents through the current phase's payment path.
-5. Record receipts.
+2. Decide whether a source/tool unlock is useful.
+3. Create a spend intent with amount, recipient, and reason.
+4. Wait for user approval before payment.
+5. Verify Arc proof after payment.
 6. Produce final result.
-7. Explain how each paid source/tool/agent contributed.
+7. Explain how the paid source/tool contributed.
 
 ## Budget Flow
+
+Budget is the control layer, not the product headline. It limits how much the agent can request for source/tool unlocks.
 
 Budget states:
 
@@ -58,7 +72,7 @@ Budget fields:
 
 ## Spend Intent
 
-A spend intent is an agent-requested payment action.
+A spend intent is an agent-requested source/tool payment action.
 
 Fields:
 
@@ -101,13 +115,13 @@ Receipt honesty:
 
 ## Creator/Source/Tool Payout Model
 
-Nano should support these recipient types:
+Nano source-payment work should prioritize these recipient types:
 
 - source unlock: pay to access a source or dataset
 - tool: pay for API/tool execution
 - creator: pay a creator/source owner
-- agent: pay another Dispatch agent for a subtask
-- platform/main agent: retain remaining budget as earned value when supported
+- agent: planned future helper-agent subtask payout
+- platform/main agent: planned future remaining-budget earnings when supported
 
 MVP can model recipients before live payout proof exists, but the UI and docs must label proof status honestly.
 
@@ -137,12 +151,13 @@ MVP Nano should include:
 - `/nano` flow
 - wallet-required state
 - 1 USDC budget creation path
-- spend plan
+- source/tool unlock spend plan
 - spend intents
 - receipt trail
 - final brief/result
 - review action
 - honest metrics from real/local run state
+- clear starter labels when source insight, result preview, or metrics are not backend-backed
 
 ## Out Of Scope
 
@@ -157,3 +172,5 @@ Out of scope for MVP unless explicitly requested:
 - unverified Gateway settlement
 - fake traction metrics
 - autonomous unlimited agent spending
+- full agent-to-agent payout network
+- real source marketplace until implemented
