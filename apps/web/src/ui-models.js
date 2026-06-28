@@ -554,15 +554,85 @@ export function buildNanoReceiptStatusModel(receipt) {
   };
 }
 
-export function buildNanoMetricsModel(metrics) {
+function collectNanoActivityWallets(activity) {
+  const wallets = new Set();
+  const addWallet = (value) => {
+    const normalized = normalizeComparableWallet(value);
+    if (isValidEvmAddress(normalized)) wallets.add(normalized);
+  };
+
+  addWallet(activity?.budget?.ownerWallet);
+  for (const budget of activity?.budgets || []) addWallet(budget?.ownerWallet);
+  for (const intent of activity?.spendIntents || []) {
+    addWallet(intent?.ownerWallet);
+    addWallet(intent?.payee?.walletAddress);
+  }
+  for (const receipt of activity?.receipts || []) {
+    addWallet(receipt?.ownerWallet);
+    addWallet(receipt?.payee?.walletAddress);
+    addWallet(receipt?.proof?.sender);
+    addWallet(receipt?.proof?.recipient);
+  }
+
+  return wallets;
+}
+
+function sortNanoReceiptsNewestFirst(receipts) {
+  return [...receipts].sort((left, right) => {
+    const leftTime = Date.parse(left?.recordedAt || left?.proof?.recordedAt || left?.createdAt || "");
+    const rightTime = Date.parse(right?.recordedAt || right?.proof?.recordedAt || right?.createdAt || "");
+    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+  });
+}
+
+export function buildNanoMetricsModel(metrics, options = {}) {
+  const activity = options.activity || null;
+  const receipts = Array.isArray(activity?.receipts) ? activity.receipts : [];
+  const verifiedArcReceipts = receipts.filter(isVerifiedNanoArcProofReceipt);
+  const latestReceipt = sortNanoReceiptsNewestFirst(receipts)[0] || null;
+  const latestVerifiedReceipt = sortNanoReceiptsNewestFirst(verifiedArcReceipts)[0] || null;
+  const latestReceiptStatus = latestReceipt ? buildNanoReceiptStatusModel(latestReceipt) : null;
+  const verifiedArcPaymentCount = verifiedArcReceipts.length;
+  const activityBudgetCount = Array.isArray(activity?.budgets)
+    ? activity.budgets.length
+    : activity?.budget
+      ? 1
+      : 0;
+  const activitySpendIntentCount = Array.isArray(activity?.spendIntents) ? activity.spendIntents.length : 0;
+  const activityApprovedSpendIntentCount = (activity?.spendIntents || [])
+    .filter((intent) => ["approved", "payment_recorded"].includes(String(intent?.status || "").toLowerCase()))
+    .length;
+  const totalVerifiedUsdcVolume = Number(metrics?.totalRecordedPaymentValue || 0)
+    || verifiedArcReceipts.reduce((total, receipt) => total + Number(receipt?.amount || 0), 0);
+  const averageVerifiedPaymentSize = verifiedArcPaymentCount > 0
+    ? totalVerifiedUsdcVolume / verifiedArcPaymentCount
+    : 0;
+  const activityWallets = collectNanoActivityWallets(activity);
+  const sourceBacked = Boolean(metrics || activity);
+
   return {
-    budgetCount: String(metrics?.budgetCount || 0),
-    spendIntentCount: String(metrics?.spendIntentCount || 0),
-    approvedSpendIntentCount: String(metrics?.approvedSpendIntentCount || 0),
-    receiptCount: String(metrics?.receiptCount || 0),
+    sourceLabel: sourceBacked ? "Router-backed activity" : "Session activity",
+    sourceHelper: sourceBacked
+      ? "These numbers come from stored Nano router activity."
+      : "These numbers reflect this browser session only.",
+    emptyTitle: "No verified Nano payments yet.",
+    emptyBody: "Create a budget, approve a source spend, pay on Arc, and verify proof to update this section.",
+    hasVerifiedPayments: verifiedArcPaymentCount > 0 || totalVerifiedUsdcVolume > 0,
+    budgetCount: String(metrics?.budgetCount ?? activityBudgetCount),
+    spendIntentCount: String(metrics?.spendIntentCount ?? activitySpendIntentCount),
+    approvedSpendIntentCount: String(metrics?.approvedSpendIntentCount ?? activityApprovedSpendIntentCount),
+    receiptCount: String(metrics?.receiptCount ?? receipts.length),
+    verifiedArcPaymentCount: String(verifiedArcPaymentCount),
+    uniqueWalletCount: String(activityWallets.size),
+    latestProofStatus: latestReceiptStatus?.label || "No proof yet",
+    latestVerifiedReceipt: latestVerifiedReceipt?.proof?.txHash
+      ? shortWallet(latestVerifiedReceipt.proof.txHash)
+      : "None yet",
     totalAuthorizedBudget: formatNanoUsdc(metrics?.totalAuthorizedBudget || 0),
     totalApprovedIntentValue: formatNanoUsdc(metrics?.totalApprovedIntentValue || 0),
     totalRecordedPaymentValue: formatNanoUsdc(metrics?.totalRecordedPaymentValue || 0),
+    totalVerifiedUsdcVolume: formatNanoUsdc(totalVerifiedUsdcVolume),
+    averageVerifiedPaymentSize: formatNanoUsdc(averageVerifiedPaymentSize),
     availableBudget: formatNanoUsdc(metrics?.availableBudget || 0),
   };
 }

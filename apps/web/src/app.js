@@ -2567,7 +2567,7 @@ function renderNanoPage() {
   const intents = activity?.spendIntents || [];
   const receipts = activity?.receipts || [];
   const receiptsByIntent = selectedNanoReceiptsByIntent();
-  const metricsModel = buildNanoMetricsModel(state.nano.metrics);
+  const metricsModel = buildNanoMetricsModel(state.nano.metrics, { activity });
   const sourcePayoutWalletModel = buildNanoRecipientWalletModel(state.nano.sourcePayoutWallet);
   const spendTotal = nanoPlannedSpendRows.reduce((total, item) => total + item.amount, 0);
   const mainAgentRemainder = Math.max(0, Number(((budget?.amount || 1) - spendTotal).toFixed(6)));
@@ -2775,14 +2775,26 @@ function renderNanoPage() {
             </article>
 
             <article class="nano-panel reveal-on-scroll">
-              <p class="mini-label">Metrics</p>
-              <h2>Run metrics</h2>
+              <p class="mini-label">${escapeHtml(metricsModel.sourceLabel)}</p>
+              <h2>Nano activity</h2>
+              <p>${escapeHtml(metricsModel.sourceHelper)}</p>
               <div class="nano-metrics-grid">
-                <div><strong>${escapeHtml(metricsModel.budgetCount)}</strong><span>Budgets</span></div>
-                <div><strong>${escapeHtml(metricsModel.spendIntentCount)}</strong><span>Spend intents</span></div>
-                <div><strong>${escapeHtml(metricsModel.receiptCount)}</strong><span>Receipts</span></div>
-                <div><strong>${escapeHtml(metricsModel.totalRecordedPaymentValue)}</strong><span>Recorded value</span></div>
+                <div><strong>${escapeHtml(metricsModel.budgetCount)}</strong><span>Budgets created</span></div>
+                <div><strong>${escapeHtml(metricsModel.receiptCount)}</strong><span>Proof records</span></div>
+                <div><strong>${escapeHtml(metricsModel.verifiedArcPaymentCount)}</strong><span>Verified Arc payments</span></div>
+                <div><strong>${escapeHtml(metricsModel.totalVerifiedUsdcVolume)}</strong><span>Verified USDC volume</span></div>
               </div>
+              ${!metricsModel.hasVerifiedPayments ? `
+                <div class="empty-inline nano-empty-inline">
+                  <span class="empty-inline__mark" aria-hidden="true"></span>
+                  <div><strong>${escapeHtml(metricsModel.emptyTitle)}</strong><p>${escapeHtml(metricsModel.emptyBody)}</p></div>
+                </div>
+              ` : `
+                <div class="nano-metrics-detail">
+                  <div><span>Average verified payment</span><strong>${escapeHtml(metricsModel.averageVerifiedPaymentSize)}</strong></div>
+                  <div><span>Latest proof status</span><strong>${escapeHtml(metricsModel.latestProofStatus)}</strong></div>
+                </div>
+              `}
               ${state.nano.metricsLoading ? `<p class="nano-helper">Loading Nano metrics...</p>` : ""}
               ${state.nano.metricsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.metricsError)}</p>` : ""}
             </article>
@@ -2860,7 +2872,7 @@ function renderNanoPageSimplified() {
   const intents = activity?.spendIntents || [];
   const receipts = activity?.receipts || [];
   const receiptsByIntent = selectedNanoReceiptsByIntent();
-  const metricsModel = buildNanoMetricsModel(state.nano.metrics);
+  const metricsModel = buildNanoMetricsModel(state.nano.metrics, { activity });
   const budgetValidation = validateNanoBudgetAmount(state.nano.budgetAmount);
   const goalValid = Boolean(state.nano.budgetGoal.trim());
   const sourcePayoutWalletModel = buildNanoRecipientWalletModel(state.nano.sourcePayoutWallet);
@@ -3300,14 +3312,27 @@ function renderNanoPageSimplified() {
 
       <section class="nano-bottom-grid">
         <article class="nano-panel reveal-on-scroll">
-          <p class="mini-label">Nano activity</p>
+          <p class="mini-label">${escapeHtml(metricsModel.sourceLabel)}</p>
           <h2>Nano activity</h2>
+          <p>${escapeHtml(metricsModel.sourceHelper)}</p>
           <div class="nano-metrics-grid">
-            <div><strong>${escapeHtml(metricsModel.budgetCount)}</strong><span>Budgets</span></div>
-            <div><strong>${escapeHtml(metricsModel.spendIntentCount)}</strong><span>Planned spends</span></div>
-            <div><strong>${escapeHtml(metricsModel.approvedSpendIntentCount)}</strong><span>Approved spends</span></div>
+            <div><strong>${escapeHtml(metricsModel.budgetCount)}</strong><span>Budgets created</span></div>
             <div><strong>${escapeHtml(metricsModel.receiptCount)}</strong><span>Proof records</span></div>
+            <div><strong>${escapeHtml(metricsModel.verifiedArcPaymentCount)}</strong><span>Verified Arc payments</span></div>
+            <div><strong>${escapeHtml(metricsModel.totalVerifiedUsdcVolume)}</strong><span>Verified USDC volume</span></div>
           </div>
+          ${!metricsModel.hasVerifiedPayments ? `
+            <div class="empty-inline nano-empty-inline">
+              <span class="empty-inline__mark" aria-hidden="true"></span>
+              <div><strong>${escapeHtml(metricsModel.emptyTitle)}</strong><p>${escapeHtml(metricsModel.emptyBody)}</p></div>
+            </div>
+          ` : `
+            <div class="nano-metrics-detail">
+              <div><span>Average verified payment</span><strong>${escapeHtml(metricsModel.averageVerifiedPaymentSize)}</strong></div>
+              <div><span>Latest proof status</span><strong>${escapeHtml(metricsModel.latestProofStatus)}</strong></div>
+              <div><span>Latest verified receipt</span><strong>${escapeHtml(metricsModel.latestVerifiedReceipt)}</strong></div>
+            </div>
+          `}
           ${state.nano.metricsLoading ? `<p class="nano-helper">Loading Nano activity...</p>` : ""}
           ${state.nano.metricsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.metricsError)}</p>` : ""}
         </article>

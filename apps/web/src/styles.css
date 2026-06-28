@@ -2002,6 +2002,41 @@ button[data-open-dispute] {
   font-size: 0.78rem;
 }
 
+.nano-metrics-detail {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.nano-metrics-detail div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.014);
+}
+
+.nano-metrics-detail span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.nano-metrics-detail strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.nano-empty-inline {
+  margin-top: 14px;
+}
+
 .nano-result-copy {
   border: 1px solid rgba(255, 255, 255, 0.052);
   border-radius: 22px;

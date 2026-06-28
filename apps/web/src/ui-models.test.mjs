@@ -888,9 +888,84 @@ test("agent display fallbacks do not fake paid history or reviews", () => {
 test("Nano metrics use zero fallbacks without inventing payment data", () => {
   const model = buildNanoMetricsModel(null);
 
+  assert.equal(model.sourceLabel, "Session activity");
   assert.equal(model.budgetCount, "0");
   assert.equal(model.totalAuthorizedBudget, "0 USDC");
   assert.equal(model.totalRecordedPaymentValue, "0 USDC");
+  assert.equal(model.verifiedArcPaymentCount, "0");
+  assert.equal(model.totalVerifiedUsdcVolume, "0 USDC");
+  assert.equal(model.averageVerifiedPaymentSize, "0 USDC");
+  assert.equal(model.latestProofStatus, "No proof yet");
+  assert.equal(model.latestVerifiedReceipt, "None yet");
+  assert.equal(model.emptyTitle, "No verified Nano payments yet.");
+  assert.match(model.emptyBody, /verify proof/);
+  assert.doesNotMatch(Object.values(model).join(" "), /revenue|earnings|traction|paid users/i);
+});
+
+test("Nano metrics count only verified Arc proof as paid usage", () => {
+  const verifiedTx = `0x${"a".repeat(64)}`;
+  const gatewayTx = `0x${"b".repeat(64)}`;
+  const model = buildNanoMetricsModel({
+    budgetCount: 1,
+    spendIntentCount: 4,
+    approvedSpendIntentCount: 3,
+    receiptCount: 4,
+    totalAuthorizedBudget: 1,
+    totalApprovedIntentValue: 0.14,
+    totalRecordedPaymentValue: 0.05,
+    availableBudget: 0.95,
+  }, {
+    activity: {
+      budget: { ownerWallet: "0x1111111111111111111111111111111111111111" },
+      spendIntents: [
+        { ownerWallet: "0x1111111111111111111111111111111111111111", payee: { walletAddress: "0x2222222222222222222222222222222222222222" } },
+        { ownerWallet: "0x1111111111111111111111111111111111111111", payee: { walletAddress: "0x3333333333333333333333333333333333333333" } },
+      ],
+      receipts: [
+        {
+          amount: 0.05,
+          paymentState: "recorded",
+          recordedAt: "2026-06-01T12:00:00.000Z",
+          proof: {
+            proofType: "arc_tx",
+            paymentState: "recorded",
+            txHash: verifiedTx,
+            sender: "0x1111111111111111111111111111111111111111",
+            recipient: "0x2222222222222222222222222222222222222222",
+          },
+        },
+        {
+          amount: 0.03,
+          paymentState: "recorded",
+          recordedAt: "2026-06-01T12:01:00.000Z",
+          proof: { proofType: "local", paymentState: "recorded", txHash: null },
+        },
+        {
+          amount: 0.04,
+          paymentState: "recorded",
+          recordedAt: "2026-06-01T12:02:00.000Z",
+          proof: { proofType: "circle_gateway", paymentState: "recorded", txHash: gatewayTx },
+        },
+        {
+          amount: 0.02,
+          paymentState: "failed",
+          recordedAt: "2026-06-01T12:03:00.000Z",
+          proof: { proofType: "arc_tx", paymentState: "failed", txHash: verifiedTx },
+        },
+      ],
+    },
+  });
+
+  assert.equal(model.sourceLabel, "Router-backed activity");
+  assert.equal(model.budgetCount, "1");
+  assert.equal(model.receiptCount, "4");
+  assert.equal(model.verifiedArcPaymentCount, "1");
+  assert.equal(model.totalVerifiedUsdcVolume, "0.05 USDC");
+  assert.equal(model.averageVerifiedPaymentSize, "0.05 USDC");
+  assert.equal(model.uniqueWalletCount, "3");
+  assert.equal(model.latestProofStatus, "Proof rejected");
+  assert.equal(model.latestVerifiedReceipt, "0xaaaa...aaaa");
+  assert.equal(model.hasVerifiedPayments, true);
 });
 
 test("wallet-scoped dashboard separates buyer tasks owned agents and owned-agent earnings", () => {
