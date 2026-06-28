@@ -520,6 +520,10 @@ test("Nano approved source spend is not paid", () => {
 
   assert.equal(decision.status, "Approved");
   assert.equal(source.unlocked, false);
+  assert.equal(source.isUnlocked, false);
+  assert.equal(source.canShowInResult, false);
+  assert.equal(source.unlockStatus, "locked");
+  assert.equal(source.proofStatus, "Approved, not paid yet");
   assert.equal(source.status, "Approved, not paid yet");
 });
 
@@ -531,7 +535,13 @@ test("Nano source insight remains locked before verified proof", () => {
 
   assert.equal(missing.title, "Source insight locked");
   assert.equal(missing.unlocked, false);
+  assert.equal(missing.isUnlocked, false);
+  assert.equal(missing.canShowInResult, false);
+  assert.equal(missing.unlockStatus, "locked");
+  assert.equal(missing.proofStatus, "Not paid yet");
   assert.equal(missing.status, "Planned");
+  assert.equal(missing.priceUsdc, 0.01);
+  assert.equal(missing.priceLabel, "0.01 USDC");
 });
 
 test("Nano source insight unlocks only after verified Arc proof", () => {
@@ -550,7 +560,14 @@ test("Nano source insight unlocks only after verified Arc proof", () => {
 
   assert.equal(source.title, "Source insight unlocked");
   assert.equal(source.unlocked, true);
+  assert.equal(source.isUnlocked, true);
+  assert.equal(source.canShowInResult, true);
+  assert.equal(source.unlockStatus, "unlocked");
+  assert.equal(source.proofStatus, "Paid with proof");
   assert.equal(source.status, "Paid with proof");
+  assert.equal(source.recipientWallet, "0x1111111111111111111111111111111111111111");
+  assert.equal(source.starterOrLiveLabel, "Live source insight");
+  assert.match(source.contributionSummary, /Unlocked source context/);
   assert.match(source.insight, /Stablecoins became/);
 });
 
@@ -564,7 +581,45 @@ test("Nano local receipt does not unlock source insight as Paid with proof", () 
   });
 
   assert.equal(source.unlocked, false);
+  assert.equal(source.isUnlocked, false);
+  assert.equal(source.canShowInResult, false);
+  assert.equal(source.proofStatus, "Local receipt");
   assert.equal(source.status, "Local receipt");
+});
+
+test("Nano rejected proof keeps source insight locked", () => {
+  const source = buildNanoSourceUnlockPresentation({
+    intent: { status: "approved", amount: 0.01, payee: { walletAddress: "0x1111111111111111111111111111111111111111" } },
+    receipt: {
+      paymentState: "failed",
+      proof: {
+        proofType: "arc_tx",
+        paymentState: "failed",
+        txHash: `0x${"f".repeat(64)}`,
+      },
+    },
+  });
+
+  assert.equal(source.isUnlocked, false);
+  assert.equal(source.canShowInResult, false);
+  assert.equal(source.unlockStatus, "locked");
+  assert.equal(source.proofStatus, "Proof rejected");
+  assert.equal(source.status, "Proof rejected");
+});
+
+test("Nano source insight stays locked when proof is missing", () => {
+  const source = buildNanoSourceUnlockPresentation({
+    hasBudget: true,
+    intent: null,
+    receipt: null,
+  });
+
+  assert.equal(source.label, "Active source insight");
+  assert.equal(source.starterOrLiveLabel, "Active source insight");
+  assert.equal(source.isUnlocked, false);
+  assert.equal(source.canShowInResult, false);
+  assert.equal(source.proofStatus, "Not paid yet");
+  assert.match(source.lockedSummary, /Verify Arc proof/);
 });
 
 test("Nano result preview waits for source proof before verified payment", () => {
@@ -579,15 +634,48 @@ test("Nano result preview waits for source proof before verified payment", () =>
 });
 
 test("Nano result preview references unlocked source after verified proof", () => {
+  const sourceUnlock = buildNanoSourceUnlockPresentation({
+    intent: { status: "approved", amount: 0.01, payee: { walletAddress: "0x1111111111111111111111111111111111111111" } },
+    receipt: {
+      paymentState: "recorded",
+      proof: {
+        proofType: "arc_tx",
+        paymentState: "recorded",
+        txHash: `0x${"b".repeat(64)}`,
+      },
+    },
+  });
   const preview = buildNanoResultPreviewPresentation({
     goal: "Create a short brief about stablecoin payments.",
     hasVerifiedSourceProof: true,
+    sourceUnlock,
   });
 
   assert.equal(preview.status, "Source-backed preview");
-  assert.equal(preview.paidSourceUsed, "Starter source insight");
+  assert.equal(preview.paidSourceUsed, "Live source insight");
   assert.equal(preview.proofStatus, "Paid with proof");
+  assert.match(preview.body, /Stablecoins became the default settlement layer/);
   assert.match(preview.body, /tiny payments/);
+});
+
+test("Nano result preview does not reference source contribution before verified proof", () => {
+  const sourceUnlock = buildNanoSourceUnlockPresentation({
+    intent: { status: "approved", amount: 0.01, payee: { walletAddress: "0x1111111111111111111111111111111111111111" } },
+    receipt: {
+      paymentState: "recorded",
+      proof: { proofType: "local", paymentState: "recorded" },
+    },
+  });
+  const preview = buildNanoResultPreviewPresentation({
+    goal: "Create a short brief about stablecoin payments.",
+    hasVerifiedSourceProof: true,
+    sourceUnlock,
+  });
+
+  assert.equal(sourceUnlock.canShowInResult, false);
+  assert.equal(preview.status, "Waiting for source proof");
+  assert.equal(preview.paidSourceUsed, "Waiting for verified source proof");
+  assert.doesNotMatch(preview.body, /Stablecoins became the default settlement layer/);
 });
 
 test("Nano run progress follows budget approval proof and result states", () => {
@@ -641,9 +729,11 @@ test("Nano pay action is enabled only for approved spends with a valid recipient
     status: "approved",
     payee: { walletAddress: "0x1111111111111111111111111111111111111111" },
   }, {
+    paymentState: "recorded",
     receiptId: "receipt",
     proof: {
       proofType: "arc_tx",
+      paymentState: "recorded",
       txHash: `0x${"a".repeat(64)}`,
     },
   });
@@ -719,7 +809,19 @@ test("Nano Arc receipt without a valid tx hash is not Paid with proof", () => {
 
   assert.equal(model.label, "Proof pending");
   assert.notEqual(model.label, "Paid with proof");
-  assert.match(model.helper, /valid transaction hash/);
+  assert.match(model.helper, /recorded payment and valid transaction hash/);
+});
+
+test("Nano Arc receipt without recorded payment state is not Paid with proof", () => {
+  const model = buildNanoReceiptStatusModel({
+    proof: {
+      proofType: "arc_tx",
+      txHash: `0x${"c".repeat(64)}`,
+    },
+  });
+
+  assert.equal(model.label, "Proof pending");
+  assert.notEqual(model.label, "Paid with proof");
 });
 
 test("Nano rejected proof does not show Paid with proof", () => {
@@ -752,6 +854,23 @@ test("Gateway and x402 proof labels remain planned-only", () => {
   assert.equal(x402.label, "x402 proof metadata");
   assert.equal(x402.tone, "pending");
   assert.match(x402.helper, /planned next/);
+});
+
+test("Gateway and x402 proof metadata do not unlock Nano source insight", () => {
+  for (const proofType of ["circle_gateway", "x402"]) {
+    const source = buildNanoSourceUnlockPresentation({
+      intent: { status: "approved", amount: 0.01, payee: { walletAddress: "0x1111111111111111111111111111111111111111" } },
+      receipt: {
+        paymentState: "recorded",
+        proof: { proofType, paymentState: "recorded", txHash: null },
+      },
+    });
+
+    assert.equal(source.isUnlocked, false);
+    assert.equal(source.canShowInResult, false);
+    assert.equal(source.unlockStatus, "locked");
+    assert.notEqual(source.proofStatus, "Paid with proof");
+  }
 });
 
 test("agent display fallbacks do not fake paid history or reviews", () => {

@@ -2884,11 +2884,16 @@ function renderNanoPageSimplified() {
   const canVerifyArcProof = Boolean(arcProofIntent && !arcProofReceipt && state.nano.arcProofTxHash.trim());
   const hasApprovedSpend = intents.some((intent) => intent.status === "approved");
   const hasPendingApprovedSpend = intents.some((intent) => intent.status === "approved" && !receiptsByIntent.has(intent.intentId));
-  const hasVerifiedSourceProof = Boolean(sourceReceipt && buildNanoReceiptStatusModel(sourceReceipt).label === "Paid with proof");
+  const sourceUnlock = buildNanoSourceUnlockPresentation({
+    hasBudget: Boolean(budget),
+    intent: sourceIntent,
+    receipt: sourceReceipt,
+    recipientWalletModel: sourcePayoutWalletModel,
+  });
+  const hasVerifiedSourceProof = Boolean(sourceUnlock.canShowInResult);
   const hasVerifiedReceipt = hasVerifiedSourceProof;
   const hasProofPending = state.nano.arcProofStatus === "pending" || Boolean(state.nano.arcProofTxHash.trim() && arcProofIntent && !arcProofReceipt);
   const agentDecision = buildNanoAgentDecisionPresentation({ hasBudget: Boolean(budget), intent: sourceIntent, receipt: sourceReceipt });
-  const sourceUnlock = buildNanoSourceUnlockPresentation({ intent: sourceIntent, receipt: sourceReceipt, recipientWalletModel: sourcePayoutWalletModel });
   const runProgress = buildNanoRunProgressPresentation({
     hasBudget: Boolean(budget),
     hasSpendPlan: hasFullNanoPlan,
@@ -2899,6 +2904,7 @@ function renderNanoPageSimplified() {
   const resultPreview = buildNanoResultPreviewPresentation({
     goal: state.nano.budgetGoal,
     hasVerifiedSourceProof,
+    sourceUnlock,
   });
   const firstUnapprovedIntent = intents.find((intent) => intent.status === "proposed");
   const primaryAction = (() => {

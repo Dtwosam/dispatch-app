@@ -20,6 +20,17 @@ function normalizeComparableValue(value) {
   return value == null ? "" : String(value);
 }
 
+function isRecordedPaymentState(receipt) {
+  const paymentState = String(receipt?.paymentState || receipt?.proof?.paymentState || "").toLowerCase();
+  return paymentState === "recorded";
+}
+
+function isVerifiedNanoArcProofReceipt(receipt) {
+  return String(receipt?.proof?.proofType || "").toLowerCase() === "arc_tx"
+    && isRecordedPaymentState(receipt)
+    && Boolean(buildArcTransactionLink(receipt?.proof?.txHash));
+}
+
 export function walletNetworkSnapshotsEqual(left = {}, right = {}) {
   return normalizeComparableWallet(left.walletAddress) === normalizeComparableWallet(right.walletAddress)
     && normalizeComparableValue(left.chainId) === normalizeComparableValue(right.chainId)
@@ -285,29 +296,55 @@ export function buildNanoAgentDecisionPresentation({ hasBudget = false, intent =
   };
 }
 
-export function buildNanoSourceUnlockPresentation({ intent = null, receipt = null, recipientWalletModel = null } = {}) {
+export function buildNanoSourceUnlockPresentation({
+  intent = null,
+  receipt = null,
+  recipientWalletModel = null,
+  hasBudget = false,
+} = {}) {
   const receiptStatus = receipt ? buildNanoReceiptStatusModel(receipt) : null;
   const intentStatus = intent ? buildNanoSpendIntentStatusModel(intent, receipt) : null;
-  const unlocked = receiptStatus?.label === "Paid with proof";
+  const unlocked = isVerifiedNanoArcProofReceipt(receipt);
   const status = receiptStatus || intentStatus || { label: "Planned", tone: "pending" };
+  const sourcePlan = nanoSourcePaymentSpendPlanRows.find((row) => row.payeeId === "source_unlock") || nanoSourcePaymentSpendPlanRows[0];
   const recipient = recipientWalletModel?.valid
     ? recipientWalletModel.label
     : intent?.payee?.walletAddress
       ? shortWallet(intent.payee.walletAddress)
       : (recipientWalletModel?.label || "No recipient wallet");
+  const recipientWallet = intent?.payee?.walletAddress || recipientWalletModel?.wallet || "";
+  const priceUsdc = Number(intent?.amount ?? sourcePlan?.amount ?? 0.01);
+  const reason = intent?.reason || sourcePlan?.reason || "Adds source-backed context for the final result.";
+  const unlockedInsight = "Stablecoins became the default settlement layer for crypto-native payments because they allow fast dollar-denominated transfers without waiting on traditional banking rails.";
+  const contributionSummary = receipt?.contributionSummary || sourcePlan?.contributionSummary || "Unlocked source context for the final brief.";
+  const starterOrLiveLabel = intent ? "Live source insight" : hasBudget ? "Active source insight" : "Starter source insight";
+  const proofStatus = unlocked
+    ? "Paid with proof"
+    : receiptStatus?.label || (intent?.status === "approved" ? "Approved, not paid yet" : "Not paid yet");
   return {
+    label: starterOrLiveLabel,
+    isUnlocked: unlocked,
     unlocked,
+    canShowInResult: unlocked,
+    unlockStatus: unlocked ? "unlocked" : "locked",
+    proofStatus,
     title: unlocked ? "Source insight unlocked" : "Source insight locked",
     copy: unlocked
       ? "This paid source is now available for the result preview."
       : "The agent wants to unlock this source because the final result needs grounded context.",
     status: status.label,
     tone: status.tone,
-    priceLabel: intent?.amount != null ? formatNanoUsdc(intent.amount) : "0.01 USDC",
+    priceUsdc,
+    priceLabel: formatNanoUsdc(priceUsdc),
+    recipientWallet,
     recipient,
-    reason: "Adds source-backed context for the final result.",
-    insightLabel: "Starter source insight",
-    insight: "Stablecoins became the default settlement layer for crypto-native payments because they allow fast dollar-denominated transfers without waiting on traditional banking rails.",
+    reason,
+    lockedSummary: "Verify Arc proof before this source appears in the result preview.",
+    unlockedInsight,
+    contributionSummary,
+    starterOrLiveLabel,
+    insightLabel: starterOrLiveLabel,
+    insight: unlockedInsight,
   };
 }
 
@@ -357,18 +394,22 @@ export function buildNanoRunProgressPresentation({
   };
 }
 
-export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourceProof = false } = {}) {
+export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourceProof = false, sourceUnlock = null } = {}) {
+  const canUseSource = sourceUnlock ? Boolean(sourceUnlock.canShowInResult) : hasVerifiedSourceProof;
+  const sourceLabel = sourceUnlock?.starterOrLiveLabel || "Starter source insight";
+  const sourceInsight = sourceUnlock?.unlockedInsight
+    || "Stablecoins became one of crypto's most useful products because they make dollar payments fast, programmable, and global.";
   return {
     title: "Result preview",
     subtitle: "See what this Nano run produced and which paid source supported it.",
-    status: hasVerifiedSourceProof ? "Source-backed preview" : "Waiting for source proof",
-    tone: hasVerifiedSourceProof ? "good" : "pending",
-    cta: hasVerifiedSourceProof ? "Review result" : "View result",
+    status: canUseSource ? "Source-backed preview" : "Waiting for source proof",
+    tone: canUseSource ? "good" : "pending",
+    cta: canUseSource ? "Review result" : "View result",
     goal: goal || "Create a short brief about stablecoin payments.",
-    paidSourceUsed: hasVerifiedSourceProof ? "Starter source insight" : "Waiting for verified source proof",
-    proofStatus: hasVerifiedSourceProof ? "Paid with proof" : "Not paid yet",
-    body: hasVerifiedSourceProof
-      ? "Stablecoins quietly became one of crypto's most useful products because they make dollar payments fast, programmable, and global. For agents, that matters because tiny payments can now happen per source, per API call, or per task without forcing users into subscriptions."
+    paidSourceUsed: canUseSource ? sourceLabel : "Waiting for verified source proof",
+    proofStatus: canUseSource ? "Paid with proof" : "Not paid yet",
+    body: canUseSource
+      ? `${sourceInsight} For agents, that matters because tiny payments can now happen per source, per API call, or per task without forcing users into subscriptions.`
       : "The result preview is waiting for source proof.",
     label: "Starter brief preview",
   };
@@ -479,11 +520,11 @@ export function buildNanoReceiptStatusModel(receipt) {
     };
   }
   if (proofType === "arc_tx") {
-    if (!buildArcTransactionLink(receipt.proof?.txHash)) {
+    if (!isVerifiedNanoArcProofReceipt(receipt)) {
       return {
         label: "Proof pending",
         tone: "pending",
-        helper: "Arc proof needs a valid transaction hash before this spend is marked paid.",
+        helper: "Arc proof needs a recorded payment and valid transaction hash before this spend is marked paid.",
       };
     }
     return {
