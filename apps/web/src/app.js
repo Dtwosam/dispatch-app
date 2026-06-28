@@ -2967,6 +2967,9 @@ function renderNanoPageSimplified() {
           : hasPendingApprovedSpend
             ? "Not paid yet"
             : "Not paid yet";
+  const submittedArcTxLink = ["pending", "verified"].includes(state.nano.arcProofStatus)
+    ? buildArcTransactionLink(state.nano.arcProofTxHash)
+    : null;
 
   el.appRoot.innerHTML = `
     <section data-structure="nano-source-payment" class="nano-page nano-page--simple">
@@ -3195,6 +3198,12 @@ function renderNanoPageSimplified() {
               <small>Paste the Arc Testnet transaction hash if the wallet transfer was already submitted.</small>
             </label>
             <p class="nano-helper">${escapeHtml(nanoPayAction.reason)}</p>
+            ${submittedArcTxLink ? `
+              <p class="nano-helper">
+                Submitted Arc transaction:
+                <a href="${escapeHtml(submittedArcTxLink)}" target="_blank" rel="noreferrer">${escapeHtml(shortWallet(state.nano.arcProofTxHash))}</a>
+              </p>
+            ` : ""}
             ${state.nano.arcProofMessage ? `<p class="nano-helper ${state.nano.arcProofStatus === "rejected" || state.nano.arcProofStatus === "unavailable" ? "nano-helper--warn" : ""}">${escapeHtml(state.nano.arcProofMessage)}</p>` : ""}
           </div>
         </article>

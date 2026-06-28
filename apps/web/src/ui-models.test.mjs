@@ -1647,6 +1647,14 @@ test("Arc transaction links are only generated for valid hashes", () => {
   assert.equal(buildArcTransactionLink("0x1234"), null);
 });
 
+test("Nano tx hash display requires a real valid Arc transaction hash", () => {
+  const txHash = `0x${"9".repeat(64)}`;
+  assert.equal(buildArcTransactionLink(txHash), `https://testnet.arcscan.app/tx/${txHash}`);
+  assert.equal(buildArcTransactionLink(""), null);
+  assert.equal(buildArcTransactionLink("0xnot_real"), null);
+  assert.equal(buildArcTransactionLink("local_receipt_only"), null);
+});
+
 test("task lifecycle prefers backend settlement summaries for refund-ready and disputed messaging", () => {
   const refundModel = buildTaskLifecycleModel({
     taskId: "task_refund_ready",

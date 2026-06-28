@@ -126,6 +126,22 @@ test("Nano Arc proof verifier rejects wrong token payer payee and amount", async
   }
 });
 
+test("Nano Arc proof verifier rejects a mismatched sender", async () => {
+  const verifier = makeVerifier(successfulReceipt());
+
+  const result = await verifier.verify({
+    txHash,
+    expectedPayer: other,
+    expectedPayee: payee,
+    expectedAmountUsdc: 0.05,
+    tokenAddress: ARC_USDC_ADDRESS,
+    network: "Arc Testnet",
+  });
+
+  assert.equal(result.proofStatus, "rejected");
+  assert.equal(result.matched, null);
+});
+
 test("Nano Arc proof verifier verifies only matching Arc USDC transfer logs", async () => {
   const verifier = makeVerifier(successfulReceipt());
 
@@ -144,4 +160,26 @@ test("Nano Arc proof verifier verifies only matching Arc USDC transfer logs", as
   assert.equal(result.matched?.from, payer);
   assert.equal(result.matched?.to, payee);
   assert.equal(result.matched?.amountUsdc, 0.05);
+});
+
+test("Nano Arc proof verifier accepts the current source unlock amount", async () => {
+  const verifier = makeVerifier(successfulReceipt({
+    logs: [{
+      address: ARC_USDC_ADDRESS,
+      topics: [transferTopic, topicForAddress(payer), topicForAddress(payee)],
+      data: dataForAmount("0.01"),
+    }],
+  }));
+
+  const result = await verifier.verify({
+    txHash,
+    expectedPayer: payer,
+    expectedPayee: payee,
+    expectedAmountUsdc: 0.01,
+    tokenAddress: ARC_USDC_ADDRESS,
+    network: "Arc Testnet",
+  });
+
+  assert.equal(result.proofStatus, "verified");
+  assert.equal(result.matched?.amountUsdc, 0.01);
 });
