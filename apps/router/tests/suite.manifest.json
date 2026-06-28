@@ -9,6 +9,7 @@
   { "file": "./tests/platformAgentLineup.test.ts" },
   { "file": "./tests/platformAgentBenchmarks.test.ts" },
   { "file": "./tests/platformAgentTaskPacks.test.ts" },
+  { "file": "./tests/publicBaseUrl.test.ts" },
   { "file": "./tests/settlementService.test.ts" },
   { "file": "./tests/storePersistence.test.ts" },
   { "file": "./tests/startupValidation.test.ts" },

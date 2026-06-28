@@ -375,7 +375,7 @@ export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourc
 }
 
 export function nanoApiUnavailableMessage() {
-  return "Nano API is unavailable. Budget creation and proof checks need the router API.";
+  return "Nano router is unavailable. Budget creation and proof checks need the Dispatch router API.";
 }
 
 export function formatNanoUsdc(value) {

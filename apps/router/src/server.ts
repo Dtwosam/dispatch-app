@@ -29,7 +29,7 @@ import { SafetyService } from "./services/safetyService";
 import { AdminService } from "./services/adminService";
 import { seedMarketplaceData } from "./seed/seedMarketplace";
 import { resolvePlatformAgentOwnerWallet } from "./services/platformAgentCatalog";
-import { resolveAllowedOrigins } from "./lib/publicBaseUrl";
+import { isAllowedOrigin, resolveAllowedOrigins } from "./lib/publicBaseUrl";
 import { validateRouterStartupEnv } from "./config/startupValidation";
 
 type OnchainAwareAgent = {
@@ -61,7 +61,7 @@ if (startupValidation.errors.length > 0) {
 const allowedOrigins = resolveAllowedOrigins();
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.has(origin) || /^http:\/\/localhost:\d+$/.test(origin))) {
+  if (origin && isAllowedOrigin(origin, allowedOrigins)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");

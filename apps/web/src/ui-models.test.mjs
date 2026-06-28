@@ -600,7 +600,10 @@ test("Nano run progress follows budget approval proof and result states", () => 
 });
 
 test("Nano API unavailable copy explains router dependency", () => {
-  assert.equal(nanoApiUnavailableMessage(), "Nano API is unavailable. Budget creation and proof checks need the router API.");
+  assert.equal(
+    nanoApiUnavailableMessage(),
+    "Nano router is unavailable. Budget creation and proof checks need the Dispatch router API.",
+  );
 });
 
 test("wallet network snapshots compare stable connected wallet state", () => {
