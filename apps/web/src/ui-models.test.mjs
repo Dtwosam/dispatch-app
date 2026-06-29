@@ -34,7 +34,10 @@ import {
   buildNanoPaymentActionModel,
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
+  buildNanoReceiptDetailModel,
   buildNanoResetDraftState,
+  buildNanoRunHistoryModel,
+  buildNanoSelectedRunModel,
   buildNanoResultPreviewPresentation,
   buildNanoRunProgressPresentation,
   buildNanoSourceUnlockPresentation,
@@ -447,8 +450,11 @@ test("Nano current step changes across wallet budget spend and proof states", ()
 
 test("Nano start new budget resets draft state without disconnecting wallet", () => {
   const current = {
+    budgets: [{ budgetId: "budget_1" }],
+    budgetsLoaded: true,
     selectedBudgetId: "budget_1",
     activity: { receipts: [] },
+    runActivities: { budget_1: { receipts: [] } },
     budgetGoal: "Keep this goal",
     budgetAmount: "1.00",
     budgetPreset: "1.00",
@@ -468,6 +474,13 @@ test("Nano start new budget resets draft state without disconnecting wallet", ()
   assert.equal(reset.actionPending, "");
   assert.equal(reset.sourcePayoutWallet, "0x1111111111111111111111111111111111111111");
   assert.equal(reset.budgetGoal, "Keep this goal");
+
+  const preserved = buildNanoResetDraftState(current, { preserveHistory: true });
+  assert.deepEqual(preserved.budgets, current.budgets);
+  assert.equal(preserved.budgetsLoaded, true);
+  assert.deepEqual(preserved.runActivities, current.runActivities);
+  assert.equal(preserved.selectedBudgetId, "");
+  assert.equal(preserved.activity, null);
 });
 
 test("Nano spend plan labels distinguish starter from active state", () => {
@@ -966,6 +979,312 @@ test("Nano metrics count only verified Arc proof as paid usage", () => {
   assert.equal(model.latestProofStatus, "Proof rejected");
   assert.equal(model.latestVerifiedReceipt, "0xaaaa...aaaa");
   assert.equal(model.hasVerifiedPayments, true);
+});
+
+test("Nano run history asks for wallet before exposing runs", () => {
+  const model = buildNanoRunHistoryModel({ wallet: "", budgets: [] });
+
+  assert.equal(model.walletConnected, false);
+  assert.deepEqual(model.runCards, []);
+  assert.equal(model.emptyTitle, "Connect a wallet to see Nano runs for that wallet.");
+  assert.doesNotMatch(`${model.title} ${model.subtitle} ${model.emptyTitle} ${model.emptyBody}`, /judge/i);
+});
+
+test("Nano run history returns honest empty state for connected wallet with no runs", () => {
+  const model = buildNanoRunHistoryModel({ wallet: "0x1111111111111111111111111111111111111111", budgets: [] });
+
+  assert.equal(model.walletConnected, true);
+  assert.deepEqual(model.runCards, []);
+  assert.equal(model.emptyTitle, "No Nano runs yet.");
+  assert.equal(model.emptyBody, "Create a budget to start a source-payment run.");
+});
+
+test("Nano run history cards use router-backed budget and activity fields", () => {
+  const txHash = `0x${"c".repeat(64)}`;
+  const budget = {
+    budgetId: "nano_budget_1",
+    runId: "nano_run_1",
+    goal: "Create a stablecoin brief",
+    amount: 1,
+    status: "spending",
+    createdAt: "2026-06-01T12:00:00.000Z",
+    updatedAt: "2026-06-01T12:01:00.000Z",
+  };
+  const activity = {
+    budget,
+    runContext: { goal: budget.goal, updatedAt: "2026-06-01T12:02:00.000Z" },
+    spendIntents: [
+      {
+        intentId: "intent_source",
+        payee: { payeeId: "source_unlock", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+        amount: 0.05,
+        reason: "Adds source-backed context.",
+        status: "payment_recorded",
+        updatedAt: "2026-06-01T12:03:00.000Z",
+      },
+      {
+        intentId: "intent_local",
+        payee: { payeeId: "summarizer", label: "Summarizer agent", walletAddress: null },
+        amount: 0.03,
+        reason: "Turns notes into a short summary.",
+        status: "payment_recorded",
+      },
+    ],
+    receipts: [
+      {
+        receiptId: "receipt_verified",
+        intentId: "intent_source",
+        amount: 0.05,
+        paymentState: "recorded",
+        contributionSummary: "Verified source unlock improved the brief.",
+        createdAt: "2026-06-01T12:04:00.000Z",
+        proof: { proofType: "arc_tx", paymentState: "recorded", txHash },
+      },
+      {
+        receiptId: "receipt_local",
+        intentId: "intent_local",
+        amount: 0.03,
+        paymentState: "recorded",
+        createdAt: "2026-06-01T12:05:00.000Z",
+        proof: { proofType: "local", paymentState: "recorded", txHash: null },
+      },
+    ],
+  };
+  const model = buildNanoRunHistoryModel({
+    wallet: "0x1111111111111111111111111111111111111111",
+    budgets: [budget],
+    activities: { [budget.budgetId]: activity },
+    selectedBudgetId: budget.budgetId,
+  });
+
+  assert.equal(model.runCards.length, 1);
+  assert.equal(model.runCards[0].goal, "Create a stablecoin brief");
+  assert.equal(model.runCards[0].budget, "1 USDC");
+  assert.equal(model.runCards[0].sourceStatus, "Paid with proof");
+  assert.equal(model.runCards[0].proofStatus, "Local receipt");
+  assert.equal(model.runCards[0].verifiedReceiptCount, "1");
+  assert.equal(model.runCards[0].selected, true);
+});
+
+test("Nano run history does not count rejected local pending or Gateway receipts as verified", () => {
+  const validTx = `0x${"d".repeat(64)}`;
+  const budget = {
+    budgetId: "nano_budget_2",
+    runId: "nano_run_2",
+    goal: "Check claims",
+    amount: 1,
+    status: "spending",
+    createdAt: "2026-06-01T12:00:00.000Z",
+    updatedAt: "2026-06-01T12:00:00.000Z",
+  };
+  const activity = {
+    budget,
+    spendIntents: [
+      { intentId: "rejected", payee: { payeeId: "source_unlock", label: "Source unlock" }, amount: 0.05, reason: "Context", status: "failed" },
+      { intentId: "gateway", payee: { payeeId: "gateway", label: "Gateway metadata" }, amount: 0.03, reason: "Metadata", status: "payment_recorded" },
+      { intentId: "pending", payee: { payeeId: "pending", label: "Pending Arc" }, amount: 0.04, reason: "Pending", status: "payment_recorded" },
+      { intentId: "local", payee: { payeeId: "local", label: "Local receipt" }, amount: 0.02, reason: "Local", status: "payment_recorded" },
+    ],
+    receipts: [
+      { intentId: "rejected", paymentState: "failed", proof: { proofType: "arc_tx", paymentState: "failed", txHash: validTx } },
+      { intentId: "gateway", paymentState: "recorded", proof: { proofType: "circle_gateway", paymentState: "recorded", txHash: validTx } },
+      { intentId: "pending", paymentState: "recorded", proof: { proofType: "arc_tx", paymentState: "recorded", txHash: "not-a-hash" } },
+      { intentId: "local", paymentState: "recorded", proof: { proofType: "local", paymentState: "recorded", txHash: null } },
+    ],
+  };
+  const model = buildNanoRunHistoryModel({
+    wallet: "0x1111111111111111111111111111111111111111",
+    budgets: [budget],
+    activities: { [budget.budgetId]: activity },
+  });
+
+  assert.equal(model.runCards[0].verifiedReceiptCount, "0");
+  assert.notEqual(model.runCards[0].sourceStatus, "Paid with proof");
+});
+
+test("Nano receipt detail only links valid transaction hashes and preserves missing detail fallback", () => {
+  const validTx = `0x${"e".repeat(64)}`;
+  const missing = buildNanoReceiptDetailModel(null, "nano_budget_missing");
+  assert.equal(missing.available, false);
+  assert.equal(missing.body, "Receipt detail unavailable from the current router response.");
+
+  const detail = buildNanoReceiptDetailModel({
+    budget: { budgetId: "nano_budget_detail" },
+    spendIntents: [
+      {
+        intentId: "intent_verified",
+        payee: { label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+        amount: 0.05,
+        reason: "Adds source-backed context.",
+        status: "payment_recorded",
+      },
+      {
+        intentId: "intent_fake_hash",
+        payee: { label: "Hook agent", walletAddress: null },
+        amount: 0.02,
+        reason: "Makes the brief easier to read.",
+        status: "payment_recorded",
+      },
+    ],
+    receipts: [
+      {
+        receiptId: "receipt_verified",
+        intentId: "intent_verified",
+        paymentState: "recorded",
+        contributionSummary: "Verified source unlock improved the brief.",
+        proof: { proofType: "arc_tx", paymentState: "recorded", txHash: validTx },
+      },
+      {
+        receiptId: "receipt_invalid",
+        intentId: "intent_fake_hash",
+        paymentState: "recorded",
+        proof: { proofType: "arc_tx", paymentState: "recorded", txHash: "0x123" },
+      },
+    ],
+  }, "nano_budget_detail");
+
+  assert.equal(detail.available, true);
+  assert.equal(detail.rows.length, 2);
+  assert.equal(detail.rows[0].proofState, "Paid with proof");
+  assert.match(detail.rows[0].txLink, /testnet\.arcscan\.app/);
+  assert.equal(detail.rows[0].contributionSummary, "Verified source unlock improved the brief.");
+  assert.equal(detail.rows[1].proofState, "Proof pending");
+  assert.equal(detail.rows[1].txLink, null);
+});
+
+test("Nano receipt detail does not invent source or result details", () => {
+  const detail = buildNanoReceiptDetailModel({
+    budget: { budgetId: "nano_budget_detail" },
+    spendIntents: [
+      {
+        intentId: "intent_without_receipt",
+        payee: { label: "Source unlock", walletAddress: null },
+        amount: 0.05,
+        reason: "",
+        status: "approved",
+      },
+    ],
+    receipts: [],
+  }, "nano_budget_detail");
+
+  assert.equal(detail.rows[0].reason, "No reason recorded.");
+  assert.equal(detail.rows[0].contributionSummary, "");
+  assert.equal(detail.rows[0].txLink, null);
+  assert.equal(detail.rows[0].proofState, "Approved, not paid yet");
+});
+
+test("Nano selected run label uses a real budget id safely", () => {
+  const empty = buildNanoSelectedRunModel({});
+  assert.equal(empty.active, false);
+  assert.equal(empty.label, "New Nano run");
+
+  const selected = buildNanoSelectedRunModel({
+    selectedBudgetId: "nano_budget_abcdefghijklmnopqrstuvwxyz",
+    budget: { budgetId: "nano_budget_abcdefghijklmnopqrstuvwxyz" },
+    activity: { receipts: [] },
+  });
+
+  assert.equal(selected.active, true);
+  assert.equal(selected.label, "Viewing Nano run: nano_b...wxyz");
+  assert.equal(selected.helper, "Continuing from router-backed run state.");
+  assert.equal(selected.detailAvailable, true);
+  assert.doesNotMatch(`${selected.label} ${selected.helper}`, /judge/i);
+});
+
+test("Nano selected run reports unavailable detail without inventing state", () => {
+  const selected = buildNanoSelectedRunModel({
+    selectedBudgetId: "nano_budget_missing",
+    budget: { budgetId: "nano_budget_missing" },
+    activity: null,
+  });
+
+  assert.equal(selected.active, true);
+  assert.equal(selected.helper, "Run detail unavailable from the current router response.");
+  assert.equal(selected.detailAvailable, false);
+});
+
+test("Nano run card exposes Continue run only for real budget cards", () => {
+  const disconnected = buildNanoRunHistoryModel({ wallet: "", budgets: [{ budgetId: "budget_1" }] });
+  assert.deepEqual(disconnected.runCards, []);
+
+  const connected = buildNanoRunHistoryModel({
+    wallet: "0x1111111111111111111111111111111111111111",
+    budgets: [{ budgetId: "budget_1", runId: "run_1", goal: "Run", amount: 1, status: "draft" }],
+  });
+  assert.equal(connected.runCards.length, 1);
+  assert.equal(connected.runCards[0].buttonLabel, "Continue run");
+});
+
+test("continued run with approved but unpaid source spend stays locked", () => {
+  const intent = {
+    intentId: "intent_source",
+    status: "approved",
+    amount: 0.05,
+    reason: "Adds source-backed context.",
+    payee: { payeeId: "source_unlock", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+  };
+  const source = buildNanoSourceUnlockPresentation({ hasBudget: true, intent, receipt: null });
+  const result = buildNanoResultPreviewPresentation({ hasVerifiedSourceProof: false, sourceUnlock: source });
+
+  assert.equal(source.canShowInResult, false);
+  assert.equal(source.proofStatus, "Approved, not paid yet");
+  assert.equal(result.paidSourceUsed, "Waiting for verified source proof");
+});
+
+test("continued run with rejected or local proof keeps source locked", () => {
+  const intent = {
+    intentId: "intent_source",
+    status: "payment_recorded",
+    amount: 0.05,
+    reason: "Adds source-backed context.",
+    payee: { payeeId: "source_unlock", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+  };
+  const rejected = buildNanoSourceUnlockPresentation({
+    hasBudget: true,
+    intent,
+    receipt: {
+      paymentState: "failed",
+      proof: { proofType: "arc_tx", paymentState: "failed", txHash: `0x${"f".repeat(64)}` },
+    },
+  });
+  const local = buildNanoSourceUnlockPresentation({
+    hasBudget: true,
+    intent,
+    receipt: {
+      paymentState: "recorded",
+      proof: { proofType: "local", paymentState: "recorded", txHash: null },
+    },
+  });
+
+  assert.equal(rejected.canShowInResult, false);
+  assert.equal(rejected.proofStatus, "Proof rejected");
+  assert.equal(local.canShowInResult, false);
+  assert.equal(local.proofStatus, "Local receipt");
+});
+
+test("continued run with verified Arc proof unlocks source and result preview", () => {
+  const intent = {
+    intentId: "intent_source",
+    status: "payment_recorded",
+    amount: 0.05,
+    reason: "Adds source-backed context.",
+    payee: { payeeId: "source_unlock", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+  };
+  const source = buildNanoSourceUnlockPresentation({
+    hasBudget: true,
+    intent,
+    receipt: {
+      paymentState: "recorded",
+      proof: { proofType: "arc_tx", paymentState: "recorded", txHash: `0x${"1".repeat(64)}` },
+    },
+  });
+  const result = buildNanoResultPreviewPresentation({ goal: "Brief", hasVerifiedSourceProof: true, sourceUnlock: source });
+
+  assert.equal(source.canShowInResult, true);
+  assert.equal(source.proofStatus, "Paid with proof");
+  assert.equal(result.status, "Source-backed preview");
+  assert.equal(result.proofStatus, "Paid with proof");
+  assert.match(result.body, /tiny payments/);
 });
 
 test("wallet-scoped dashboard separates buyer tasks owned agents and owned-agent earnings", () => {

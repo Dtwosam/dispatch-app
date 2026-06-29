@@ -75,6 +75,9 @@ import {
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
   buildNanoResetDraftState,
+  buildNanoReceiptDetailModel,
+  buildNanoRunHistoryModel,
+  buildNanoSelectedRunModel,
   buildNanoRunProgressPresentation,
   buildNanoResultPreviewPresentation,
   buildNanoSourceUnlockPresentation,
@@ -122,13 +125,23 @@ function resetNanoDataForWallet() {
   state.nano.selectedBudgetId = "";
   state.nano.activity = null;
   state.nano.activityError = "";
+  state.nano.runActivities = {};
+  state.nano.runHistoryLoading = false;
+  state.nano.runHistoryError = "";
   state.nano.metrics = null;
   state.nano.metricsError = "";
 }
 
 function resetNanoDraftFlow() {
   nanoAutoRefreshWalletKey = "";
-  state.nano = buildNanoResetDraftState(state.nano);
+  state.nano = buildNanoResetDraftState(state.nano, { preserveHistory: true });
+}
+
+function resetNanoProofDraftFields() {
+  state.nano.arcProofTxHash = "";
+  state.nano.arcProofIntentId = "";
+  state.nano.arcProofStatus = "";
+  state.nano.arcProofMessage = "";
 }
 
 function loadAttachmentIngestionModule() {
@@ -2463,6 +2476,7 @@ async function refreshNanoActivity(budgetId = state.nano.selectedBudgetId) {
     );
     state.nano.activity = activity;
     state.nano.selectedBudgetId = activity.budget.budgetId;
+    state.nano.runActivities = { ...(state.nano.runActivities || {}), [activity.budget.budgetId]: activity };
     return activity;
   } catch (error) {
     state.nano.activityError = nanoApiErrorMessage(error, nanoApiUnavailableMessage());
@@ -2472,20 +2486,57 @@ async function refreshNanoActivity(budgetId = state.nano.selectedBudgetId) {
   }
 }
 
+async function refreshNanoRunHistoryActivities(budgets = state.nano.budgets) {
+  if (!state.wallet.trim() || !budgets.length) {
+    state.nano.runActivities = {};
+    return;
+  }
+  state.nano.runHistoryLoading = true;
+  state.nano.runHistoryError = "";
+  const entries = await Promise.allSettled(budgets.map(async (budget) => {
+    if (state.nano.runActivities?.[budget.budgetId]) return [budget.budgetId, state.nano.runActivities[budget.budgetId]];
+    const activity = await getJson(
+      `/api/nano/budgets/${encodeURIComponent(budget.budgetId)}/activity?wallet=${nanoWalletParam()}`,
+      validateNanoBudgetActivityResponse,
+    );
+    return [budget.budgetId, activity];
+  }));
+  const nextActivities = { ...(state.nano.runActivities || {}) };
+  let failed = false;
+  for (const result of entries) {
+    if (result.status === "fulfilled") {
+      const [budgetId, activity] = result.value;
+      nextActivities[budgetId] = activity;
+    } else {
+      failed = true;
+    }
+  }
+  state.nano.runActivities = nextActivities;
+  state.nano.runHistoryError = failed
+    ? "Some receipt details are temporarily unavailable."
+    : "";
+  state.nano.runHistoryLoading = false;
+}
+
 async function refreshNanoData() {
   if (!state.wallet.trim()) {
     state.nano.budgets = [];
     state.nano.budgetsLoaded = false;
     state.nano.activity = null;
+    state.nano.runActivities = {};
+    state.nano.runHistoryLoading = false;
+    state.nano.runHistoryError = "";
     state.nano.metrics = null;
     return;
   }
   state.nano.healthLoading = true;
   state.nano.budgetsLoading = true;
   state.nano.metricsLoading = true;
+  state.nano.runHistoryLoading = true;
   state.nano.healthError = "";
   state.nano.budgetsError = "";
   state.nano.metricsError = "";
+  state.nano.runHistoryError = "";
   try {
     const [healthResult, budgetsResult, metricsResult] = await Promise.allSettled([
       getJson("/api/nano/health", validateNanoHealthResponse),
@@ -2514,10 +2565,14 @@ async function refreshNanoData() {
     if (state.nano.selectedBudgetId) {
       await refreshNanoActivity(state.nano.selectedBudgetId);
     }
+    if (state.nano.budgets.length) {
+      await refreshNanoRunHistoryActivities(state.nano.budgets);
+    }
   } finally {
     state.nano.healthLoading = false;
     state.nano.budgetsLoading = false;
     state.nano.metricsLoading = false;
+    state.nano.runHistoryLoading = false;
   }
 }
 
@@ -2873,6 +2928,23 @@ function renderNanoPageSimplified() {
   const receipts = activity?.receipts || [];
   const receiptsByIntent = selectedNanoReceiptsByIntent();
   const metricsModel = buildNanoMetricsModel(state.nano.metrics, { activity });
+  const runHistoryModel = buildNanoRunHistoryModel({
+    wallet: state.wallet,
+    budgets: state.nano.budgets,
+    activities: state.nano.runActivities,
+    selectedBudgetId: state.nano.selectedBudgetId,
+    loading: state.nano.runHistoryLoading,
+    error: state.nano.runHistoryError,
+  });
+  const receiptDetailModel = buildNanoReceiptDetailModel(
+    state.nano.runActivities?.[state.nano.selectedBudgetId] || activity,
+    state.nano.selectedBudgetId,
+  );
+  const selectedRunModel = buildNanoSelectedRunModel({
+    selectedBudgetId: state.nano.selectedBudgetId,
+    budget,
+    activity: state.nano.runActivities?.[state.nano.selectedBudgetId] || activity,
+  });
   const budgetValidation = validateNanoBudgetAmount(state.nano.budgetAmount);
   const goalValid = Boolean(state.nano.budgetGoal.trim());
   const sourcePayoutWalletModel = buildNanoRecipientWalletModel(state.nano.sourcePayoutWallet);
@@ -3012,6 +3084,14 @@ function renderNanoPageSimplified() {
         `).join("")}
       </section>
 
+      <section class="nano-selected-run reveal-on-scroll" aria-live="polite">
+        <div>
+          <strong>${escapeHtml(selectedRunModel.label)}</strong>
+          <p>${escapeHtml(selectedRunModel.helper)}</p>
+        </div>
+        ${selectedRunModel.active ? `<button class="hero-secondary" type="button" id="nanoStartNewBudget">Start new run</button>` : ""}
+      </section>
+
       <section class="nano-panel nano-how reveal-on-scroll">
         <div class="nano-section-head">
           <div>
@@ -3071,7 +3151,7 @@ function renderNanoPageSimplified() {
           <button class="hero-primary" type="button" ${primaryButtonAttributes} ${primaryAction.disabled ? "disabled" : ""}>${state.nano.actionPending === "arcProof" ? "Verifying Arc proof" : state.nano.actionPending ? "Working..." : escapeHtml(primaryAction.label)}</button>
           <p>${escapeHtml(primaryAction.reason)}</p>
           <button class="hero-secondary" type="button" id="nanoRefresh" ${state.nano.budgetsLoading ? "disabled" : ""}>Refresh</button>
-          ${budget ? `<button class="hero-secondary" type="button" id="nanoStartNewBudget">Start new budget</button>` : ""}
+          ${budget ? `<button class="hero-secondary" type="button" id="nanoStartNewBudgetSecondary">Start new run</button>` : ""}
         </div>
       </section>
 
@@ -3310,6 +3390,82 @@ function renderNanoPageSimplified() {
         ${state.nano.activityError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.activityError)}</p>` : ""}
       </article>
 
+      <section class="nano-panel nano-run-history reveal-on-scroll" id="nanoRunHistory">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">Wallet-scoped history</p>
+            <h2>${escapeHtml(runHistoryModel.title)}</h2>
+            <p>${escapeHtml(runHistoryModel.subtitle)}</p>
+          </div>
+          ${runHistoryModel.loading ? `<span class="meta-pill">Loading runs</span>` : `<span class="meta-pill">${runHistoryModel.runCards.length} run${runHistoryModel.runCards.length === 1 ? "" : "s"}</span>`}
+        </div>
+        ${runHistoryModel.runCards.length ? `
+          <div class="nano-run-grid">
+            ${runHistoryModel.runCards.map((run) => `
+              <article class="nano-run-card ${run.selected ? "is-selected" : ""}">
+                <div class="nano-run-card__head">
+                  <strong>${escapeHtml(run.goal)}</strong>
+                  <span class="status-chip ${run.proofTone === "good" ? "good" : run.proofTone === "warn" ? "warn" : "pending"}">${escapeHtml(run.proofStatus)}</span>
+                </div>
+                <div class="nano-run-card__facts">
+                  <div><span>Budget</span><strong>${escapeHtml(run.budget)}</strong></div>
+                  <div><span>Budget status</span><strong>${escapeHtml(run.budgetStatus)}</strong></div>
+                  <div><span>Source status</span><strong>${escapeHtml(run.sourceStatus)}</strong></div>
+                  <div><span>Verified receipts</span><strong>${escapeHtml(run.verifiedReceiptCount)}</strong></div>
+                  <div><span>Updated</span><strong>${escapeHtml(run.updated)}</strong></div>
+                </div>
+                <button class="${run.selected ? "hero-secondary" : "hero-primary"}" type="button" data-nano-run-id="${escapeHtml(run.budgetId)}">${escapeHtml(run.buttonLabel)}</button>
+                ${!run.detailAvailable ? `<p class="nano-helper">Run detail unavailable from the current router response.</p>` : ""}
+              </article>
+            `).join("")}
+          </div>
+        ` : `
+          <div class="empty-inline nano-empty-inline">
+            <span class="empty-inline__mark" aria-hidden="true"></span>
+            <div><strong>${escapeHtml(runHistoryModel.emptyTitle)}</strong><p>${escapeHtml(runHistoryModel.emptyBody)}</p></div>
+          </div>
+        `}
+        ${runHistoryModel.error ? `<p class="nano-helper nano-helper--warn">${escapeHtml(runHistoryModel.error)}</p>` : ""}
+      </section>
+
+      <article class="nano-panel nano-receipt-detail reveal-on-scroll" id="nanoReceiptDetail">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">Receipt detail</p>
+            <h2>${escapeHtml(receiptDetailModel.title)}</h2>
+            <p>${escapeHtml(receiptDetailModel.body)}</p>
+          </div>
+          <span class="meta-pill">${receiptDetailModel.rows.length} row${receiptDetailModel.rows.length === 1 ? "" : "s"}</span>
+        </div>
+        ${receiptDetailModel.available && receiptDetailModel.rows.length ? `
+          <div class="nano-receipt-detail-list">
+            ${receiptDetailModel.rows.map((row) => `
+              <article class="nano-receipt-detail-row">
+                <div>
+                  <span>Spend</span>
+                  <strong>${escapeHtml(row.spend)}</strong>
+                  <p>${escapeHtml(row.reason)}</p>
+                  ${row.contributionSummary ? `<p>${escapeHtml(row.contributionSummary)}</p>` : ""}
+                </div>
+                <div><span>Amount</span><strong>${escapeHtml(row.amount)}</strong></div>
+                <div><span>Recipient</span><strong>${escapeHtml(row.recipient)}</strong></div>
+                <div><span>Proof state</span><strong>${escapeHtml(row.proofState)}</strong></div>
+                <div><span>Payment state</span><strong>${escapeHtml(row.paymentState)}</strong></div>
+                <div>
+                  <span>Tx link</span>
+                  ${row.txLink ? `<a href="${escapeHtml(row.txLink)}" target="_blank" rel="noreferrer">${escapeHtml(row.txLabel)}</a>` : `<strong>No valid transaction link</strong>`}
+                </div>
+              </article>
+            `).join("")}
+          </div>
+        ` : `
+          <div class="empty-inline nano-empty-inline">
+            <span class="empty-inline__mark" aria-hidden="true"></span>
+            <div><strong>${escapeHtml(receiptDetailModel.emptyTitle || receiptDetailModel.title)}</strong><p>${escapeHtml(receiptDetailModel.emptyBody || receiptDetailModel.body)}</p></div>
+          </div>
+        `}
+      </article>
+
       <section class="nano-bottom-grid">
         <article class="nano-panel reveal-on-scroll">
           <p class="mini-label">${escapeHtml(metricsModel.sourceLabel)}</p>
@@ -3390,10 +3546,26 @@ function renderNanoPageSimplified() {
   });
   document.getElementById("nanoBudgetSelect")?.addEventListener("change", async (event) => {
     state.nano.selectedBudgetId = event.target.value;
-    state.nano.activity = null;
+    state.nano.activity = state.nano.runActivities?.[event.target.value] || null;
+    resetNanoProofDraftFields();
     renderNanoPageSimplified();
     await refreshNanoActivity(event.target.value);
     renderNanoPageSimplified();
+  });
+  document.querySelectorAll("[data-nano-run-id]").forEach((node) => {
+    node.addEventListener("click", async () => {
+      const budgetId = node.dataset.nanoRunId;
+      if (!budgetId) return;
+      state.nano.selectedBudgetId = budgetId;
+      state.nano.activity = state.nano.runActivities?.[budgetId] || null;
+      resetNanoProofDraftFields();
+      renderNanoPageSimplified();
+      if (!state.nano.activity) {
+        await refreshNanoActivity(budgetId);
+        renderNanoPageSimplified();
+      }
+      document.getElementById("nanoReceiptDetail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   });
   document.getElementById("nanoRefresh")?.addEventListener("click", async () => {
     await withNanoAction("refresh", refreshNanoData);
@@ -3405,6 +3577,10 @@ function renderNanoPageSimplified() {
     document.getElementById("nanoResultPreview")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   document.getElementById("nanoStartNewBudget")?.addEventListener("click", () => {
+    resetNanoDraftFlow();
+    renderNanoPageSimplified();
+  });
+  document.getElementById("nanoStartNewBudgetSecondary")?.addEventListener("click", () => {
     resetNanoDraftFlow();
     renderNanoPageSimplified();
   });

@@ -235,15 +235,19 @@ export function buildNanoCurrentStepModel({
   };
 }
 
-export function buildNanoResetDraftState(current = {}) {
+export function buildNanoResetDraftState(current = {}, options = {}) {
+  const preserveHistory = Boolean(options.preserveHistory);
   return {
     ...current,
-    budgets: [],
-    budgetsLoaded: false,
-    budgetsError: "",
+    budgets: preserveHistory ? (current.budgets || []) : [],
+    budgetsLoaded: preserveHistory ? Boolean(current.budgetsLoaded) : false,
+    budgetsError: preserveHistory ? (current.budgetsError || "") : "",
     selectedBudgetId: "",
     activity: null,
     activityError: "",
+    runActivities: preserveHistory ? (current.runActivities || {}) : {},
+    runHistoryLoading: false,
+    runHistoryError: preserveHistory ? (current.runHistoryError || "") : "",
     budgetPreset: "0.10",
     customBudgetAmount: "",
     budgetAmount: "0.10",
@@ -253,6 +257,27 @@ export function buildNanoResetDraftState(current = {}) {
     arcProofStatus: "",
     arcProofMessage: "",
     actionPending: "",
+  };
+}
+
+export function buildNanoSelectedRunModel({ selectedBudgetId = "", budget = null, activity = null } = {}) {
+  if (!selectedBudgetId || !budget) {
+    return {
+      active: false,
+      label: "New Nano run",
+      helper: "Create a budget to start a new source-payment run.",
+      shortId: "",
+      detailAvailable: false,
+    };
+  }
+  return {
+    active: true,
+    label: `Viewing Nano run: ${shortWallet(selectedBudgetId)}`,
+    helper: activity
+      ? "Continuing from router-backed run state."
+      : "Run detail unavailable from the current router response.",
+    shortId: shortWallet(selectedBudgetId),
+    detailAvailable: Boolean(activity),
   };
 }
 
@@ -307,10 +332,10 @@ export function buildNanoSourceUnlockPresentation({
   const unlocked = isVerifiedNanoArcProofReceipt(receipt);
   const status = receiptStatus || intentStatus || { label: "Planned", tone: "pending" };
   const sourcePlan = nanoSourcePaymentSpendPlanRows.find((row) => row.payeeId === "source_unlock") || nanoSourcePaymentSpendPlanRows[0];
-  const recipient = recipientWalletModel?.valid
-    ? recipientWalletModel.label
-    : intent?.payee?.walletAddress
-      ? shortWallet(intent.payee.walletAddress)
+  const recipient = intent?.payee?.walletAddress
+    ? shortWallet(intent.payee.walletAddress)
+    : recipientWalletModel?.valid
+      ? recipientWalletModel.label
       : (recipientWalletModel?.label || "No recipient wallet");
   const recipientWallet = intent?.payee?.walletAddress || recipientWalletModel?.wallet || "";
   const priceUsdc = Number(intent?.amount ?? sourcePlan?.amount ?? 0.01);
@@ -634,6 +659,141 @@ export function buildNanoMetricsModel(metrics, options = {}) {
     totalVerifiedUsdcVolume: formatNanoUsdc(totalVerifiedUsdcVolume),
     averageVerifiedPaymentSize: formatNanoUsdc(averageVerifiedPaymentSize),
     availableBudget: formatNanoUsdc(metrics?.availableBudget || 0),
+  };
+}
+
+function latestNanoActivityTimestamp(budget, activity) {
+  const timestamps = [
+    budget?.updatedAt,
+    budget?.createdAt,
+    activity?.runContext?.updatedAt,
+    activity?.runContext?.createdAt,
+    ...(activity?.spendIntents || []).flatMap((intent) => [intent?.updatedAt, intent?.approvedAt, intent?.createdAt]),
+    ...(activity?.receipts || []).flatMap((receipt) => [receipt?.createdAt, receipt?.proof?.recordedAt]),
+  ].filter(Boolean);
+  const latest = timestamps
+    .map((value) => ({ value, time: Date.parse(value) }))
+    .filter((item) => Number.isFinite(item.time))
+    .sort((a, b) => b.time - a.time)[0];
+  return latest?.value || "";
+}
+
+function formatNanoDateTime(value) {
+  if (!value) return "Not available";
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return "Not available";
+  return new Date(time).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function nanoLatestReceiptStatus(receipts) {
+  const latestReceipt = sortNanoReceiptsNewestFirst(receipts || [])[0] || null;
+  return latestReceipt ? buildNanoReceiptStatusModel(latestReceipt) : null;
+}
+
+function nanoSourceIntent(activity) {
+  return (activity?.spendIntents || []).find((intent) => intent?.payee?.payeeId === "source_unlock")
+    || (activity?.spendIntents || [])[0]
+    || null;
+}
+
+function nanoReceiptForIntent(activity, intent) {
+  if (!intent) return null;
+  return (activity?.receipts || []).find((receipt) => receipt?.intentId === intent.intentId) || null;
+}
+
+export function buildNanoRunHistoryModel({ wallet, budgets = [], activities = {}, selectedBudgetId = "", loading = false, error = "" } = {}) {
+  const walletConnected = Boolean(String(wallet || "").trim());
+  const runCards = walletConnected ? budgets.map((budget) => {
+    const activity = activities?.[budget.budgetId] || null;
+    const sourceIntent = nanoSourceIntent(activity);
+    const sourceReceipt = nanoReceiptForIntent(activity, sourceIntent);
+    const sourceStatus = sourceReceipt
+      ? buildNanoReceiptStatusModel(sourceReceipt)
+      : sourceIntent
+        ? buildNanoSpendIntentStatusModel(sourceIntent, null)
+        : { label: activity ? "No planned source spend" : "Detail unavailable", tone: "pending" };
+    const latestProof = nanoLatestReceiptStatus(activity?.receipts || []);
+    const verifiedReceipts = (activity?.receipts || []).filter(isVerifiedNanoArcProofReceipt);
+    const updatedAt = latestNanoActivityTimestamp(budget, activity);
+    return {
+      budgetId: budget.budgetId,
+      runId: budget.runId,
+      selected: budget.budgetId === selectedBudgetId,
+      detailAvailable: Boolean(activity),
+      goal: budget.goal || activity?.runContext?.goal || "Untitled Nano run",
+      budget: formatNanoUsdc(budget.amount || 0),
+      budgetStatus: buildNanoBudgetStatusModel(budget).label,
+      sourceStatus: sourceStatus.label,
+      sourceTone: sourceStatus.tone,
+      proofStatus: latestProof?.label || (activity ? "No proof yet" : "Detail unavailable"),
+      proofTone: latestProof?.tone || "pending",
+      verifiedReceiptCount: String(verifiedReceipts.length),
+      updated: formatNanoDateTime(updatedAt),
+      updatedRaw: updatedAt,
+      buttonLabel: "Continue run",
+    };
+  }) : [];
+
+  return {
+    walletConnected,
+    title: "Recent Nano runs",
+    subtitle: "Router-backed runs for the connected wallet.",
+    loading,
+    error,
+    runCards,
+    emptyTitle: walletConnected ? "No Nano runs yet." : "Connect a wallet to see Nano runs for that wallet.",
+    emptyBody: walletConnected
+      ? "Create a budget to start a source-payment run."
+      : "Nano run history is scoped to the connected wallet.",
+  };
+}
+
+export function buildNanoReceiptDetailModel(activity, selectedBudgetId = "") {
+  if (!activity) {
+    return {
+      available: false,
+      title: "Receipt detail unavailable.",
+      body: "Receipt detail unavailable from the current router response.",
+      rows: [],
+    };
+  }
+  const receiptsByIntent = new Map((activity.receipts || []).map((receipt) => [receipt.intentId, receipt]));
+  const rows = (activity.spendIntents || []).map((intent) => {
+    const receipt = receiptsByIntent.get(intent.intentId) || null;
+    const status = receipt ? buildNanoReceiptStatusModel(receipt) : buildNanoSpendIntentStatusModel(intent, null);
+    const txLink = buildArcTransactionLink(receipt?.proof?.txHash);
+    return {
+      intentId: intent.intentId,
+      receiptId: receipt?.receiptId || "",
+      spend: intent.payee?.label || "Unnamed spend",
+      amount: formatNanoUsdc(intent.amount || 0),
+      recipient: intent.payee?.walletAddress ? shortWallet(intent.payee.walletAddress) : "No recipient wallet",
+      recipientRaw: intent.payee?.walletAddress || "",
+      reason: intent.reason || "No reason recorded.",
+      proofState: status.label,
+      proofTone: status.tone,
+      paymentState: receipt?.paymentState || "Not paid yet",
+      txLink,
+      txLabel: txLink ? shortWallet(receipt.proof.txHash) : "",
+      contributionSummary: receipt?.contributionSummary || "",
+    };
+  });
+
+  return {
+    available: true,
+    budgetId: activity.budget?.budgetId || selectedBudgetId,
+    title: "Receipt detail",
+    body: rows.length
+      ? "Stored receipt and proof state for the selected Nano run."
+      : "Receipt detail unavailable from the current router response.",
+    rows,
+    emptyTitle: "Receipt detail unavailable.",
+    emptyBody: "Receipt detail unavailable from the current router response.",
   };
 }
 
