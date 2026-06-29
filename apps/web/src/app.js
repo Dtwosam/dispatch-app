@@ -75,6 +75,7 @@ import {
   buildNanoMultiSpendPlanRows,
   buildNanoPaymentActionModel,
   buildNanoReceiptStatusModel,
+  buildNanoRecipientRegistry,
   buildNanoRecipientWalletModel,
   buildNanoResetDraftState,
   buildNanoReceiptDetailModel,
@@ -2978,6 +2979,7 @@ function renderNanoPageSimplified() {
     planRows: nanoPlannedSpendRows,
     intents,
     receiptsByIntent,
+    recipientRegistry: buildNanoRecipientRegistry({ sourceWallet: sourcePayoutWalletModel.wallet }),
   });
   const budgetGuardrails = buildNanoBudgetGuardrailModel({
     budget,
@@ -3260,9 +3262,12 @@ function renderNanoPageSimplified() {
                 <article class="nano-spend-row ${row.primary ? "nano-spend-row--primary" : row.plannedOnly ? "nano-spend-row--planned" : ""}">
                   <div>
                     <span class="nano-payee-type">${escapeHtml(row.typeLabel)}</span>
+                    <span class="meta-pill">${escapeHtml(row.recipientAvailability)}</span>
                     <strong>${escapeHtml(row.label)}</strong>
+                    <p>${escapeHtml(row.recipientDescription)}</p>
                     <p>${escapeHtml(row.reason)}</p>
-                    <p>${row.primary ? "Primary source/tool unlock for this Nano run." : "Planned next. Not a live payout flow unless real proof exists."}</p>
+                    <p>${escapeHtml(row.contributionSummary)}</p>
+                    <p>${escapeHtml(row.proofRequirement)}</p>
                     ${row.recipientWallet ? `<p>Recipient wallet ${escapeHtml(row.recipient)}</p>` : ""}
                     ${row.primary ? `
                       <label class="nano-field nano-field--inline">

@@ -34,6 +34,8 @@ import {
   buildNanoMetricsModel,
   buildNanoMultiSpendPlanRows,
   buildNanoPaymentActionModel,
+  buildNanoRecipientProfile,
+  buildNanoRecipientRegistry,
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
   buildNanoReceiptDetailModel,
@@ -48,6 +50,7 @@ import {
   getTaskBriefTemplate,
   nanoBudgetPresets,
   nanoApiUnavailableMessage,
+  nanoRecipientRegistryProfiles,
   nanoSourcePaymentSpendPlanRows,
   taskBriefTemplates,
   validateNanoBudgetAmount,
@@ -513,8 +516,57 @@ test("Nano source payment plan keeps source unlock primary with safe 2-decimal a
   });
 });
 
+test("Nano recipient registry returns expected source and tool profiles", () => {
+  const registry = buildNanoRecipientRegistry({ sourceWallet: "0x2222222222222222222222222222222222222222" });
+  const source = buildNanoRecipientProfile("source_unlock", { registry });
+  const formatter = buildNanoRecipientProfile("summary_formatter", { registry });
+  const checker = buildNanoRecipientProfile("claim_check_tool", { registry });
+
+  assert.equal(nanoRecipientRegistryProfiles.length, 3);
+  assert.equal(source.label, "Dispatch Source Unlock");
+  assert.equal(source.type, "source");
+  assert.equal(source.paymentStatus, "payable_now");
+  assert.equal(source.walletAddress, "0x2222222222222222222222222222222222222222");
+  assert.match(source.proofRequirement, /Requires verified proof/);
+  assert.equal(formatter.type, "tool");
+  assert.equal(formatter.paymentStatus, "planned_next");
+  assert.equal(formatter.walletAddress, "");
+  assert.match(formatter.proofRequirement, /future spend path/);
+  assert.equal(checker.defaultPrice, 0.02);
+  assert.doesNotMatch(`${source.description} ${formatter.description} ${checker.description}`, /earned|paid recipient|judge/i);
+});
+
+test("Nano planned tool profiles do not expose live pay actions", () => {
+  const registry = buildNanoRecipientRegistry();
+  const rows = buildNanoMultiSpendPlanRows({
+    recipientRegistry: registry,
+    intents: [
+      {
+        intentId: "intent_tool",
+        status: "approved",
+        amount: 0.02,
+        reason: "Checks the strongest claims.",
+        payee: {
+          payeeId: "claim_check_tool",
+          type: "tool",
+          label: "Claim-check Tool",
+          walletAddress: "0x3333333333333333333333333333333333333333",
+        },
+      },
+    ],
+    receiptsByIntent: new Map(),
+  });
+  const tool = rows.rows.find((row) => row.payeeId === "claim_check_tool");
+
+  assert.equal(tool.recipientPaymentStatus, "planned_next");
+  assert.equal(tool.canPayOnArc, false);
+  assert.equal(tool.payActionLabel, "Planned next");
+  assert.match(tool.proofRequirement, /not paid in the current live flow/);
+});
+
 test("Nano multi-spend plan returns multiple rows with only source payable on Arc", () => {
   const rows = buildNanoMultiSpendPlanRows({
+    recipientRegistry: buildNanoRecipientRegistry({ sourceWallet: "0x2222222222222222222222222222222222222222" }),
     intents: [
       {
         intentId: "intent_source",
@@ -548,9 +600,12 @@ test("Nano multi-spend plan returns multiple rows with only source payable on Ar
   assert.equal(rows.rows[0].label, "Source unlock");
   assert.equal(rows.rows[0].canPayOnArc, true);
   assert.equal(rows.rows[0].payActionLabel, "Pay source on Arc");
+  assert.equal(rows.rows[0].recipientAvailability, "Payable on Arc");
+  assert.match(rows.rows[0].proofRequirement, /source-backed result unlocks/);
   assert.equal(rows.rows[1].canPayOnArc, false);
   assert.equal(rows.rows[1].payActionLabel, "Planned next");
   assert.equal(rows.rows[1].proofLabel, "Not paid yet");
+  assert.match(rows.rows[1].recipientDescription, /summary/);
   assert.equal(rows.payableRows.length, 1);
   assert.match(rows.helper, /Only the source unlock can be paid/);
 });

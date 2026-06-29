@@ -150,6 +150,65 @@ export const nanoSourcePaymentSpendPlanRows = [
   },
 ];
 
+export const nanoRecipientRegistryProfiles = [
+  {
+    id: "source_unlock",
+    label: "Dispatch Source Unlock",
+    type: "source",
+    description: "A curated starter source used to add grounded context to the Nano result.",
+    walletAddress: "",
+    paymentStatus: "payable_now",
+    defaultPrice: 0.01,
+    why: "The agent uses this when the answer needs source-backed context.",
+    contribution: "Unlocks a source-backed insight after verified Arc proof.",
+    availabilityLabel: "Payable on Arc",
+    proofRequirement: "Payable on Arc. Requires verified proof before the source-backed result unlocks.",
+  },
+  {
+    id: "summary_formatter",
+    label: "Summary Formatter",
+    type: "tool",
+    description: "A planned tool profile for turning source notes into a tighter summary.",
+    walletAddress: "",
+    paymentStatus: "planned_next",
+    defaultPrice: 0.01,
+    why: "The agent may use this to format source notes into a clearer brief.",
+    contribution: "Contributes formatting and structure in a future paid tool path.",
+    availabilityLabel: "Planned next",
+    proofRequirement: "Planned next. This tool is shown as a future spend path and is not paid in the current live flow.",
+  },
+  {
+    id: "claim_check_tool",
+    label: "Claim-check Tool",
+    type: "tool",
+    description: "A planned tool profile for checking the strongest claims before final output.",
+    walletAddress: "",
+    paymentStatus: "planned_next",
+    defaultPrice: 0.02,
+    why: "The agent may use this to verify the strongest claims in the source-backed brief.",
+    contribution: "Contributes verification and claim checking in a future paid tool path.",
+    availabilityLabel: "Planned next",
+    proofRequirement: "Planned next. This tool is shown as a future spend path and is not paid in the current live flow.",
+  },
+];
+
+export function buildNanoRecipientRegistry({ sourceWallet = "" } = {}) {
+  return nanoRecipientRegistryProfiles.map((profile) => {
+    if (profile.id !== "source_unlock") return { ...profile };
+    const walletAddress = isValidEvmAddress(sourceWallet) ? sourceWallet.trim() : "";
+    return {
+      ...profile,
+      walletAddress,
+      walletLabel: walletAddress ? shortWallet(walletAddress) : "Recipient wallet required before payment",
+    };
+  });
+}
+
+export function buildNanoRecipientProfile(payeeId, options = {}) {
+  const registry = options.registry || buildNanoRecipientRegistry(options);
+  return registry.find((profile) => profile.id === payeeId) || null;
+}
+
 export function validateNanoBudgetAmount(value) {
   const raw = String(value ?? "").trim();
   if (!raw) {
@@ -524,38 +583,50 @@ export function buildNanoSpendIntentStatusModel(intent, receipt) {
   };
 }
 
-export function buildNanoMultiSpendPlanRows({ planRows = nanoSourcePaymentSpendPlanRows, intents = [], receiptsByIntent = new Map() } = {}) {
+export function buildNanoMultiSpendPlanRows({
+  planRows = nanoSourcePaymentSpendPlanRows,
+  intents = [],
+  receiptsByIntent = new Map(),
+  recipientRegistry = buildNanoRecipientRegistry(),
+} = {}) {
   const intentByPayeeId = new Map((intents || []).map((intent) => [intent?.payee?.payeeId, intent]));
   const usedIntentIds = new Set();
   const buildRow = (plan, intent = null, fallbackIndex = 0) => {
+    const payeeId = plan?.payeeId || intent?.payee?.payeeId || "";
+    const recipientProfile = recipientRegistry.find((profile) => profile.id === payeeId) || null;
     const receipt = intent ? receiptsByIntent.get(intent.intentId) : null;
     const status = receipt ? buildNanoReceiptStatusModel(receipt) : intent ? buildNanoSpendIntentStatusModel(intent, null) : { label: "Not paid yet", tone: "pending" };
     const proofStatus = receipt ? buildNanoReceiptStatusModel(receipt) : { label: "Not paid yet", tone: "pending" };
+    const recipientWallet = intent?.payee?.walletAddress || recipientProfile?.walletAddress || "";
     const payableNow = Boolean(
       plan?.primary
         && intent
         && intent.status === "approved"
         && !receipt
-        && intent?.payee?.walletAddress,
+        && recipientWallet,
     );
     const plannedOnly = Boolean(!plan?.primary || plan?.starterOnly);
     const verified = isVerifiedNanoArcProofReceipt(receipt);
     if (intent?.intentId) usedIntentIds.add(intent.intentId);
     return {
-      key: plan?.payeeId || intent?.intentId || `planned_${fallbackIndex}`,
+      key: payeeId || intent?.intentId || `planned_${fallbackIndex}`,
       intentId: intent?.intentId || "",
       receiptId: receipt?.receiptId || "",
-      payeeId: plan?.payeeId || intent?.payee?.payeeId || "",
-      label: intent?.payee?.label || plan?.label || "Planned spend",
-      type: intent?.payee?.type || plan?.type || "tool",
-      typeLabel: labelize(intent?.payee?.type || plan?.type || "tool"),
-      amount: formatNanoUsdc(intent?.amount ?? plan?.amount ?? 0),
-      amountValue: Number(intent?.amount ?? plan?.amount ?? 0),
+      payeeId,
+      label: intent?.payee?.label || recipientProfile?.label || plan?.label || "Planned spend",
+      type: intent?.payee?.type || recipientProfile?.type || plan?.type || "tool",
+      typeLabel: labelize(intent?.payee?.type || recipientProfile?.type || plan?.type || "tool"),
+      amount: formatNanoUsdc(intent?.amount ?? recipientProfile?.defaultPrice ?? plan?.amount ?? 0),
+      amountValue: Number(intent?.amount ?? recipientProfile?.defaultPrice ?? plan?.amount ?? 0),
       intentStatus: String(intent?.status || "").toLowerCase(),
-      reason: intent?.reason || plan?.reason || "No reason recorded.",
-      contributionSummary: receipt?.contributionSummary || plan?.contributionSummary || "",
-      recipient: intent?.payee?.walletAddress ? shortWallet(intent.payee.walletAddress) : "No recipient wallet",
-      recipientWallet: intent?.payee?.walletAddress || "",
+      reason: intent?.reason || recipientProfile?.why || plan?.reason || "No reason recorded.",
+      contributionSummary: receipt?.contributionSummary || recipientProfile?.contribution || plan?.contributionSummary || "",
+      recipientDescription: recipientProfile?.description || "Router-backed recipient from stored spend intent.",
+      recipientAvailability: recipientProfile?.availabilityLabel || (intent ? "Router-backed spend" : "Starter preview"),
+      recipientPaymentStatus: recipientProfile?.paymentStatus || (intent ? "unavailable" : "starter_only"),
+      proofRequirement: recipientProfile?.proofRequirement || "Starter preview. Not counted as paid without Arc proof.",
+      recipient: recipientWallet ? shortWallet(recipientWallet) : "No recipient wallet",
+      recipientWallet,
       stateLabel: plan?.primary
         ? "Payable on Arc"
         : intent

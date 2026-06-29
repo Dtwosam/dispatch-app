@@ -1955,6 +1955,12 @@ button[data-open-dispute] {
   overflow-wrap: anywhere;
 }
 
+.nano-spend-row .meta-pill {
+  display: inline-flex;
+  margin-left: 6px;
+  margin-bottom: 8px;
+}
+
 .nano-spend-row__meta,
 .nano-receipt-row > div:last-child {
   display: grid;
