@@ -1,10 +1,10 @@
 # Lepton Demo Flow
 
-This is the planned Dispatch Nano judge demo.
+This is the planned Dispatch Nano source-payment demo.
 
 ## Demo Goal
 
-Show that Dispatch Nano lets an AI agent request a tiny USDC payment for a source/tool, get user approval, pay on Arc, verify proof, and show how the paid source/tool improved the final result.
+Show that Dispatch Nano is the receipt layer for AI agents paying sources/tools: the agent requests a tiny USDC source payment, the user approves it, Arc proof verifies it, and the result unlocks only after proof.
 
 ## Demo Script
 
@@ -12,7 +12,7 @@ Show that Dispatch Nano lets an AI agent request a tiny USDC payment for a sourc
 2. Connect wallet.
 3. Create a 1 USDC budget.
 4. Ask the main agent to create a short research-backed brief.
-5. Agent decides that a source/tool unlock improves the result.
+5. Agent decides that a source/tool payment improves the result.
 6. User approves the tiny source/tool spend.
 7. User pays on Arc and proof is verified.
 8. Final brief appears with the unlocked source/tool value.

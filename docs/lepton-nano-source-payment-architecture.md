@@ -2,9 +2,9 @@
 
 ## Final Product Direction
 
-Dispatch Nano is an AI agent source-payment layer for Dispatch.
+Dispatch Nano is the receipt layer for AI agents paying sources and tools.
 
-It lets a user give an AI agent a small USDC budget, approve a tiny payment for a source or tool, pay on Arc, verify payment proof, and see how the paid source or tool improved the final result.
+It lets a user give an AI agent a small USDC budget, approve a tiny payment for source-backed work, pay on Arc, verify payment proof, and see how the proof-verified source improved the final result.
 
 Nano is not a generic budget dashboard.
 
@@ -12,21 +12,21 @@ Nano is not a full autonomous agent economy yet.
 
 Nano is not a fake helper-agent marketplace.
 
-Budget, spend intent, and receipt models are implementation architecture. The product story is source/tool unlock with Arc USDC proof.
+Budget, spend intent, and receipt models are implementation architecture. The product story is source/tool payment with Arc USDC proof.
 
 ## One-Line Pitch
 
-Dispatch Nano lets AI agents request tiny USDC payments for sources/tools, get user approval, pay on Arc, verify proof, and show how the paid source improved the final result.
+Dispatch Nano lets AI agents pay for source-backed work with tiny USDC payments, then proves the payment before the result unlocks.
 
-## Judge Flow
+## Review Flow
 
 User goal -> agent decision -> tiny USDC source/tool payment -> Arc proof -> unlocked source/tool value -> final result -> receipt trail.
 
 ## Product Structure
 
-The `/nano` page should be organized around this judge run:
+The `/nano` page should be organized around this source-payment flow:
 
-- Judge Run Intro
+- Source-payment intro
 - Goal
 - Budget
 - Agent Decision
@@ -41,7 +41,7 @@ The `/nano` page should be organized around this judge run:
 - Payment Trail
 - Why This Matters
 
-Every section should help the judge understand one thing: the agent asked to unlock a source/tool, the user approved a small USDC spend, Arc proof verified the payment, and the final result shows what improved.
+Every section should help a user or judge understand one thing: the agent asked to unlock a source/tool, the user approved a small USDC spend, Arc proof verified the payment, and the final result shows what improved.
 
 ## What Is Real Now
 
@@ -117,7 +117,7 @@ Future Nano work should follow this source-payment build order unless the user e
 
 - Phase 0: Stabilize current Nano UX
 - Phase 1: Add this source-of-truth doc
-- Phase 2: Source Payment Judge Run UI
+- Phase 2: Source Payment UI
 - Phase 3: Source Unlock State Model
 - Phase 4: Real Arc Source Payment Path
 - Phase 5: Honest usage/traction surface

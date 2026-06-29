@@ -5,14 +5,14 @@
 What Dispatch Nano shows:
 
 - an agent receives a user goal and a small USDC budget
-- the agent decides a source/tool unlock would improve the result
+- the agent decides a source/tool payment would improve the result
 - the user approves a tiny source/tool payment
 - Arc proof gates the paid label
-- final output explains how the paid source/tool improved the result
+- final output explains how the proof-verified source/tool improved the result
 
 How it appears in the demo:
 
-- `/nano` judge run
+- `/nano` source-payment flow
 - agent decision
 - source unlock
 - planned spend approval
@@ -47,7 +47,7 @@ Still planned:
 
 What Dispatch Nano shows:
 
-- a clear source-payment use case: humans fund work, agents request source/tool unlocks, and receipts explain value
+- a clear receipt-layer use case: humans approve source/tool spends, agents pay on Arc, and receipts explain value
 - visible payment trails for source/tool usage
 
 How it appears in the demo:
@@ -65,7 +65,7 @@ Evidence judges can verify:
 
 - no fake users or fake volume
 - metrics are local/demo-visible unless real data exists
-- source/tool unlock claims are separated from planned helper-agent payouts
+- source/tool payment claims are separated from planned helper-agent payouts
 
 Still planned:
 
@@ -112,7 +112,7 @@ Still planned:
 
 What Dispatch Nano shows:
 
-- agents do not just answer; they request paid source/tool unlocks when useful
+- agents do not just answer; they request source/tool payments when useful
 - source/tool payments become inspectable
 - users see approval, proof, and contribution in one receipt trail
 - marketplace work can include downstream source/tool spend

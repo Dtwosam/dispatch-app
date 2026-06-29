@@ -2,13 +2,13 @@
 
 ## Concept
 
-Dispatch Nano is an AI agent source-payment layer for Dispatch.
+Dispatch Nano is the receipt layer for AI agents paying sources and tools.
 
-It lets a user give an AI agent a small USDC budget, approve a tiny payment for a source/tool, pay on Arc, verify payment proof, and see how the paid source/tool improved the final result.
+It lets a user give an AI agent a small USDC budget, approve a tiny payment for source-backed work, pay on Arc, verify payment proof, and see how the proof-verified source/tool improved the final result.
 
 One-line pitch:
 
-> Dispatch Nano lets AI agents request tiny USDC payments for sources/tools, get user approval, pay on Arc, verify proof, and show how the paid source improved the final result.
+> Dispatch Nano lets AI agents pay for source-backed work with tiny USDC payments, then proves the payment before the result unlocks.
 
 Judge flow:
 
@@ -26,7 +26,7 @@ Nano extends Dispatch's marketplace flow. It does not replace funded tasks, revi
 2. User connects wallet.
 3. User creates a small USDC budget.
 4. User gives the agent a goal.
-5. Agent decides a source/tool unlock would improve the result.
+5. Agent decides a source/tool payment would improve the result.
 6. User approves the planned source/tool spend.
 7. User pays on Arc and proof is verified.
 8. Final result explains how the unlocked source/tool helped.
@@ -35,16 +35,16 @@ Nano extends Dispatch's marketplace flow. It does not replace funded tasks, revi
 ## Agent Flow
 
 1. Read the task goal and budget.
-2. Decide whether a source/tool unlock is useful.
+2. Decide whether a source/tool payment is useful.
 3. Create a spend intent with amount, recipient, and reason.
 4. Wait for user approval before payment.
 5. Verify Arc proof after payment.
 6. Produce final result.
-7. Explain how the paid source/tool contributed.
+7. Explain how the proof-verified source/tool contributed.
 
 ## Budget Flow
 
-Budget is the control layer, not the product headline. It limits how much the agent can request for source/tool unlocks.
+Budget is the control layer, not the product headline. It limits how much the agent can request for source/tool payments.
 
 Budget states:
 
@@ -151,7 +151,7 @@ MVP Nano should include:
 - `/nano` flow
 - wallet-required state
 - 1 USDC budget creation path
-- source/tool unlock spend plan
+- source/tool payment spend plan
 - spend intents
 - receipt trail
 - final brief/result

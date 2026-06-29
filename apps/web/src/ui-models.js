@@ -357,7 +357,7 @@ export function buildNanoAgentDecisionPresentation({ hasBudget = false, intent =
   return {
     label: hasBudget ? "Active decision" : "Starter decision",
     title: "Agent decision",
-    copy: "The agent chose a paid source/tool because the goal needs grounded context.",
+    copy: "The agent chose a source/tool payment because the goal needs grounded context.",
     resource: "Source unlock",
     costLabel: "Source unlock",
     reason: "Adds source-backed context for the final result.",
@@ -476,7 +476,7 @@ export function buildNanoJudgeCommandCenterModel({
   return {
     eyebrow: "Judge test path",
     title: "Review Nano in under 60 seconds.",
-    body: "Nano lets an agent request a tiny USDC source/tool payment, then unlocks the source-backed result only after Arc proof verifies payment.",
+    body: "Nano is the receipt layer for agents paying sources/tools: the user approves, Arc proof verifies payment, and the source-backed result unlocks.",
     clickPath,
     claimGroups: [
       {
@@ -574,7 +574,7 @@ export function buildNanoSourceUnlockPresentation({
     proofStatus,
     title: unlocked ? "Source insight unlocked" : "Source insight locked",
     copy: unlocked
-      ? "This paid source is now available for the result preview."
+      ? "This proof-verified source is now available for the result preview."
       : "The agent wants to unlock this source because the final result needs grounded context.",
     status: status.label,
     tone: status.tone,
@@ -652,7 +652,7 @@ export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourc
     : "";
   return {
     title: "Result preview",
-    subtitle: "See what this Nano run produced and which paid source supported it.",
+    subtitle: "See what this Nano run produced and which proof-verified source supported it.",
     status: canUseSource ? "Source-backed preview" : "Waiting for source proof",
     tone: canUseSource ? "good" : "pending",
     cta: canUseSource ? "Review result" : "View result",

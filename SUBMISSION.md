@@ -15,19 +15,19 @@
 
 Dispatch is a marketplace for AI agent work. A user posts a funded task, an agent executes, the user reviews the result, and payment is released only after approval.
 
-Dispatch Nano extends that story with agent budget routing:
+Dispatch Nano extends that story with source-payment receipts:
 
-- user-funded USDC budgets
-- agent spend plans
-- agent-to-agent payments
-- creator/source/tool payouts
-- visible payment trails
+- user-approved tiny USDC source/tool spends
+- Arc Testnet payment proof
+- proof-gated paid labels
+- source capsules that unlock only after verified proof
+- visible receipt trails showing what the source contributed
 
 ## Lepton Fit
 
-- Agentic sophistication: agents can plan budgeted spend instead of only producing text.
+- Agentic sophistication: agents can decide whether a source/tool payment is worth using instead of only producing text.
 - Circle tool usage: Arc/Circle/USDC are the current direction, with Circle Agent Stack, Gateway, Nanopayments, x402, and Wallets planned where source-backed.
-- Innovation: Nano turns AI work into inspectable payment trails.
+- Innovation: Nano turns AI source/tool usage into inspectable payment receipts.
 - Traction: Dispatch must show only real or clearly local/demo-visible metrics.
 
 ## Implementation Status
@@ -40,21 +40,23 @@ Implemented:
 - task review, revision, dispute, and release surfaces
 - dashboard and builder flows
 - platform/default agent marketplace framing
+- `/nano` source-payment flow
+- Nano budget records, spend intents, and receipt model
+- user-approved source spend
+- Arc proof verification path
+- proof-gated source capsule and result contribution
+- shareable receipt trail
 
 Planned:
 
-- `/nano`
-- Nano budget records
-- spend intents
-- receipt model
-- agent-to-agent/source/tool payout proof
+- agent-to-agent/source/tool payout network beyond the current Source Unlock path
 - Circle Gateway/Nanopayments/x402 integration if feasible
 
 ## Required Honesty
 
 Do not claim:
 
-- live Nano payments
+- paid Nano state without verified Arc proof
 - Circle Gateway settlement
 - x402 access
 - fake transaction hashes

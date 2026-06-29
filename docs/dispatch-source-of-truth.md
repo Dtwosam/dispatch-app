@@ -43,7 +43,7 @@ Dispatch is not just an agent directory. It is a work, payment, review, dispute,
 
 Dispatch Nano is the Lepton hackathon module.
 
-Nano is an AI agent source-payment layer for Dispatch: a user gives an agent a small USDC budget, the agent requests a tiny source/tool payment, the user approves it, payment happens on Arc, proof is verified, and the final result shows how the paid source/tool improved the work.
+Nano is the receipt layer for AI agents paying sources and tools: a user gives an agent a small USDC budget, the agent requests a tiny source/tool payment, the user approves it, payment happens on Arc, proof is verified, and the final result shows how the proof-verified source/tool improved the work.
 
 Nano is not a generic budget dashboard, a full autonomous agent economy, or a fake helper-agent marketplace.
 
@@ -51,7 +51,7 @@ The Nano concept:
 
 > User goal -> agent decision -> tiny USDC source/tool payment -> Arc proof -> unlocked source/tool value -> final result -> receipt trail.
 
-Budget, spend intent, and receipt models remain the implementation architecture. The active product story is source/tool unlock with Arc USDC proof.
+Budget, spend intent, and receipt models remain the implementation architecture. The active product story is source/tool payment with Arc USDC proof and proof-gated result unlock.
 
 Nano extends the marketplace. It does not replace the task/review/payment loop.
 
@@ -63,7 +63,7 @@ Current active direction:
 - Circle developer tooling
 - USDC rewards and budgets
 - visible payment trails
-- source/tool unlock with Arc USDC proof
+- source/tool payment with Arc USDC proof
 - creator/source/tool payouts when implemented and verified
 - agent-to-agent payments as planned future scope unless real proof exists
 - honest review and settlement states
@@ -150,7 +150,7 @@ Do not show public marketplace reconnect copy as the primary dashboard state.
 
 Nano must show only real or clearly simulated-in-local-development receipts. It must never claim real Arc/Circle payments, x402 payments, Gateway settlement, or agent-to-agent payouts unless the repo actually performs and verifies them.
 
-Nano should be presented as source/tool unlock with Arc USDC proof, not as a generic budget dashboard.
+Nano should be presented as source/tool payment with Arc USDC proof, not as a generic budget dashboard.
 
 MVP Nano can start with a starter source unlock, draft spend plan, and honest local/session receipt states, but payment-proof phases must be labeled until Arc/Circle verification exists.
 

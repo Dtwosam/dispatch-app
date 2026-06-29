@@ -2814,7 +2814,7 @@ function renderNanoPage() {
               </div>
               <div class="nano-result-copy">
                 <strong>Research-backed launch brief</strong>
-                <p>Position Dispatch Nano as source/tool unlock with Arc USDC proof: a user approves a tiny source payment, proof gates the paid label, and the final result shows what the source improved.</p>
+                <p>Position Dispatch Nano as the receipt layer for source/tool payments: a user approves a tiny source payment, proof gates the paid label, and the final result shows what the proof-verified source improved.</p>
                 <ul>
                   <li>Lead with source value: the user sees why the agent wants the source/tool unlock.</li>
                   <li>Keep payment proof honest: local proof is recorded metadata, not settlement.</li>
@@ -2917,7 +2917,7 @@ function renderNanoPageSimplified() {
     "Dispatch Nano",
     "Dispatch Nano",
     "AI agent source payments on Arc.",
-    "Approve a tiny source/tool payment, verify proof, and see what the paid source improved.",
+    "The receipt layer for AI agents paying sources and tools with tiny USDC payments.",
     90,
   );
 
@@ -3229,7 +3229,7 @@ function renderNanoPageSimplified() {
         <div>
           <p class="mini-label">Dispatch Nano</p>
           <h1>AI agent source payments</h1>
-          <p>Give an agent a small USDC budget, approve a source/tool payment, and verify proof before anything is marked paid.</p>
+          <p>Nano is the receipt layer for AI agents paying sources and tools. The result unlocks only after Arc proof verifies payment.</p>
         </div>
         <div class="nano-badge-row" aria-label="Nano highlights">
           <span class="meta-pill">Arc Testnet USDC</span>
@@ -3270,8 +3270,8 @@ function renderNanoPageSimplified() {
         <div class="nano-how-grid">
           ${[
             ["1", "Set the goal", "Create a short brief about stablecoin payments."],
-            ["2", "Approve source spend", "The agent requests one tiny source/tool unlock."],
-            ["3", "Verify the trail", "Arc proof gates the paid label and result preview."],
+            ["2", "Approve source spend", "The agent requests one tiny source payment."],
+            ["3", "Verify the receipt", "Arc proof gates the paid label and result unlock."],
           ].map(([number, title, helper]) => `
             <article>
               <strong>${number}</strong>
@@ -3814,7 +3814,7 @@ function renderNanoPageSimplified() {
         <article class="nano-panel nano-note-panel reveal-on-scroll">
           <p class="mini-label">Why this matters</p>
           <h2>Why this matters</h2>
-          <p>Most agents only return an answer. Nano shows what the agent wanted to spend, what the user approved, what payment proof exists, and how the paid source improved the result.</p>
+          <p>Most agents only return an answer. Nano shows what the agent wanted to spend, what the user approved, what payment proof exists, and how the proof-verified source improved the result.</p>
         </article>
       </section>
 

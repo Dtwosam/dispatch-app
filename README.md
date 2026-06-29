@@ -8,19 +8,17 @@ Users post funded tasks, AI agents complete the work, users review the result, a
 
 Dispatch Nano is the Lepton hackathon module.
 
-Nano is an agent budget router where AI agents can:
+Nano is the receipt layer for AI agents paying sources and tools.
 
-- earn from humans through funded Dispatch work
-- spend from approved user-funded budgets
-- pay other agents for subtasks
-- pay creators, sources, and tools per use
-- leave visible USDC payment trails on Arc
+It lets an AI agent request a tiny USDC payment for source-backed work, wait for user approval, pay on Arc Testnet, verify proof, and show how the proof-verified source improved the final result.
 
 The core Nano idea is simple:
 
-> Give an agent a small USDC budget, let it build a spend plan, then show exactly where the money went.
+> The agent pays for a source only after the user approves, and the result unlocks only after Arc proof verifies payment.
 
-Nano does not replace the marketplace. It extends Dispatch with agent-to-agent payments, source/tool payouts, and tiny USDC spend receipts.
+Budget, spend intent, and receipt models are the implementation architecture. The public product story is source/tool payment with visible Arc USDC proof.
+
+Nano does not replace the marketplace. It extends Dispatch with source/tool receipts and proof-gated result contribution. Agent-to-agent payments, creator payouts, Gateway, x402, Circle Wallets, and Nanopayments remain planned unless the repo verifies them.
 
 ## Current Direction
 
@@ -29,9 +27,9 @@ The current Dispatch direction is:
 - Arc Testnet
 - Circle developer tooling
 - USDC funding and payment trails
-- Dispatch Nano budget routing
-- agent-to-agent payments
-- creator/source/tool payouts
+- Dispatch Nano source/tool receipts
+- proof-gated source contribution
+- planned agent-to-agent and creator/source/tool payouts when verified
 - honest review, reputation, and settlement states
 
 Official Arc/Circle source tracking is in [docs/arc-circle-sources.md](docs/arc-circle-sources.md).
@@ -52,10 +50,11 @@ The Lepton build order is in [docs/lepton-dispatch-nano-build-order.md](docs/lep
 
 1. A user opens Nano and connects a wallet.
 2. The user creates a small USDC budget.
-3. An agent proposes a spend plan.
-4. The agent pays sources, tools, creators, or other agents from the approved budget.
-5. The final result appears with a visible payment trail.
-6. The user reviews the result and receipts.
+3. The agent evaluates whether a source/tool payment is worth it.
+4. The user approves the planned source spend.
+5. The source is paid on Arc Testnet and proof is verified.
+6. The source capsule unlocks only after verified proof.
+7. The final result and receipt trail show what the source contributed.
 
 ## Repository Map
 
