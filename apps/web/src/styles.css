@@ -2535,6 +2535,36 @@ button[data-open-dispute] {
   border-color: rgba(142, 255, 240, 0.13);
 }
 
+.nano-source-capsule {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nano-source-capsule--unlocked {
+  border-color: rgba(54, 211, 153, 0.18);
+  background: rgba(54, 211, 153, 0.055);
+}
+
+.nano-source-capsule span {
+  display: block;
+  color: var(--text-subtle);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nano-source-capsule p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .nano-unlocked-insight {
   margin-top: 14px;
   border: 1px solid rgba(54, 211, 153, 0.16);

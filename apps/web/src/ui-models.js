@@ -479,11 +479,25 @@ export function buildNanoSourceUnlockPresentation({
   const unlockedInsight = "Stablecoins became the default settlement layer for crypto-native payments because they allow fast dollar-denominated transfers without waiting on traditional banking rails.";
   const contributionSummary = receipt?.contributionSummary || sourcePlan?.contributionSummary || "Unlocked source context for the final brief.";
   const starterOrLiveLabel = intent ? "Live source insight" : hasBudget ? "Active source insight" : "Starter source insight";
+  const txLink = unlocked ? buildArcTransactionLink(receipt?.proof?.txHash) : null;
   const proofStatus = unlocked
     ? "Paid with proof"
     : receiptStatus?.label || (intent?.status === "approved" ? "Approved, not paid yet" : "Not paid yet");
   return {
     label: starterOrLiveLabel,
+    capsuleLabel: "Dispatch-hosted starter source capsule",
+    capsuleTitle: unlocked ? "Source capsule unlocked" : "Source capsule locked",
+    capsuleHelper: unlocked
+      ? "Verified Arc proof unlocked this Dispatch-hosted starter source capsule for the result preview."
+      : "This Dispatch-hosted starter source capsule unlocks only after verified Arc proof.",
+    capsuleSummary: unlocked
+      ? unlockedInsight
+      : "Starter source summary is locked until Arc proof verifies payment.",
+    capsuleContribution: unlocked
+      ? contributionSummary
+      : "Source contribution is hidden from the result until verified proof exists.",
+    capsuleStateLabel: unlocked ? "Unlocked after proof" : "Locked before proof",
+    externalAccessClaim: false,
     isUnlocked: unlocked,
     unlocked,
     canShowInResult: unlocked,
@@ -506,6 +520,7 @@ export function buildNanoSourceUnlockPresentation({
     starterOrLiveLabel,
     insightLabel: starterOrLiveLabel,
     insight: unlockedInsight,
+    txLink,
   };
 }
 

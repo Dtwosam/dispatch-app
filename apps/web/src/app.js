@@ -3338,28 +3338,34 @@ function renderNanoPageSimplified() {
         <article class="nano-panel nano-source-card reveal-on-scroll" id="nanoSourceUnlock">
           <div class="nano-section-head">
             <div>
-              <p class="mini-label">Source unlock</p>
-              <h2>${escapeHtml(sourceUnlock.title)}</h2>
-              <p>${escapeHtml(sourceUnlock.copy)}</p>
+              <p class="mini-label">${escapeHtml(sourceUnlock.capsuleLabel)}</p>
+              <h2>${escapeHtml(sourceUnlock.capsuleTitle)}</h2>
+              <p>${escapeHtml(sourceUnlock.capsuleHelper)}</p>
             </div>
-            <span class="status-chip ${sourceUnlock.tone === "good" ? "good" : sourceUnlock.tone === "warn" ? "warn" : "pending"}">${escapeHtml(sourceUnlock.status)}</span>
+            <span class="status-chip ${sourceUnlock.tone === "good" ? "good" : sourceUnlock.tone === "warn" ? "warn" : "pending"}">${escapeHtml(sourceUnlock.proofStatus)}</span>
           </div>
           <div class="nano-source-facts">
+            <div><span>Capsule state</span><strong>${escapeHtml(sourceUnlock.capsuleStateLabel)}</strong></div>
             <div><span>Price</span><strong>${escapeHtml(sourceUnlock.priceLabel)}</strong></div>
             <div><span>Recipient wallet</span><strong>${escapeHtml(sourceUnlock.recipient)}</strong></div>
             <div><span>Reason</span><strong>${escapeHtml(sourceUnlock.reason)}</strong></div>
           </div>
-          ${sourceUnlock.unlocked ? `
-            <div class="nano-unlocked-insight">
-              <span>${escapeHtml(sourceUnlock.insightLabel)}</span>
-              <p>${escapeHtml(sourceUnlock.insight)}</p>
+          <div class="nano-source-capsule nano-source-capsule--${sourceUnlock.unlocked ? "unlocked" : "locked"}">
+            <div>
+              <span>${sourceUnlock.unlocked ? "Unlocked source summary" : "Locked source summary"}</span>
+              <p>${escapeHtml(sourceUnlock.capsuleSummary)}</p>
             </div>
-          ` : `
-            <div class="empty-inline">
-              <span class="empty-inline__mark" aria-hidden="true"></span>
-              <div><strong>Source insight locked.</strong><p>Verify Arc proof before this starter source insight appears in the result preview.</p></div>
+            <div>
+              <span>Contribution used by result</span>
+              <p>${escapeHtml(sourceUnlock.capsuleContribution)}</p>
             </div>
-          `}
+          </div>
+          <div class="nano-quiet-actions">
+            ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View receipt/proof</button>` : ""}
+            ${sourceUnlock.txLink ? `<a href="${escapeHtml(sourceUnlock.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
+          </div>
+          ${!sourceUnlock.unlocked ? `<p class="nano-helper nano-helper--warn">${escapeHtml(sourceUnlock.lockedSummary)}</p>` : ""}
+          <p class="nano-helper">This is a Dispatch-hosted starter source capsule, not claimed external source access.</p>
         </article>
       </section>
 

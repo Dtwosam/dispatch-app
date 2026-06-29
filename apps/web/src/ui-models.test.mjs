@@ -1393,6 +1393,13 @@ test("Nano source insight remains locked before verified proof", () => {
   assert.equal(missing.isUnlocked, false);
   assert.equal(missing.canShowInResult, false);
   assert.equal(missing.unlockStatus, "locked");
+  assert.equal(missing.capsuleLabel, "Dispatch-hosted starter source capsule");
+  assert.equal(missing.capsuleTitle, "Source capsule locked");
+  assert.equal(missing.capsuleStateLabel, "Locked before proof");
+  assert.match(missing.capsuleSummary, /locked until Arc proof/);
+  assert.match(missing.capsuleContribution, /hidden from the result/);
+  assert.equal(missing.externalAccessClaim, false);
+  assert.equal(missing.txLink, null);
   assert.equal(missing.proofStatus, "Not paid yet");
   assert.equal(missing.status, "Planned");
   assert.equal(missing.priceUsdc, 0.01);
@@ -1418,6 +1425,13 @@ test("Nano source insight unlocks only after verified Arc proof", () => {
   assert.equal(source.isUnlocked, true);
   assert.equal(source.canShowInResult, true);
   assert.equal(source.unlockStatus, "unlocked");
+  assert.equal(source.capsuleTitle, "Source capsule unlocked");
+  assert.equal(source.capsuleStateLabel, "Unlocked after proof");
+  assert.match(source.capsuleHelper, /Verified Arc proof unlocked/);
+  assert.match(source.capsuleSummary, /Stablecoins became/);
+  assert.match(source.capsuleContribution, /Unlocked source context/);
+  assert.match(source.txLink, /testnet\.arcscan\.app/);
+  assert.equal(source.externalAccessClaim, false);
   assert.equal(source.proofStatus, "Paid with proof");
   assert.equal(source.status, "Paid with proof");
   assert.equal(source.recipientWallet, "0x1111111111111111111111111111111111111111");
@@ -1440,6 +1454,8 @@ test("Nano local receipt does not unlock source insight as Paid with proof", () 
   assert.equal(source.canShowInResult, false);
   assert.equal(source.proofStatus, "Local receipt");
   assert.equal(source.status, "Local receipt");
+  assert.equal(source.capsuleTitle, "Source capsule locked");
+  assert.equal(source.txLink, null);
 });
 
 test("Nano rejected proof keeps source insight locked", () => {
@@ -1460,6 +1476,8 @@ test("Nano rejected proof keeps source insight locked", () => {
   assert.equal(source.unlockStatus, "locked");
   assert.equal(source.proofStatus, "Proof rejected");
   assert.equal(source.status, "Proof rejected");
+  assert.equal(source.capsuleStateLabel, "Locked before proof");
+  assert.equal(source.txLink, null);
 });
 
 test("Nano source insight stays locked when proof is missing", () => {
@@ -1475,6 +1493,7 @@ test("Nano source insight stays locked when proof is missing", () => {
   assert.equal(source.canShowInResult, false);
   assert.equal(source.proofStatus, "Not paid yet");
   assert.match(source.lockedSummary, /Verify Arc proof/);
+  assert.match(source.capsuleHelper, /starter source capsule/);
 });
 
 test("Nano result preview waits for source proof before verified payment", () => {
