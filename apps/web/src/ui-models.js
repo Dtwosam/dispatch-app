@@ -496,6 +496,120 @@ export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourc
   };
 }
 
+export function buildNanoResultContributionModel({
+  goal = "",
+  budget = null,
+  sourceRow = null,
+  sourceUnlock = null,
+  sourceIntent = null,
+  sourceReceipt = null,
+  verifiedContributions = [],
+} = {}) {
+  const receiptStatus = sourceReceipt ? buildNanoReceiptStatusModel(sourceReceipt) : null;
+  const sourceType = sourceRow?.typeLabel || labelize(sourceRow?.type || "source");
+  const sourceUsedLabel = sourceRow?.label || sourceUnlock?.starterOrLiveLabel || "Starter source contribution";
+  const verified = Boolean(sourceRow?.verified || sourceUnlock?.canShowInResult);
+  const txLink = verified ? buildArcTransactionLink(sourceReceipt?.proof?.txHash) || sourceRow?.txLink || null : null;
+  const verifiedSummaries = (verifiedContributions || [])
+    .filter((item) => item?.verified && item?.contributionSummary)
+    .map((item) => item.contributionSummary);
+  const primaryContribution = verifiedSummaries[0]
+    || sourceRow?.contributionSummary
+    || sourceUnlock?.contributionSummary
+    || "Starter source contribution waits for verified proof.";
+  const goalText = goal || "Create a short brief about stablecoin payments.";
+  const hasBudget = Boolean(budget);
+  const intentStatus = String(sourceIntent?.status || "").toLowerCase();
+
+  let proofStatus = "locked";
+  let proofStatusLabel = "Run not started";
+  let starterOrLiveLabel = "Starter brief preview";
+  let helper = "Create a Nano budget before source-backed contribution can unlock.";
+  let warning = "No fake source contribution is shown before verified proof.";
+
+  if (!hasBudget) {
+    proofStatus = "not_started";
+  } else if (verified) {
+    proofStatus = "unlocked";
+    proofStatusLabel = "Paid with proof";
+    starterOrLiveLabel = "Source-backed result unlocked";
+    helper = "Source-backed result unlocked. Nano verified the Arc payment before using this contribution.";
+    warning = "";
+  } else if (receiptStatus?.label === "Proof rejected") {
+    proofStatus = "rejected";
+    proofStatusLabel = "Proof rejected";
+    helper = "Source-backed contribution remains locked because proof was rejected.";
+    warning = "Rejected proof does not unlock paid contribution.";
+  } else if (receiptStatus?.label === "Local receipt") {
+    proofStatus = "local";
+    proofStatusLabel = "Local receipt";
+    helper = "Local receipt recorded. It does not unlock verified contribution.";
+    warning = "Local receipt is not a verified payment.";
+  } else if (receiptStatus?.label === "Proof pending") {
+    proofStatus = "pending";
+    proofStatusLabel = "Proof pending";
+    helper = "Arc proof is pending or unavailable. Source-backed contribution remains locked.";
+    warning = "Pending proof does not unlock paid contribution.";
+  } else if (intentStatus === "approved") {
+    proofStatus = "approved";
+    proofStatusLabel = "Approved, not paid yet";
+    helper = "Approved, not paid yet. The source-backed result remains locked until Arc proof verifies payment.";
+    warning = "Approval is not payment.";
+  } else {
+    proofStatus = "starter";
+    proofStatusLabel = "Not paid yet";
+    helper = "Starter brief preview. The source-backed contribution is locked until Arc proof verifies payment.";
+    warning = "Starter preview is not paid source access.";
+  }
+
+  const unlocked = proofStatus === "unlocked";
+  const sourceContributionSummary = unlocked
+    ? primaryContribution
+    : "Locked until verified Arc proof.";
+  const contributionBullets = unlocked
+    ? [
+      primaryContribution,
+      "Connects the final output to the user-approved source/tool spend.",
+      "Links the contribution back to a verified receipt trail.",
+    ]
+    : [
+      "Shows the starter output without claiming paid source access.",
+      "Keeps the paid contribution locked until verified proof exists.",
+      "Separates approval from payment.",
+    ];
+  const beforeSourceCopy = "Basic answer from starter context.";
+  const afterSourceCopy = unlocked
+    ? "Source-backed version adds the paid contribution summary."
+    : "Source-backed version unlocks after verified Arc proof.";
+  const finalOutput = unlocked
+    ? `${primaryContribution} Dispatch Nano uses that verified contribution to produce a clearer, source-backed brief about tiny USDC payments for agent work.`
+    : "The final output is a starter brief preview until source payment proof verifies.";
+
+  return {
+    goal: goalText,
+    resultTitle: "Result & source contribution",
+    starterOrLiveLabel,
+    proofStatus,
+    proofStatusLabel,
+    sourceUsedLabel,
+    sourceType,
+    sourceContributionSummary,
+    contributionBullets,
+    beforeSourceCopy,
+    afterSourceCopy,
+    finalOutput,
+    receiptReference: unlocked && sourceReceipt?.receiptId
+      ? `Receipt ${shortWallet(sourceReceipt.receiptId)}`
+      : "No verified receipt yet",
+    txLink,
+    locked: !unlocked,
+    unlocked,
+    tone: unlocked ? "good" : proofStatus === "rejected" ? "warn" : "pending",
+    helper,
+    warning,
+  };
+}
+
 export function nanoApiUnavailableMessage() {
   return "Nano router is unavailable. Budget creation and proof checks need the Dispatch router API.";
 }

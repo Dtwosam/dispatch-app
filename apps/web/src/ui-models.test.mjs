@@ -39,6 +39,7 @@ import {
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
   buildNanoReceiptDetailModel,
+  buildNanoResultContributionModel,
   buildNanoResetDraftState,
   buildNanoRunHistoryModel,
   buildNanoSelectedRunModel,
@@ -724,6 +725,120 @@ test("Nano result preview references only verified unlocked contributions", () =
     verifiedContributions: [{ verified: true, contributionSummary: "Should stay hidden without source proof." }],
   });
   assert.equal(locked.body, "The result preview is waiting for source proof.");
+});
+
+test("Nano result contribution stays locked before budget and before proof", () => {
+  const notStarted = buildNanoResultContributionModel({
+    goal: "Brief",
+    budget: null,
+  });
+  assert.equal(notStarted.locked, true);
+  assert.equal(notStarted.proofStatus, "not_started");
+  assert.equal(notStarted.proofStatusLabel, "Run not started");
+  assert.equal(notStarted.sourceContributionSummary, "Locked until verified Arc proof.");
+  assert.match(notStarted.helper, /Create a Nano budget/);
+
+  const starter = buildNanoResultContributionModel({
+    goal: "Brief",
+    budget: { amount: 0.1 },
+    sourceRow: { label: "Dispatch Source Unlock", typeLabel: "Source", contributionSummary: "Starter contribution.", verified: false },
+  });
+  assert.equal(starter.locked, true);
+  assert.equal(starter.proofStatus, "starter");
+  assert.equal(starter.proofStatusLabel, "Not paid yet");
+  assert.match(starter.finalOutput, /starter brief preview/i);
+});
+
+test("Nano result contribution approved local rejected and pending proof do not unlock", () => {
+  const approved = buildNanoResultContributionModel({
+    budget: { amount: 0.1 },
+    sourceIntent: { status: "approved" },
+  });
+  assert.equal(approved.locked, true);
+  assert.equal(approved.proofStatusLabel, "Approved, not paid yet");
+  assert.match(approved.warning, /Approval is not payment/);
+
+  const local = buildNanoResultContributionModel({
+    budget: { amount: 0.1 },
+    sourceReceipt: { proof: { proofType: "local", paymentState: "recorded" }, paymentState: "recorded" },
+  });
+  assert.equal(local.locked, true);
+  assert.equal(local.proofStatusLabel, "Local receipt");
+  assert.match(local.warning, /not a verified payment/);
+
+  const rejected = buildNanoResultContributionModel({
+    budget: { amount: 0.1 },
+    sourceReceipt: { proof: { proofType: "arc_tx", paymentState: "failed", txHash: `0x${"a".repeat(64)}` }, paymentState: "failed" },
+  });
+  assert.equal(rejected.locked, true);
+  assert.equal(rejected.proofStatusLabel, "Proof rejected");
+
+  const pending = buildNanoResultContributionModel({
+    budget: { amount: 0.1 },
+    sourceReceipt: { proof: { proofType: "arc_tx", paymentState: "recorded", txHash: "0x123" }, paymentState: "recorded" },
+  });
+  assert.equal(pending.locked, true);
+  assert.equal(pending.proofStatusLabel, "Proof pending");
+  assert.equal(pending.txLink, null);
+});
+
+test("Nano result contribution unlocks only with verified Arc proof and valid tx link", () => {
+  const txHash = `0x${"f".repeat(64)}`;
+  const sourceReceipt = {
+    receiptId: "receipt_source_verified",
+    contributionSummary: "Verified source showed why tiny USDC source payments matter.",
+    paymentState: "recorded",
+    proof: { proofType: "arc_tx", paymentState: "recorded", txHash },
+  };
+  const sourceRow = {
+    label: "Dispatch Source Unlock",
+    typeLabel: "Source",
+    verified: true,
+    contributionSummary: sourceReceipt.contributionSummary,
+    txLink: `https://testnet.arcscan.app/tx/${txHash}`,
+  };
+  const model = buildNanoResultContributionModel({
+    goal: "Create a brief",
+    budget: { amount: 0.1 },
+    sourceRow,
+    sourceReceipt,
+    verifiedContributions: [sourceRow],
+  });
+
+  assert.equal(model.unlocked, true);
+  assert.equal(model.locked, false);
+  assert.equal(model.proofStatusLabel, "Paid with proof");
+  assert.equal(model.sourceUsedLabel, "Dispatch Source Unlock");
+  assert.equal(model.sourceType, "Source");
+  assert.match(model.sourceContributionSummary, /tiny USDC source payments/);
+  assert.match(model.finalOutput, /verified contribution/);
+  assert.match(model.receiptReference, /Receipt/);
+  assert.match(model.txLink, /testnet\.arcscan\.app/);
+});
+
+test("Nano result contribution does not claim real external source access or planned tool unlocks", () => {
+  const gateway = buildNanoReceiptStatusModel({
+    proof: { proofType: "circle_gateway", paymentState: "recorded" },
+  });
+  const x402 = buildNanoReceiptStatusModel({
+    proof: { proofType: "x402", paymentState: "recorded" },
+  });
+  const plannedTool = buildNanoResultContributionModel({
+    budget: { amount: 0.1 },
+    sourceRow: {
+      label: "Claim-check Tool",
+      typeLabel: "Tool",
+      verified: false,
+      plannedOnly: true,
+      contributionSummary: "Planned tool contribution.",
+    },
+  });
+
+  assert.equal(plannedTool.locked, true);
+  assert.doesNotMatch(`${plannedTool.helper} ${plannedTool.finalOutput} ${plannedTool.sourceContributionSummary}`, /external source accessed|tool executed|paid source result/i);
+  assert.doesNotMatch(`${plannedTool.helper} ${plannedTool.warning}`, /judge/i);
+  assert.match(gateway.helper, /planned next/);
+  assert.match(x402.helper, /planned next/);
 });
 
 test("Nano budget guardrails calculate active budget totals without implying escrow", () => {

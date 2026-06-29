@@ -79,6 +79,7 @@ import {
   buildNanoRecipientWalletModel,
   buildNanoResetDraftState,
   buildNanoReceiptDetailModel,
+  buildNanoResultContributionModel,
   buildNanoRunHistoryModel,
   buildNanoSelectedRunModel,
   buildNanoRunProgressPresentation,
@@ -3006,6 +3007,16 @@ function renderNanoPageSimplified() {
     sourceUnlock,
     verifiedContributions: multiSpendPlan.verifiedRows,
   });
+  const sourceSpendRow = multiSpendPlan.rows.find((row) => row.payeeId === "source_unlock") || null;
+  const resultContribution = buildNanoResultContributionModel({
+    goal: state.nano.budgetGoal,
+    budget,
+    sourceRow: sourceSpendRow,
+    sourceUnlock,
+    sourceIntent,
+    sourceReceipt,
+    verifiedContributions: multiSpendPlan.verifiedRows,
+  });
   const firstUnapprovedIntent = intents.find((intent) => intent.status === "proposed");
   const primaryAction = (() => {
     if (!walletConnected) {
@@ -3356,21 +3367,34 @@ function renderNanoPageSimplified() {
         <article class="nano-panel nano-result-panel reveal-on-scroll" id="nanoResultPreview">
           <div class="nano-section-head">
             <div>
-              <p class="mini-label">${escapeHtml(resultPreview.label)}</p>
-              <h2>${escapeHtml(resultPreview.title)}</h2>
-              <p>${escapeHtml(resultPreview.subtitle)}</p>
+              <p class="mini-label">${escapeHtml(resultContribution.starterOrLiveLabel)}</p>
+              <h2>${escapeHtml(resultContribution.resultTitle)}</h2>
+              <p>${escapeHtml(resultContribution.helper)}</p>
             </div>
-            <span class="status-chip ${resultPreview.tone === "good" ? "good" : "pending"}">${escapeHtml(resultPreview.status)}</span>
+            <span class="status-chip ${resultContribution.tone === "good" ? "good" : resultContribution.tone === "warn" ? "warn" : "pending"}">${escapeHtml(resultContribution.proofStatusLabel)}</span>
           </div>
           <div class="nano-result-fields">
-            <div><span>Goal</span><strong>${escapeHtml(resultPreview.goal)}</strong></div>
-            <div><span>Paid source used</span><strong>${escapeHtml(resultPreview.paidSourceUsed)}</strong></div>
-            <div><span>Proof status</span><strong>${escapeHtml(resultPreview.proofStatus)}</strong></div>
+            <div><span>Goal</span><strong>${escapeHtml(resultContribution.goal)}</strong></div>
+            <div><span>Source/tool used</span><strong>${escapeHtml(resultContribution.sourceUsedLabel)}</strong></div>
+            <div><span>Type</span><strong>${escapeHtml(resultContribution.sourceType)}</strong></div>
+            <div><span>Contribution</span><strong>${escapeHtml(resultContribution.sourceContributionSummary)}</strong></div>
+            <div><span>Receipt</span><strong>${escapeHtml(resultContribution.receiptReference)}</strong></div>
+            <div><span>Proof status</span><strong>${escapeHtml(resultContribution.proofStatusLabel)}</strong></div>
+          </div>
+          <div class="nano-result-contrast">
+            <div><span>Before source</span><strong>${escapeHtml(resultContribution.beforeSourceCopy)}</strong></div>
+            <div><span>After source</span><strong>${escapeHtml(resultContribution.afterSourceCopy)}</strong></div>
           </div>
           <div class="nano-result-copy">
-            <strong>What the agent produced</strong>
-            <p>${escapeHtml(resultPreview.body)}</p>
+            <strong>What changed because of the source</strong>
+            <ul>
+              ${resultContribution.contributionBullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
+            </ul>
+            <strong>Final output</strong>
+            <p>${escapeHtml(resultContribution.finalOutput)}</p>
           </div>
+          ${resultContribution.txLink ? `<a class="hero-secondary nano-result-cta" href="${escapeHtml(resultContribution.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
+          ${resultContribution.warning ? `<p class="nano-helper nano-helper--warn">${escapeHtml(resultContribution.warning)}</p>` : ""}
           <button class="hero-secondary nano-result-cta" type="button" id="nanoViewResult">${escapeHtml(resultPreview.cta)}</button>
         </article>
       </section>

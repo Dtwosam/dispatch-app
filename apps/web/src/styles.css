@@ -2371,7 +2371,8 @@ button[data-open-dispute] {
 
 .nano-decision-grid,
 .nano-source-facts,
-.nano-result-fields {
+.nano-result-fields,
+.nano-result-contrast {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
@@ -2380,7 +2381,8 @@ button[data-open-dispute] {
 
 .nano-decision-grid div,
 .nano-source-facts div,
-.nano-result-fields div {
+.nano-result-fields div,
+.nano-result-contrast div {
   min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.052);
   border-radius: 16px;
@@ -2390,7 +2392,8 @@ button[data-open-dispute] {
 
 .nano-decision-grid span,
 .nano-source-facts span,
-.nano-result-fields span {
+.nano-result-fields span,
+.nano-result-contrast span {
   display: block;
   color: var(--text-subtle);
   font-size: 0.72rem;
@@ -2400,7 +2403,8 @@ button[data-open-dispute] {
 
 .nano-decision-grid strong,
 .nano-source-facts strong,
-.nano-result-fields strong {
+.nano-result-fields strong,
+.nano-result-contrast strong {
   display: block;
   margin-top: 5px;
   color: var(--text);
@@ -2750,6 +2754,7 @@ button[data-open-dispute] {
   .nano-decision-grid,
   .nano-source-facts,
   .nano-result-fields,
+  .nano-result-contrast,
   .nano-guardrail-grid,
   .nano-run-card__facts {
     grid-template-columns: 1fr;
