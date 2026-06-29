@@ -131,30 +131,21 @@ export const nanoSourcePaymentSpendPlanRows = [
     primary: true,
   },
   {
-    payeeId: "summarizer_agent",
-    type: "agent",
-    label: "Summarizer helper",
+    payeeId: "summary_formatter",
+    type: "tool",
+    label: "Summary formatter",
     amount: 0.01,
     reason: "Turns notes into a short summary.",
     contributionSummary: "Compressed source notes into a concise signal summary.",
     starterOnly: true,
   },
   {
-    payeeId: "claim_check_agent",
-    type: "agent",
-    label: "Claim-check helper",
-    amount: 0.01,
+    payeeId: "claim_check_tool",
+    type: "tool",
+    label: "Claim-check tool",
+    amount: 0.02,
     reason: "Checks the strongest claims.",
     contributionSummary: "Flagged claims that need cautious wording.",
-    starterOnly: true,
-  },
-  {
-    payeeId: "hook_agent",
-    type: "agent",
-    label: "Hook helper",
-    amount: 0.01,
-    reason: "Makes the brief easier to read.",
-    contributionSummary: "Generated the opening angle used in the final brief.",
     starterOnly: true,
   },
 ];
@@ -419,11 +410,17 @@ export function buildNanoRunProgressPresentation({
   };
 }
 
-export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourceProof = false, sourceUnlock = null } = {}) {
+export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourceProof = false, sourceUnlock = null, verifiedContributions = [] } = {}) {
   const canUseSource = sourceUnlock ? Boolean(sourceUnlock.canShowInResult) : hasVerifiedSourceProof;
+  const unlockedContributions = (verifiedContributions || [])
+    .filter((item) => item?.verified && item?.contributionSummary)
+    .map((item) => item.contributionSummary);
   const sourceLabel = sourceUnlock?.starterOrLiveLabel || "Starter source insight";
   const sourceInsight = sourceUnlock?.unlockedInsight
     || "Stablecoins became one of crypto's most useful products because they make dollar payments fast, programmable, and global.";
+  const contributionCopy = unlockedContributions.length > 1
+    ? ` Verified contributions: ${unlockedContributions.join(" ")}`
+    : "";
   return {
     title: "Result preview",
     subtitle: "See what this Nano run produced and which paid source supported it.",
@@ -434,7 +431,7 @@ export function buildNanoResultPreviewPresentation({ goal = "", hasVerifiedSourc
     paidSourceUsed: canUseSource ? sourceLabel : "Waiting for verified source proof",
     proofStatus: canUseSource ? "Paid with proof" : "Not paid yet",
     body: canUseSource
-      ? `${sourceInsight} For agents, that matters because tiny payments can now happen per source, per API call, or per task without forcing users into subscriptions.`
+      ? `${sourceInsight} For agents, that matters because tiny payments can now happen per source, per API call, or per task without forcing users into subscriptions.${contributionCopy}`
       : "The result preview is waiting for source proof.",
     label: "Starter brief preview",
   };
@@ -524,6 +521,80 @@ export function buildNanoSpendIntentStatusModel(intent, receipt) {
     label: "Planned",
     tone: "pending",
     helper: "The user must approve this spend before proof can be recorded.",
+  };
+}
+
+export function buildNanoMultiSpendPlanRows({ planRows = nanoSourcePaymentSpendPlanRows, intents = [], receiptsByIntent = new Map() } = {}) {
+  const intentByPayeeId = new Map((intents || []).map((intent) => [intent?.payee?.payeeId, intent]));
+  const usedIntentIds = new Set();
+  const buildRow = (plan, intent = null, fallbackIndex = 0) => {
+    const receipt = intent ? receiptsByIntent.get(intent.intentId) : null;
+    const status = receipt ? buildNanoReceiptStatusModel(receipt) : intent ? buildNanoSpendIntentStatusModel(intent, null) : { label: "Not paid yet", tone: "pending" };
+    const proofStatus = receipt ? buildNanoReceiptStatusModel(receipt) : { label: "Not paid yet", tone: "pending" };
+    const payableNow = Boolean(
+      plan?.primary
+        && intent
+        && intent.status === "approved"
+        && !receipt
+        && intent?.payee?.walletAddress,
+    );
+    const plannedOnly = Boolean(!plan?.primary || plan?.starterOnly);
+    const verified = isVerifiedNanoArcProofReceipt(receipt);
+    if (intent?.intentId) usedIntentIds.add(intent.intentId);
+    return {
+      key: plan?.payeeId || intent?.intentId || `planned_${fallbackIndex}`,
+      intentId: intent?.intentId || "",
+      receiptId: receipt?.receiptId || "",
+      payeeId: plan?.payeeId || intent?.payee?.payeeId || "",
+      label: intent?.payee?.label || plan?.label || "Planned spend",
+      type: intent?.payee?.type || plan?.type || "tool",
+      typeLabel: labelize(intent?.payee?.type || plan?.type || "tool"),
+      amount: formatNanoUsdc(intent?.amount ?? plan?.amount ?? 0),
+      amountValue: Number(intent?.amount ?? plan?.amount ?? 0),
+      reason: intent?.reason || plan?.reason || "No reason recorded.",
+      contributionSummary: receipt?.contributionSummary || plan?.contributionSummary || "",
+      recipient: intent?.payee?.walletAddress ? shortWallet(intent.payee.walletAddress) : "No recipient wallet",
+      recipientWallet: intent?.payee?.walletAddress || "",
+      stateLabel: plan?.primary
+        ? "Payable on Arc"
+        : intent
+          ? "Planned next"
+          : "Starter",
+      proofLabel: proofStatus.label,
+      proofTone: proofStatus.tone,
+      statusLabel: status.label,
+      statusTone: status.tone,
+      canPayOnArc: payableNow,
+      payActionLabel: payableNow ? "Pay source on Arc" : plannedOnly ? "Planned next" : "Proof required before paid",
+      plannedOnly,
+      starterOnly: Boolean(plan?.starterOnly && !intent),
+      primary: Boolean(plan?.primary),
+      verified,
+      txLink: buildArcTransactionLink(receipt?.proof?.txHash),
+      txLabel: buildArcTransactionLink(receipt?.proof?.txHash) ? shortWallet(receipt.proof.txHash) : "",
+    };
+  };
+
+  const rows = (planRows || []).map((plan, index) => buildRow(plan, intentByPayeeId.get(plan.payeeId) || null, index));
+  for (const intent of intents || []) {
+    if (!intent?.intentId || usedIntentIds.has(intent.intentId)) continue;
+    rows.push(buildRow({
+      payeeId: intent?.payee?.payeeId || intent.intentId,
+      type: intent?.payee?.type || "tool",
+      label: intent?.payee?.label || "Stored spend",
+      amount: intent?.amount || 0,
+      reason: intent?.reason || "Stored router spend intent.",
+      contributionSummary: "",
+      starterOnly: false,
+      primary: false,
+    }, intent, rows.length));
+  }
+
+  return {
+    rows,
+    payableRows: rows.filter((row) => row.canPayOnArc),
+    verifiedRows: rows.filter((row) => row.verified),
+    helper: "Only the source unlock can be paid in the current live Arc flow. Other spend intents show where Nano can expand next and are never marked paid without proof.",
   };
 }
 

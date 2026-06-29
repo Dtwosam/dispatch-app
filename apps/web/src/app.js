@@ -71,6 +71,7 @@ import {
   buildNanoAgentDecisionPresentation,
   buildNanoBudgetStatusModel,
   buildNanoMetricsModel,
+  buildNanoMultiSpendPlanRows,
   buildNanoPaymentActionModel,
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
@@ -2439,10 +2440,10 @@ function makeNanoLocalProof(label, notes = []) {
 
 function selectedNanoArcProofIntent(intents, receiptsByIntent) {
   const requestedId = state.nano.arcProofIntentId;
-  return intents.find((intent) => intent.intentId === requestedId)
-    || intents.find((intent) => intent.status === "approved" && !receiptsByIntent.has(intent.intentId))
-    || intents.find((intent) => !receiptsByIntent.has(intent.intentId))
-    || intents[0]
+  const payableSourceIntents = intents.filter((intent) => intent?.payee?.payeeId === "source_unlock");
+  return payableSourceIntents.find((intent) => intent.intentId === requestedId && !receiptsByIntent.has(intent.intentId))
+    || payableSourceIntents.find((intent) => intent.status === "approved" && !receiptsByIntent.has(intent.intentId))
+    || payableSourceIntents.find((intent) => !receiptsByIntent.has(intent.intentId))
     || null;
 }
 
@@ -2974,6 +2975,11 @@ function renderNanoPageSimplified() {
     receipt: sourceReceipt,
     recipientWalletModel: sourcePayoutWalletModel,
   });
+  const multiSpendPlan = buildNanoMultiSpendPlanRows({
+    planRows: nanoPlannedSpendRows,
+    intents,
+    receiptsByIntent,
+  });
   const hasVerifiedSourceProof = Boolean(sourceUnlock.canShowInResult);
   const hasVerifiedReceipt = hasVerifiedSourceProof;
   const hasProofPending = state.nano.arcProofStatus === "pending" || Boolean(state.nano.arcProofTxHash.trim() && arcProofIntent && !arcProofReceipt);
@@ -2989,6 +2995,7 @@ function renderNanoPageSimplified() {
     goal: state.nano.budgetGoal,
     hasVerifiedSourceProof,
     sourceUnlock,
+    verifiedContributions: multiSpendPlan.verifiedRows,
   });
   const firstUnapprovedIntent = intents.find((intent) => intent.status === "proposed");
   const primaryAction = (() => {
@@ -3209,7 +3216,7 @@ function renderNanoPageSimplified() {
             <div>
               <p class="mini-label">Spend plan</p>
               <h2>${escapeHtml(spendPlanPresentation.label)}</h2>
-              <p>Each planned spend should support the final result shown below.</p>
+              <p>The agent can propose source/tool payments, but each paid state needs proof.</p>
             </div>
             <span class="status-chip ${budgetStatus.tone === "good" ? "good" : budgetStatus.tone === "warn" ? "warn" : "pending"}">${escapeHtml(runProgress.currentStep)}</span>
           </div>
@@ -3217,29 +3224,16 @@ function renderNanoPageSimplified() {
           ${state.nano.budgetsLoading ? `<p class="nano-helper">Loading your Nano budgets...</p>` : ""}
           ${state.nano.budgetsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(nanoApiUnavailableMessage())}</p>` : ""}
           <div class="nano-spend-plan">
-            ${nanoPlannedSpendRows.map((plan) => {
-              const intent = intents.find((item) => item.payee.payeeId === plan.payeeId);
-              const receipt = intent ? receiptsByIntent.get(intent.intentId) : null;
-              const status = intent ? buildNanoSpendIntentStatusModel(intent, receipt) : { label: "Planned", tone: "pending" };
-              const nextAction = receipt
-                ? "Paid with proof"
-                : intent?.status === "approved"
-                  ? (intent.payee.walletAddress ? "Pay source on Arc" : "Add recipient wallet")
-                  : intent
-                    ? "Approve planned spend"
-                    : "Create budget";
-              const sourceRecipient = plan.payeeId === "source_unlock" && intent?.payee?.walletAddress
-                ? `<p>Recipient wallet ${escapeHtml(shortWallet(intent.payee.walletAddress))}</p>`
-                : "";
+            ${multiSpendPlan.rows.map((row) => {
               return `
-                <article class="nano-spend-row ${plan.primary ? "nano-spend-row--primary" : ""}">
+                <article class="nano-spend-row ${row.primary ? "nano-spend-row--primary" : row.plannedOnly ? "nano-spend-row--planned" : ""}">
                   <div>
-                    <span class="nano-payee-type">${escapeHtml(labelize(plan.type))}</span>
-                    <strong>${escapeHtml(plan.label)}</strong>
-                    <p>${escapeHtml(plan.reason)}</p>
-                    <p>${plan.primary ? "Primary source/tool unlock for this Nano run." : "Secondary starter example; not a live external helper-agent payout."}</p>
-                    ${sourceRecipient}
-                    ${plan.payeeId === "source_unlock" ? `
+                    <span class="nano-payee-type">${escapeHtml(row.typeLabel)}</span>
+                    <strong>${escapeHtml(row.label)}</strong>
+                    <p>${escapeHtml(row.reason)}</p>
+                    <p>${row.primary ? "Primary source/tool unlock for this Nano run." : "Planned next. Not a live payout flow unless real proof exists."}</p>
+                    ${row.recipientWallet ? `<p>Recipient wallet ${escapeHtml(row.recipient)}</p>` : ""}
+                    ${row.primary ? `
                       <label class="nano-field nano-field--inline">
                         <span>Recipient wallet</span>
                         <input id="nanoSourcePayoutWallet" type="text" value="${escapeHtml(state.nano.sourcePayoutWallet)}" placeholder="0x recipient wallet" />
@@ -3248,9 +3242,11 @@ function renderNanoPageSimplified() {
                     ` : ""}
                   </div>
                   <div class="nano-spend-row__meta">
-                    <strong>${escapeHtml(formatNanoUsdc(plan.amount))}</strong>
-                    <span class="status-chip ${status.tone === "good" ? "good" : status.tone === "warn" ? "warn" : "pending"}">${escapeHtml(status.label)}</span>
-                    <small>Next: ${escapeHtml(nextAction)}</small>
+                    <strong>${escapeHtml(row.amount)}</strong>
+                    <span class="status-chip ${row.proofTone === "good" ? "good" : row.proofTone === "warn" ? "warn" : "pending"}">${escapeHtml(row.proofLabel)}</span>
+                    <small>State: ${escapeHtml(row.stateLabel)}</small>
+                    <small>Action: ${escapeHtml(row.payActionLabel)}</small>
+                    ${row.txLink ? `<a href="${escapeHtml(row.txLink)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
                   </div>
                 </article>
               `;
@@ -3266,7 +3262,7 @@ function renderNanoPageSimplified() {
                 </div>
               </article>
           </div>
-          <p class="nano-helper">${escapeHtml(spendPlanPresentation.helper)}</p>
+          <p class="nano-helper">${escapeHtml(multiSpendPlan.helper)}</p>
         </article>
 
         <article class="nano-panel reveal-on-scroll" id="nanoProofGate">
@@ -3667,7 +3663,7 @@ async function createNanoBudgetDraft() {
     ownerWallet: state.wallet,
     goal: state.nano.budgetGoal.trim(),
     amount,
-    spendPlanSummary: "Lepton Nano spend plan: source unlock, summarizer agent, claim-check agent, hook agent, main agent remainder.",
+    spendPlanSummary: "Lepton Nano spend plan: source unlock, summary formatter, claim-check tool, main agent remainder.",
     policy: {
       maxBudgetAmount: amount,
       maxSpendAmount: amount,

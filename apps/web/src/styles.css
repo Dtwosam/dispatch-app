@@ -1943,6 +1943,11 @@ button[data-open-dispute] {
   background: rgba(255, 255, 255, 0.012);
 }
 
+.nano-spend-row--planned {
+  border-color: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.014);
+}
+
 .nano-spend-row strong,
 .nano-receipt-row strong,
 .nano-summary-list strong {

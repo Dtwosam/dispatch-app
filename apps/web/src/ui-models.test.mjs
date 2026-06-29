@@ -31,6 +31,7 @@ import {
   buildNanoBudgetStatusModel,
   buildNanoCurrentStepModel,
   buildNanoMetricsModel,
+  buildNanoMultiSpendPlanRows,
   buildNanoPaymentActionModel,
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
@@ -501,12 +502,172 @@ test("Nano source payment plan keeps source unlock primary with safe 2-decimal a
   assert.equal(source.payeeId, "source_unlock");
   assert.equal(source.primary, true);
   assert.equal(source.amount, 0.01);
+  assert.equal(nanoSourcePaymentSpendPlanRows.length, 3);
   assert.equal(validateNanoBudgetAmount("0.005").valid, false);
   assert.equal(validateNanoBudgetAmount("0.005").message, "Use up to 2 decimal places.");
   helpers.forEach((helper) => {
     assert.equal(helper.starterOnly, true);
-    assert.equal(helper.amount, 0.01);
+    assert.equal(helper.type, "tool");
+    assert.ok(["0.01", "0.02"].includes(helper.amount.toFixed(2)));
   });
+});
+
+test("Nano multi-spend plan returns multiple rows with only source payable on Arc", () => {
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [
+      {
+        intentId: "intent_source",
+        status: "approved",
+        amount: 0.01,
+        reason: "Adds source-backed context.",
+        payee: {
+          payeeId: "source_unlock",
+          type: "source",
+          label: "Source unlock",
+          walletAddress: "0x2222222222222222222222222222222222222222",
+        },
+      },
+      {
+        intentId: "intent_tool",
+        status: "approved",
+        amount: 0.02,
+        reason: "Checks the strongest claims.",
+        payee: {
+          payeeId: "claim_check_tool",
+          type: "tool",
+          label: "Claim-check tool",
+          walletAddress: "0x3333333333333333333333333333333333333333",
+        },
+      },
+    ],
+    receiptsByIntent: new Map(),
+  });
+
+  assert.equal(rows.rows.length, 3);
+  assert.equal(rows.rows[0].label, "Source unlock");
+  assert.equal(rows.rows[0].canPayOnArc, true);
+  assert.equal(rows.rows[0].payActionLabel, "Pay source on Arc");
+  assert.equal(rows.rows[1].canPayOnArc, false);
+  assert.equal(rows.rows[1].payActionLabel, "Planned next");
+  assert.equal(rows.rows[1].proofLabel, "Not paid yet");
+  assert.equal(rows.payableRows.length, 1);
+  assert.match(rows.helper, /Only the source unlock can be paid/);
+});
+
+test("Nano multi-spend planned rows do not show paid without verified proof", () => {
+  const localReceipt = {
+    receiptId: "receipt_local",
+    intentId: "intent_tool",
+    paymentState: "recorded",
+    proof: { proofType: "local", paymentState: "recorded", txHash: null },
+  };
+  const rejectedReceipt = {
+    receiptId: "receipt_rejected",
+    intentId: "intent_rejected",
+    paymentState: "failed",
+    proof: { proofType: "arc_tx", paymentState: "failed", txHash: `0x${"b".repeat(64)}` },
+  };
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [
+      {
+        intentId: "intent_tool",
+        status: "payment_recorded",
+        amount: 0.02,
+        reason: "Checks the strongest claims.",
+        payee: { payeeId: "claim_check_tool", type: "tool", label: "Claim-check tool", walletAddress: null },
+      },
+      {
+        intentId: "intent_rejected",
+        status: "failed",
+        amount: 0.01,
+        reason: "Formats the summary.",
+        payee: { payeeId: "summary_formatter", type: "tool", label: "Summary formatter", walletAddress: null },
+      },
+    ],
+    receiptsByIntent: new Map([
+      ["intent_tool", localReceipt],
+      ["intent_rejected", rejectedReceipt],
+    ]),
+  });
+
+  assert.equal(rows.rows.find((row) => row.payeeId === "claim_check_tool").proofLabel, "Local receipt");
+  assert.equal(rows.rows.find((row) => row.payeeId === "claim_check_tool").verified, false);
+  assert.equal(rows.rows.find((row) => row.payeeId === "summary_formatter").proofLabel, "Proof rejected");
+  assert.equal(rows.rows.find((row) => row.payeeId === "summary_formatter").verified, false);
+  assert.equal(rows.verifiedRows.length, 0);
+});
+
+test("Nano multi-spend rows show paid with proof and tx links only for verified Arc receipts", () => {
+  const txHash = `0x${"c".repeat(64)}`;
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [
+      {
+        intentId: "intent_source",
+        status: "payment_recorded",
+        amount: 0.01,
+        reason: "Adds source-backed context.",
+        payee: { payeeId: "source_unlock", type: "source", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+      },
+      {
+        intentId: "intent_tool",
+        status: "payment_recorded",
+        amount: 0.02,
+        reason: "Checks claims.",
+        payee: { payeeId: "claim_check_tool", type: "tool", label: "Claim-check tool", walletAddress: null },
+      },
+    ],
+    receiptsByIntent: new Map([
+      ["intent_source", {
+        receiptId: "receipt_source",
+        intentId: "intent_source",
+        paymentState: "recorded",
+        contributionSummary: "Unlocked source context for the final brief.",
+        proof: { proofType: "arc_tx", paymentState: "recorded", txHash },
+      }],
+      ["intent_tool", {
+        receiptId: "receipt_tool",
+        intentId: "intent_tool",
+        paymentState: "recorded",
+        contributionSummary: "Invalid hash should not unlock.",
+        proof: { proofType: "arc_tx", paymentState: "recorded", txHash: "0x123" },
+      }],
+    ]),
+  });
+
+  const source = rows.rows.find((row) => row.payeeId === "source_unlock");
+  const tool = rows.rows.find((row) => row.payeeId === "claim_check_tool");
+  assert.equal(source.proofLabel, "Paid with proof");
+  assert.equal(source.verified, true);
+  assert.match(source.txLink, /testnet\.arcscan\.app/);
+  assert.equal(tool.proofLabel, "Proof pending");
+  assert.equal(tool.verified, false);
+  assert.equal(tool.txLink, null);
+  assert.equal(rows.verifiedRows.length, 1);
+});
+
+test("Nano result preview references only verified unlocked contributions", () => {
+  const preview = buildNanoResultPreviewPresentation({
+    goal: "Brief",
+    hasVerifiedSourceProof: true,
+    sourceUnlock: { canShowInResult: true, starterOrLiveLabel: "Live source insight", unlockedInsight: "Verified source insight." },
+    verifiedContributions: [
+      { verified: true, contributionSummary: "Source contribution included." },
+      { verified: true, contributionSummary: "Claim-check contribution included." },
+      { verified: false, contributionSummary: "Unverified contribution must not appear." },
+    ],
+  });
+
+  assert.match(preview.body, /Source contribution included/);
+  assert.match(preview.body, /Claim-check contribution included/);
+  assert.doesNotMatch(preview.body, /Unverified contribution/);
+
+  const locked = buildNanoResultPreviewPresentation({
+    goal: "Brief",
+    hasVerifiedSourceProof: false,
+    sourceUnlock: { canShowInResult: false },
+    verifiedContributions: [{ verified: true, contributionSummary: "Should stay hidden without source proof." }],
+  });
+  assert.equal(locked.body, "The result preview is waiting for source proof.");
 });
 
 test("Nano agent decision presentation separates starter and active decision states", () => {
