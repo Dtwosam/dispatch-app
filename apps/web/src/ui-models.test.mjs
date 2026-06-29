@@ -32,6 +32,7 @@ import {
   buildNanoBudgetGuardrailModel,
   buildNanoBudgetStatusModel,
   buildNanoCurrentStepModel,
+  buildNanoJudgeCommandCenterModel,
   buildNanoMetricsModel,
   buildNanoMultiSpendPlanRows,
   buildNanoPaymentActionModel,
@@ -1559,6 +1560,29 @@ test("Nano run progress follows budget approval proof and result states", () => 
   assert.equal(buildNanoRunProgressPresentation({ hasApprovedSpend: true }).currentStep, "Payment proof pending");
   assert.equal(buildNanoRunProgressPresentation({ hasProofPending: true }).currentCopy, "Waiting for Arc proof to confirm the payment.");
   assert.equal(buildNanoRunProgressPresentation({ hasVerifiedSourceProof: true }).currentStep, "Result ready");
+});
+
+test("Nano judge command center labels live starter and planned claims honestly", () => {
+  const starter = buildNanoJudgeCommandCenterModel({});
+  const verified = buildNanoJudgeCommandCenterModel({
+    hasBudget: true,
+    hasSpendPlan: true,
+    hasApprovedSpend: true,
+    hasVerifiedSourceProof: true,
+    hasReceipt: true,
+  });
+
+  assert.equal(starter.eyebrow, "Judge test path");
+  assert.match(starter.body, /Arc proof verifies payment/);
+  assert.ok(starter.clickPath.includes("Create Nano budget"));
+  assert.ok(verified.clickPath.includes("Open receipt"));
+  assert.ok(starter.claimGroups.find((group) => group.label === "Live").items.includes("Arc Testnet USDC proof"));
+  assert.ok(starter.claimGroups.find((group) => group.label === "Starter").items.includes("Dispatch-hosted source capsule"));
+  assert.ok(starter.claimGroups.find((group) => group.label === "Planned").items.includes("Gateway/x402 settlement"));
+  assert.ok(starter.proofRules.includes("Approved is not paid."));
+  assert.ok(starter.proofRules.includes("Paid with proof appears only after verified Arc proof."));
+  assert.doesNotMatch(JSON.stringify(starter), /fake demo data|paid users|production launch/i);
+  assert.match(verified.currentState, /unlock/);
 });
 
 test("Nano API unavailable copy explains router dependency", () => {

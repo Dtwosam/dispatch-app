@@ -2309,6 +2309,78 @@ button[data-open-dispute] {
   font-size: 0.88rem;
 }
 
+.nano-judge-center {
+  border-color: rgba(142, 255, 240, 0.13);
+  background:
+    linear-gradient(135deg, rgba(9, 25, 42, 0.78), rgba(13, 36, 58, 0.5)),
+    rgba(9, 25, 42, 0.66);
+}
+
+.nano-judge-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.nano-judge-path,
+.nano-judge-claims article {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 18px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nano-judge-path strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.nano-judge-path ol,
+.nano-judge-claims ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.nano-judge-claims {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nano-judge-claims .status-chip {
+  width: fit-content;
+}
+
+.nano-proof-rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.nano-proof-rules strong,
+.nano-proof-rules span {
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.nano-proof-rules strong {
+  border-color: rgba(142, 255, 240, 0.14);
+  color: var(--text);
+  background: rgba(142, 255, 240, 0.045);
+}
+
 .nano-demo-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
@@ -2864,7 +2936,9 @@ button[data-open-dispute] {
 
   .nano-demo-card,
   .nano-two-col,
-  .nano-bottom-grid {
+  .nano-bottom-grid,
+  .nano-judge-grid,
+  .nano-judge-claims {
     grid-template-columns: 1fr;
   }
 
@@ -2896,6 +2970,8 @@ button[data-open-dispute] {
   .nano-form-grid,
   .nano-how-grid,
   .nano-demo-facts,
+  .nano-judge-grid,
+  .nano-judge-claims,
   .nano-guardrail-grid,
   .nano-receipt-detail-row {
     grid-template-columns: 1fr;

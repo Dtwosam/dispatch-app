@@ -72,6 +72,7 @@ import {
   buildNanoAgentEvaluationPanelModel,
   buildNanoBudgetGuardrailModel,
   buildNanoBudgetStatusModel,
+  buildNanoJudgeCommandCenterModel,
   buildNanoMetricsModel,
   buildNanoMultiSpendPlanRows,
   buildNanoPaymentActionModel,
@@ -3040,6 +3041,13 @@ function renderNanoPageSimplified() {
     spendRows: multiSpendPlan.rows,
   });
   const activeReceiptBudgetId = receiptBudgetId || budget?.budgetId || state.nano.selectedBudgetId || "";
+  const judgeCommandCenter = buildNanoJudgeCommandCenterModel({
+    hasBudget: Boolean(budget),
+    hasSpendPlan: hasFullNanoPlan,
+    hasApprovedSpend: sourceIntent?.status === "approved" || hasApprovedSpend,
+    hasVerifiedSourceProof,
+    hasReceipt: Boolean(activeReceiptBudgetId && receipts.length),
+  });
   const receiptShareUrl = buildNanoReceiptShareUrl({
     budgetId: activeReceiptBudgetId,
     origin: window.location.origin,
@@ -3272,6 +3280,40 @@ function renderNanoPageSimplified() {
             </article>
           `).join("")}
         </div>
+      </section>
+
+      <section class="nano-panel nano-judge-center reveal-on-scroll" id="nanoJudgeTestPath">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">${escapeHtml(judgeCommandCenter.eyebrow)}</p>
+            <h2>${escapeHtml(judgeCommandCenter.title)}</h2>
+            <p>${escapeHtml(judgeCommandCenter.body)}</p>
+          </div>
+          <span class="meta-pill">No fake demo data</span>
+        </div>
+        <div class="nano-judge-grid">
+          <div class="nano-judge-path">
+            <strong>What to click</strong>
+            <ol>
+              ${judgeCommandCenter.clickPath.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}
+            </ol>
+          </div>
+          <div class="nano-judge-claims">
+            ${judgeCommandCenter.claimGroups.map((group) => `
+              <article>
+                <span class="status-chip ${group.tone === "good" ? "good" : "pending"}">${escapeHtml(group.label)}</span>
+                <ul>
+                  ${group.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                </ul>
+              </article>
+            `).join("")}
+          </div>
+        </div>
+        <div class="nano-proof-rules">
+          <strong>What counts as paid</strong>
+          ${judgeCommandCenter.proofRules.map((rule) => `<span>${escapeHtml(rule)}</span>`).join("")}
+        </div>
+        <p class="nano-helper">${escapeHtml(judgeCommandCenter.currentState)}</p>
       </section>
 
       <section class="nano-panel nano-demo-card reveal-on-scroll" id="nanoRunStart">

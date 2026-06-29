@@ -457,6 +457,75 @@ export function buildNanoAgentEvaluationPanelModel({
   };
 }
 
+export function buildNanoJudgeCommandCenterModel({
+  hasBudget = false,
+  hasSpendPlan = false,
+  hasApprovedSpend = false,
+  hasVerifiedSourceProof = false,
+  hasReceipt = false,
+} = {}) {
+  const clickPath = [
+    hasBudget ? "Budget created" : "Create Nano budget",
+    hasSpendPlan ? "Agent evaluation ready" : "Review source payment",
+    hasApprovedSpend ? "Source spend approved" : "Approve source spend",
+    hasVerifiedSourceProof ? "Arc proof verified" : "Pay source on Arc",
+    hasVerifiedSourceProof ? "Source capsule unlocked" : "Verify Arc proof",
+    hasReceipt ? "Open receipt" : "View receipt trail",
+  ];
+
+  return {
+    eyebrow: "Judge test path",
+    title: "Review Nano in under 60 seconds.",
+    body: "Nano lets an agent request a tiny USDC source/tool payment, then unlocks the source-backed result only after Arc proof verifies payment.",
+    clickPath,
+    claimGroups: [
+      {
+        label: "Live",
+        tone: "good",
+        items: [
+          "User-approved source spend",
+          "Arc Testnet USDC proof",
+          "Proof-gated paid labels",
+          "Shareable receipt trail",
+        ],
+      },
+      {
+        label: "Starter",
+        tone: "pending",
+        items: [
+          "Controlled agent evaluation",
+          "Dispatch-hosted source capsule",
+          "Local Dispatch task handoff preview",
+        ],
+      },
+      {
+        label: "Planned",
+        tone: "pending",
+        items: [
+          "Gateway/x402 settlement",
+          "Circle Wallet custody",
+          "External source marketplace",
+        ],
+      },
+    ],
+    proofRules: [
+      "Approved is not paid.",
+      "Local, pending, rejected, or unavailable proof is not paid.",
+      "Paid with proof appears only after verified Arc proof.",
+      "Transaction links appear only for valid verified Arc hashes.",
+    ],
+    currentState: hasVerifiedSourceProof
+      ? "Verified proof can unlock the source capsule and result contribution."
+      : hasApprovedSpend
+        ? "Approved source spend is ready for Arc payment and proof verification."
+        : hasSpendPlan
+          ? "The source spend is planned; approve it before payment."
+          : hasBudget
+            ? "Create the spend plan to see the agent evaluation."
+            : "Start by creating a Nano budget.",
+  };
+}
+
 export function buildNanoSourceUnlockPresentation({
   intent = null,
   receipt = null,
