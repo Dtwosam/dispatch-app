@@ -1,3 +1,12 @@
+﻿<!-- DISPATCH_NANO_ACTIVE_WINNING_BUILD_ORDER_START -->
+## Dispatch Nano Active Winning Build Order
+
+The active post-Phase13 Nano build order is `docs/lepton-nano-winning-build-order.md`. Future ChatGPT/Codex work must follow that document unless the user explicitly changes the roadmap.
+
+Core locked direction: Dispatch Nano is an AI agent source-payment layer for Dispatch. The flow is user goal → agent decision → tiny USDC source/tool payment → Arc proof → unlocked source/tool value → final result → receipt trail.
+
+Hard rule: do not mark anything paid without verified Arc proof. Gateway/x402/Circle Wallets/Nanopayments remain planned-only unless actually implemented and verified.
+<!-- DISPATCH_NANO_ACTIVE_WINNING_BUILD_ORDER_END -->
 # Dispatch Source of Truth
 
 Last updated: 2026-06-27
@@ -197,3 +206,4 @@ Before making Dispatch changes:
 9. Report files changed, behavior changed, and tests run.
 
 Do not deploy unless explicitly instructed.
+
