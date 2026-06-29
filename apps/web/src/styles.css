@@ -2150,12 +2150,12 @@ button[data-open-dispute] {
 }
 
 .nano-page--simple .nano-hero {
-  padding: clamp(24px, 4vw, 34px);
+  padding: clamp(22px, 4vw, 32px);
   gap: 16px;
 }
 
 .nano-page--simple .nano-hero h1 {
-  font-size: clamp(2rem, 4vw, 2.25rem);
+  font-size: clamp(2rem, 4vw, 2.35rem);
   line-height: 1.04;
 }
 
@@ -2274,7 +2274,7 @@ button[data-open-dispute] {
 }
 
 .nano-how-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .nano-how-grid article {
@@ -2390,6 +2390,22 @@ button[data-open-dispute] {
   background:
     linear-gradient(135deg, rgba(9, 25, 42, 0.86), rgba(13, 36, 58, 0.58)),
     rgba(9, 25, 42, 0.7);
+}
+
+.nano-core-stack {
+  display: grid;
+  gap: 22px;
+}
+
+.nano-proof-check,
+.nano-result-panel {
+  border-color: rgba(142, 255, 240, 0.14);
+}
+
+.nano-supporting-panel,
+.nano-receipt-detail,
+.nano-bottom-grid {
+  margin-top: clamp(10px, 2vw, 18px);
 }
 
 .nano-demo-card h2 {
@@ -2940,6 +2956,10 @@ button[data-open-dispute] {
   .nano-judge-grid,
   .nano-judge-claims {
     grid-template-columns: 1fr;
+  }
+
+  .nano-how-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .nano-decision-grid,

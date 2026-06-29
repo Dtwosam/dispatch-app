@@ -1395,7 +1395,7 @@ test("Nano source insight remains locked before verified proof", () => {
   assert.equal(missing.canShowInResult, false);
   assert.equal(missing.unlockStatus, "locked");
   assert.equal(missing.capsuleLabel, "Dispatch-hosted starter source capsule");
-  assert.equal(missing.capsuleTitle, "Source capsule locked");
+  assert.equal(missing.capsuleTitle, "Starter source locked");
   assert.equal(missing.capsuleStateLabel, "Locked before proof");
   assert.match(missing.capsuleSummary, /locked until Arc proof/);
   assert.match(missing.capsuleContribution, /hidden from the result/);
@@ -1426,9 +1426,9 @@ test("Nano source insight unlocks only after verified Arc proof", () => {
   assert.equal(source.isUnlocked, true);
   assert.equal(source.canShowInResult, true);
   assert.equal(source.unlockStatus, "unlocked");
-  assert.equal(source.capsuleTitle, "Source capsule unlocked");
+  assert.equal(source.capsuleTitle, "Starter source unlocked");
   assert.equal(source.capsuleStateLabel, "Unlocked after proof");
-  assert.match(source.capsuleHelper, /Verified Arc proof unlocked/);
+  assert.match(source.capsuleHelper, /verified Arc proof/i);
   assert.match(source.capsuleSummary, /Stablecoins became/);
   assert.match(source.capsuleContribution, /Unlocked source context/);
   assert.match(source.txLink, /testnet\.arcscan\.app/);
@@ -1455,7 +1455,7 @@ test("Nano local receipt does not unlock source insight as Paid with proof", () 
   assert.equal(source.canShowInResult, false);
   assert.equal(source.proofStatus, "Local receipt");
   assert.equal(source.status, "Local receipt");
-  assert.equal(source.capsuleTitle, "Source capsule locked");
+  assert.equal(source.capsuleTitle, "Starter source locked");
   assert.equal(source.txLink, null);
 });
 
@@ -1494,7 +1494,7 @@ test("Nano source insight stays locked when proof is missing", () => {
   assert.equal(source.canShowInResult, false);
   assert.equal(source.proofStatus, "Not paid yet");
   assert.match(source.lockedSummary, /Verify Arc proof/);
-  assert.match(source.capsuleHelper, /starter source capsule/);
+  assert.match(source.capsuleHelper, /Arc proof verifies payment/);
 });
 
 test("Nano result preview waits for source proof before verified payment", () => {
@@ -1562,7 +1562,7 @@ test("Nano run progress follows budget approval proof and result states", () => 
   assert.equal(buildNanoRunProgressPresentation({ hasVerifiedSourceProof: true }).currentStep, "Result ready");
 });
 
-test("Nano judge command center labels live starter and planned claims honestly", () => {
+test("Nano test path labels live starter and planned claims honestly", () => {
   const starter = buildNanoJudgeCommandCenterModel({});
   const verified = buildNanoJudgeCommandCenterModel({
     hasBudget: true,
@@ -1572,7 +1572,7 @@ test("Nano judge command center labels live starter and planned claims honestly"
     hasReceipt: true,
   });
 
-  assert.equal(starter.eyebrow, "Judge test path");
+  assert.equal(starter.eyebrow, "How to test Nano");
   assert.match(starter.body, /Arc proof verifies payment/);
   assert.ok(starter.clickPath.includes("Create Nano budget"));
   assert.ok(verified.clickPath.includes("Open receipt"));

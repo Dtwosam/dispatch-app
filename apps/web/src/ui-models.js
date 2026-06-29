@@ -474,8 +474,8 @@ export function buildNanoJudgeCommandCenterModel({
   ];
 
   return {
-    eyebrow: "Judge test path",
-    title: "Review Nano in under 60 seconds.",
+    eyebrow: "How to test Nano",
+    title: "Test Nano in under 60 seconds.",
     body: "Nano is the receipt layer for agents paying sources/tools: the user approves, Arc proof verifies payment, and the source-backed result unlocks.",
     clickPath,
     claimGroups: [
@@ -555,10 +555,10 @@ export function buildNanoSourceUnlockPresentation({
   return {
     label: starterOrLiveLabel,
     capsuleLabel: "Dispatch-hosted starter source capsule",
-    capsuleTitle: unlocked ? "Source capsule unlocked" : "Source capsule locked",
+    capsuleTitle: unlocked ? "Starter source unlocked" : "Starter source locked",
     capsuleHelper: unlocked
-      ? "Verified Arc proof unlocked this Dispatch-hosted starter source capsule for the result preview."
-      : "This Dispatch-hosted starter source capsule unlocks only after verified Arc proof.",
+      ? "Unlocked with verified Arc proof. The result can now use this source."
+      : "Locked until Arc proof verifies payment.",
     capsuleSummary: unlocked
       ? unlockedInsight
       : "Starter source summary is locked until Arc proof verifies payment.",
@@ -867,7 +867,7 @@ export function buildNanoDispatchTaskHandoffModel({
     handoffMode: "local_preview",
     helper: verified
       ? "This Nano result can be used as Dispatch task context with a verified source-payment receipt."
-      : "Use this Nano run as draft task context. Source-backed contribution unlocks only after verified Arc proof.",
+      : "Use the verified Nano context as a local Dispatch task preview. This does not change marketplace settlement by itself.",
     warnings,
     txLink,
     copyText,
