@@ -3196,7 +3196,7 @@ function renderNanoPageSimplified() {
 
             <div class="nano-proof-box">
               <h3>Share receipt</h3>
-              <p>Approved means the user allowed the spend. Paid with proof means Nano verified the Arc payment.</p>
+              <p>This URL is generated from the selected real Nano run. Approved means the user allowed the spend; paid with proof means Nano verified the Arc payment.</p>
               <label class="nano-field">
                 <span>Direct URL</span>
                 <input readonly value="${escapeHtml(receiptProofModel.shareUrl)}" />
@@ -3313,6 +3313,11 @@ function renderNanoPageSimplified() {
           <strong>What counts as paid</strong>
           ${judgeCommandCenter.proofRules.map((rule) => `<span>${escapeHtml(rule)}</span>`).join("")}
         </div>
+        <div class="nano-proof-box">
+          <h3>How to produce a shareable receipt</h3>
+          <p>Create a real Nano run, approve the source spend, pay on Arc if comfortable, verify proof with a real transaction hash, then click View shareable receipt.</p>
+          <p>If proof is missing, local, pending, unavailable, or rejected, the receipt remains useful but is not shown as paid.</p>
+        </div>
         <p class="nano-helper">${escapeHtml(judgeCommandCenter.currentState)}</p>
       </section>
 
@@ -3403,7 +3408,7 @@ function renderNanoPageSimplified() {
             </div>
           </div>
           <div class="nano-quiet-actions">
-            ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View receipt/proof</button>` : ""}
+            ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : ""}
             ${sourceUnlock.txLink ? `<a href="${escapeHtml(sourceUnlock.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
           </div>
           ${!sourceUnlock.unlocked ? `<p class="nano-helper nano-helper--warn">${escapeHtml(sourceUnlock.lockedSummary)}</p>` : ""}
@@ -3605,7 +3610,7 @@ function renderNanoPageSimplified() {
             <p>${escapeHtml(resultContribution.finalOutput)}</p>
           </div>
           ${resultContribution.txLink ? `<a class="hero-secondary nano-result-cta" href="${escapeHtml(resultContribution.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
-          ${activeReceiptBudgetId ? `<button class="hero-secondary nano-result-cta" type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View receipt</button>` : ""}
+          ${activeReceiptBudgetId ? `<button class="hero-secondary nano-result-cta" type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : ""}
           ${resultContribution.warning ? `<p class="nano-helper nano-helper--warn">${escapeHtml(resultContribution.warning)}</p>` : ""}
           <button class="hero-secondary nano-result-cta" type="button" id="nanoViewResult">${escapeHtml(resultPreview.cta)}</button>
         </article>
@@ -3638,7 +3643,7 @@ function renderNanoPageSimplified() {
               <small>This is local task context only; it is not attached to a saved Dispatch task.</small>
             </label>
             <div class="nano-quiet-actions">
-              ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View receipt</button>` : ""}
+              ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : ""}
               <button type="button" data-nano-copy-task-context>Copy task context</button>
               <button type="button" data-nano-open-task-draft>Open task draft</button>
             </div>
@@ -3666,7 +3671,7 @@ function renderNanoPageSimplified() {
           </div>
           <div class="nano-quiet-actions">
             <span class="meta-pill">${receipts.length} proof record${receipts.length === 1 ? "" : "s"}</span>
-            ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View receipt</button>` : ""}
+            ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : ""}
           </div>
         </div>
         ${intents.length ? `
@@ -3732,7 +3737,7 @@ function renderNanoPageSimplified() {
                   <div><span>Updated</span><strong>${escapeHtml(run.updated)}</strong></div>
                 </div>
                 <button class="${run.selected ? "hero-secondary" : "hero-primary"}" type="button" data-nano-run-id="${escapeHtml(run.budgetId)}">${escapeHtml(run.buttonLabel)}</button>
-                <button class="hero-secondary" type="button" data-nano-receipt-id="${escapeHtml(run.budgetId)}">View receipt</button>
+                <button class="hero-secondary" type="button" data-nano-receipt-id="${escapeHtml(run.budgetId)}">View shareable receipt</button>
                 ${!run.detailAvailable ? `<p class="nano-helper">Run detail unavailable from the current router response.</p>` : ""}
               </article>
             `).join("")}

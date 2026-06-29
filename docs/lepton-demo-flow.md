@@ -50,6 +50,32 @@ Judge framing:
 - metrics based on real run data
 - how the unlocked source/tool improved the final result
 
+## Shareable Receipt Path
+
+Use a real Nano run. Do not seed or invent a verified receipt.
+
+1. Open `/nano`.
+2. Create or continue a Nano run.
+3. Review the agent evaluation.
+4. Approve the Source Unlock spend.
+5. Pay on Arc Testnet only if comfortable.
+6. Paste and verify the real Arc transaction hash.
+7. Confirm the source capsule unlocks only after verified proof.
+8. Click `View shareable receipt`.
+9. Share the generated `/nano?receipt=<budgetId>` URL.
+
+The receipt should show:
+
+- goal
+- agent decision
+- approved spend
+- Arc proof state
+- source capsule state
+- result contribution
+- receipt trail
+
+If proof is missing, local, pending, unavailable, or rejected, the receipt can still be inspected but must not be described as paid with proof.
+
 ## Honesty Notes
 
 Do not show fake transaction hashes.

@@ -69,6 +69,12 @@ Do not claim:
 
 If a receipt is local or proof is pending, label it clearly.
 
+## Shareable Receipt Review
+
+Judges can inspect a receipt from a real Nano run by opening `/nano`, completing the source-payment flow, and clicking `View shareable receipt`.
+
+The receipt path is generated from the selected run as `/nano?receipt=<budgetId>`. It must not be prefilled with a fake verified receipt or invented transaction hash.
+
 ## Checks
 
 For Phase 0 docs:
