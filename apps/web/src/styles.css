@@ -2466,6 +2466,71 @@ button[data-open-dispute] {
   background: rgba(246, 196, 83, 0.055);
 }
 
+.nano-evaluation-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.nano-evaluation-option {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 16px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nano-evaluation-option--chosen {
+  border-color: rgba(142, 255, 240, 0.16);
+  background: rgba(142, 255, 240, 0.045);
+}
+
+.nano-evaluation-option strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.nano-evaluation-option p {
+  margin: 7px 0 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.nano-evaluation-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.nano-evaluation-facts div {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.052);
+  border-radius: 15px;
+  padding: 10px 11px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nano-evaluation-facts span {
+  display: block;
+  color: var(--text-subtle);
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.nano-evaluation-facts strong {
+  margin-top: 5px;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .nano-source-card {
   border-color: rgba(142, 255, 240, 0.13);
 }
@@ -2827,10 +2892,15 @@ button[data-open-dispute] {
   }
 
   .nano-section-head,
+  .nano-evaluation-option,
   .nano-spend-row,
   .nano-receipt-row,
   .nano-summary-list div {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .nano-evaluation-facts {
     grid-template-columns: 1fr;
   }
 

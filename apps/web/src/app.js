@@ -69,6 +69,7 @@ import {
   buildTaskDisputeDisplayModel,
   buildArcTransactionLink,
   buildNanoAgentDecisionPresentation,
+  buildNanoAgentEvaluationPanelModel,
   buildNanoBudgetGuardrailModel,
   buildNanoBudgetStatusModel,
   buildNanoMetricsModel,
@@ -3034,6 +3035,10 @@ function renderNanoPageSimplified() {
     sourceReceipt,
     verifiedContributions: multiSpendPlan.verifiedRows,
   });
+  const agentEvaluation = buildNanoAgentEvaluationPanelModel({
+    budget,
+    spendRows: multiSpendPlan.rows,
+  });
   const activeReceiptBudgetId = receiptBudgetId || budget?.budgetId || state.nano.selectedBudgetId || "";
   const receiptShareUrl = buildNanoReceiptShareUrl({
     budgetId: activeReceiptBudgetId,
@@ -3357,6 +3362,39 @@ function renderNanoPageSimplified() {
           `}
         </article>
       </section>
+
+      <article class="nano-panel nano-evaluation-panel reveal-on-scroll">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">${escapeHtml(agentEvaluation.modeLabel)}</p>
+            <h2>${escapeHtml(agentEvaluation.title)}</h2>
+            <p>${escapeHtml(agentEvaluation.subtitle)}</p>
+          </div>
+          <span class="meta-pill">Source Unlock chosen</span>
+        </div>
+        <div class="nano-evaluation-grid">
+          ${agentEvaluation.options.map((option) => `
+            <article class="nano-evaluation-option nano-evaluation-option--${escapeHtml(option.state)}">
+              <div>
+                <span class="nano-payee-type">${escapeHtml(option.stateLabel)}</span>
+                <strong>${escapeHtml(option.label)}</strong>
+                <p>${escapeHtml(option.costValueReason)}</p>
+              </div>
+              <div class="nano-evaluation-facts">
+                <div><span>Cost</span><strong>${escapeHtml(option.amount)}</strong></div>
+                <div><span>Budget impact</span><strong>${escapeHtml(option.budgetImpact)}</strong></div>
+                <div><span>Decision</span><strong>${escapeHtml(option.decisionReason)}</strong></div>
+                <div><span>Payment</span><strong>${escapeHtml(option.payActionLabel)}</strong></div>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+        <div class="nano-proof-box">
+          <h3>Why this source is worth paying for</h3>
+          <p>${escapeHtml(agentEvaluation.whySourceWorthPaying)}</p>
+          <p>${escapeHtml(agentEvaluation.helper)}</p>
+        </div>
+      </article>
 
       <section class="nano-two-col">
         <article class="nano-panel nano-budget-panel reveal-on-scroll">

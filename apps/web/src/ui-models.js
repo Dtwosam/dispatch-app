@@ -371,6 +371,92 @@ export function buildNanoAgentDecisionPresentation({ hasBudget = false, intent =
   };
 }
 
+export function buildNanoAgentEvaluationPanelModel({
+  budget = null,
+  spendRows = [],
+} = {}) {
+  const budgetAmount = normalizeNanoAmount(budget?.amount || 0);
+  const rowsByPayee = new Map((spendRows || []).map((row) => [row.payeeId, row]));
+  const fallbackRows = nanoSourcePaymentSpendPlanRows.map((plan) => ({
+    payeeId: plan.payeeId,
+    label: plan.label,
+    amount: formatNanoUsdc(plan.amount),
+    amountValue: plan.amount,
+    reason: plan.reason,
+    primary: Boolean(plan.primary),
+    canPayOnArc: false,
+    plannedOnly: Boolean(plan.starterOnly),
+  }));
+  const readRow = (payeeId) => rowsByPayee.get(payeeId) || fallbackRows.find((row) => row.payeeId === payeeId) || null;
+  const source = readRow("source_unlock");
+  const formatter = readRow("summary_formatter");
+  const checker = readRow("claim_check_tool");
+  const sourceAmount = normalizeNanoAmount(source?.amountValue || 0.01);
+  const formatterAmount = normalizeNanoAmount(formatter?.amountValue || 0.01);
+  const checkerAmount = normalizeNanoAmount(checker?.amountValue || 0.02);
+  const budgetLabel = budgetAmount ? formatNanoUsdc(budgetAmount) : "starter budget";
+  const impactCopy = (amount) => {
+    const value = normalizeNanoAmount(amount);
+    if (!budgetAmount) return `${formatNanoUsdc(value)} from the starter budget preview.`;
+    const remaining = normalizeNanoAmount(budgetAmount - value);
+    return `${formatNanoUsdc(value)} from ${budgetLabel}; ${formatNanoUsdc(remaining)} remains before other approved spend.`;
+  };
+
+  const options = [
+    {
+      id: "source_unlock",
+      label: source?.label || "Source unlock",
+      state: "chosen",
+      stateLabel: "Chosen",
+      tone: "good",
+      amount: formatNanoUsdc(sourceAmount),
+      costValueReason: "Highest value for this goal because it adds source-backed context to the final brief.",
+      budgetImpact: impactCopy(sourceAmount),
+      decisionReason: "Worth paying for because the result should not rely on starter context alone.",
+      payable: true,
+      payActionLabel: source?.canPayOnArc ? "Pay source on Arc" : "Payable after approval",
+    },
+    {
+      id: "summary_formatter",
+      label: formatter?.label || "Summary formatter",
+      state: "skipped",
+      stateLabel: "Skipped for now",
+      tone: "pending",
+      amount: formatNanoUsdc(formatterAmount),
+      costValueReason: "Useful for polish, but lower value than unlocking source-backed context first.",
+      budgetImpact: impactCopy(formatterAmount),
+      decisionReason: "Not payable in this controlled starter flow; kept as a planned tool path.",
+      payable: false,
+      payActionLabel: "No pay action",
+    },
+    {
+      id: "claim_check_tool",
+      label: checker?.label || "Claim-check tool",
+      state: "planned_starter",
+      stateLabel: "Planned/starter",
+      tone: "pending",
+      amount: formatNanoUsdc(checkerAmount),
+      costValueReason: "Valuable for future claim checking, but not the first spend in this run.",
+      budgetImpact: impactCopy(checkerAmount),
+      decisionReason: "Planned only; it is not live payable and cannot be marked paid without verified proof.",
+      payable: false,
+      payActionLabel: "No pay action",
+    },
+  ];
+
+  return {
+    title: "Agent evaluation",
+    subtitle: "Controlled starter logic showing what the agent considered before asking you to pay.",
+    modeLabel: "Controlled starter evaluation",
+    helper: "This is not dynamic source discovery yet; it explains the current cost-vs-value choice.",
+    chosenOptionId: "source_unlock",
+    whySourceWorthPaying: "Source Unlock is worth paying for because it unlocks grounded context that can improve the final result after verified Arc proof.",
+    options,
+    noFakeAutonomy: true,
+    skippedOptionsPayable: false,
+  };
+}
+
 export function buildNanoSourceUnlockPresentation({
   intent = null,
   receipt = null,

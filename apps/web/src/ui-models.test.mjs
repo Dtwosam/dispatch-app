@@ -28,6 +28,7 @@ import {
   buildTaskTemplateBrief,
   buildWalletScopedDashboardModel,
   buildNanoAgentDecisionPresentation,
+  buildNanoAgentEvaluationPanelModel,
   buildNanoBudgetGuardrailModel,
   buildNanoBudgetStatusModel,
   buildNanoCurrentStepModel,
@@ -1294,6 +1295,72 @@ test("Nano agent decision presentation separates starter and active decision sta
   assert.equal(active.label, "Active decision");
   assert.equal(active.status, "Waiting for approval");
   assert.match(active.helper, /Review this source payment/);
+});
+
+test("Nano agent evaluation panel chooses only Source Unlock for live payment", () => {
+  const panel = buildNanoAgentEvaluationPanelModel({
+    budget: { amount: 0.1 },
+    spendRows: buildNanoMultiSpendPlanRows({
+      recipientRegistry: buildNanoRecipientRegistry({
+        sourceWallet: "0x2222222222222222222222222222222222222222",
+      }),
+      intents: [
+        {
+          intentId: "intent_source",
+          status: "approved",
+          amount: 0.01,
+          reason: "Adds source-backed context.",
+          payee: {
+            payeeId: "source_unlock",
+            type: "source",
+            label: "Source unlock",
+            walletAddress: "0x2222222222222222222222222222222222222222",
+          },
+        },
+      ],
+      receiptsByIntent: new Map(),
+    }).rows,
+  });
+  const source = panel.options.find((option) => option.id === "source_unlock");
+  const formatter = panel.options.find((option) => option.id === "summary_formatter");
+  const checker = panel.options.find((option) => option.id === "claim_check_tool");
+
+  assert.equal(panel.modeLabel, "Controlled starter evaluation");
+  assert.equal(panel.noFakeAutonomy, true);
+  assert.equal(panel.chosenOptionId, "source_unlock");
+  assert.equal(source.state, "chosen");
+  assert.equal(source.payable, true);
+  assert.match(source.payActionLabel, /Pay source on Arc|Payable after approval/);
+  assert.match(source.costValueReason, /Highest value/);
+  assert.match(source.decisionReason, /Worth paying/);
+  assert.match(source.budgetImpact, /0.01 USDC/);
+  assert.equal(formatter.payable, false);
+  assert.equal(formatter.state, "skipped");
+  assert.equal(formatter.payActionLabel, "No pay action");
+  assert.equal(checker.payable, false);
+  assert.equal(checker.state, "planned_starter");
+  assert.equal(checker.payActionLabel, "No pay action");
+});
+
+test("Nano agent evaluation panel stays honest before budget and proof", () => {
+  const panel = buildNanoAgentEvaluationPanelModel();
+  const text = [
+    panel.subtitle,
+    panel.helper,
+    panel.whySourceWorthPaying,
+    ...panel.options.flatMap((option) => [
+      option.stateLabel,
+      option.costValueReason,
+      option.budgetImpact,
+      option.decisionReason,
+      option.payActionLabel,
+    ]),
+  ].join(" ");
+
+  assert.match(panel.helper, /not dynamic source discovery yet/);
+  assert.equal(panel.skippedOptionsPayable, false);
+  assert.doesNotMatch(text, /Paid with proof|verified Arc transaction|Gateway|x402|Circle Wallets|nanopayments/i);
+  assert.doesNotMatch(text, /autonomous dynamic source discovery|source executed|tool executed/i);
 });
 
 test("Nano approved source spend is not paid", () => {
