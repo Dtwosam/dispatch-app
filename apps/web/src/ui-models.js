@@ -610,6 +610,103 @@ export function buildNanoResultContributionModel({
   };
 }
 
+function compactTaskText(value, fallback = "") {
+  const text = String(value || fallback || "").replace(/\s+/g, " ").trim();
+  if (text.length <= 220) return text;
+  return `${text.slice(0, 217).trim()}...`;
+}
+
+export function buildNanoDispatchTaskHandoffModel({
+  goal = "",
+  budget = null,
+  nanoRunId = "",
+  receiptUrl = "",
+  resultContribution = null,
+} = {}) {
+  const hasRun = Boolean(budget || nanoRunId || resultContribution);
+  const result = resultContribution || buildNanoResultContributionModel({ goal, budget });
+  const verified = Boolean(result.unlocked && result.proofStatusLabel === "Paid with proof");
+  const safeReceiptUrl = String(receiptUrl || "").trim();
+  const txLink = verified ? result.txLink || null : null;
+  const nanoGoal = result.goal || goal || budget?.goal || "Create a short brief about stablecoin payments.";
+  const sourceContributionSummary = result.sourceContributionSummary || "Locked until verified Arc proof.";
+  const sourceContributionState = verified ? "verified_source_backed" : "starter_or_draft";
+  const proofStatusLabel = result.proofStatusLabel || "Not paid yet";
+  const taskTitle = "Source-backed stablecoin brief";
+  const taskBrief = `Use the Nano result and receipt as context. The agent goal was: ${compactTaskText(nanoGoal)}. Proof status: ${proofStatusLabel}. Source contribution: ${compactTaskText(sourceContributionSummary)}. Receipt: ${safeReceiptUrl || "No receipt URL available"}.`;
+
+  if (!hasRun) {
+    return {
+      available: false,
+      taskContextStatus: "No Nano run yet",
+      taskTitle,
+      taskBrief: "",
+      nanoGoal: "",
+      nanoRunId: "",
+      receiptUrl: "",
+      proofStatus: "not_started",
+      proofStatusLabel: "Run not started",
+      sourceContributionState: "unavailable",
+      sourceContributionSummary: "Create a Nano run before using it as task context.",
+      finalOutput: "",
+      handoffMode: "unavailable",
+      helper: "Create a Nano run before using it as Dispatch task context.",
+      warnings: [],
+      txLink: null,
+      copyText: "",
+      localPreviewLabel: "No task context yet",
+      backendAttached: false,
+      fakeTaskCreated: false,
+    };
+  }
+
+  const warnings = [
+    "Local preview only. This is not attached to a saved Dispatch task.",
+  ];
+  if (!verified) {
+    warnings.push("Source-backed contribution unlocks only after verified Arc proof.");
+  }
+
+  const copyText = [
+    taskTitle,
+    "",
+    taskBrief,
+    "",
+    `Nano run: ${nanoRunId || budget?.budgetId || "Local run preview"}`,
+    `Proof: ${proofStatusLabel}`,
+    `Source contribution: ${sourceContributionSummary}`,
+    safeReceiptUrl ? `Receipt: ${safeReceiptUrl}` : "Receipt: No receipt URL available",
+    txLink ? `Verified Arc transaction: ${txLink}` : "",
+    "",
+    "This is local task context only; no Dispatch task has been created or funded from this handoff.",
+  ].filter(Boolean).join("\n");
+
+  return {
+    available: true,
+    taskContextStatus: verified ? "Verified source-backed context" : "Draft task context",
+    taskTitle,
+    taskBrief,
+    nanoGoal,
+    nanoRunId: nanoRunId || budget?.budgetId || "",
+    receiptUrl: safeReceiptUrl,
+    proofStatus: result.proofStatus || (verified ? "unlocked" : "starter"),
+    proofStatusLabel,
+    sourceContributionState,
+    sourceContributionSummary,
+    finalOutput: result.finalOutput || "",
+    handoffMode: "local_preview",
+    helper: verified
+      ? "This Nano result can be used as Dispatch task context with a verified source-payment receipt."
+      : "Use this Nano run as draft task context. Source-backed contribution unlocks only after verified Arc proof.",
+    warnings,
+    txLink,
+    copyText,
+    localPreviewLabel: "Local task context preview",
+    backendAttached: false,
+    fakeTaskCreated: false,
+  };
+}
+
 export function buildNanoReceiptShareUrl({ budgetId = "", origin = "", apiBase = "" } = {}) {
   const id = String(budgetId || "").trim();
   if (!id) return "";

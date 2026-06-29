@@ -39,6 +39,7 @@ import {
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
   buildNanoReceiptDetailModel,
+  buildNanoDispatchTaskHandoffModel,
   buildNanoReceiptProofViewModel,
   buildNanoReceiptShareUrl,
   buildNanoResultContributionModel,
@@ -841,6 +842,133 @@ test("Nano result contribution does not claim real external source access or pla
   assert.doesNotMatch(`${plannedTool.helper} ${plannedTool.warning}`, /judge/i);
   assert.match(gateway.helper, /planned next/);
   assert.match(x402.helper, /planned next/);
+});
+
+test("Nano Dispatch task handoff empty state does not invent task context", () => {
+  const model = buildNanoDispatchTaskHandoffModel();
+
+  assert.equal(model.available, false);
+  assert.equal(model.handoffMode, "unavailable");
+  assert.equal(model.backendAttached, false);
+  assert.equal(model.fakeTaskCreated, false);
+  assert.equal(model.copyText, "");
+  assert.doesNotMatch(`${model.helper} ${model.sourceContributionSummary}`, /funded task|review|release|earnings|attached to backend/i);
+});
+
+test("Nano Dispatch task handoff keeps unverified context as local draft preview", () => {
+  const approved = buildNanoResultContributionModel({
+    goal: "Create a source-backed stablecoin brief",
+    budget: { budgetId: "nano_budget_1", amount: 0.1 },
+    sourceIntent: { status: "approved" },
+  });
+  const model = buildNanoDispatchTaskHandoffModel({
+    goal: "Create a source-backed stablecoin brief",
+    budget: { budgetId: "nano_budget_1", amount: 0.1 },
+    nanoRunId: "nano_budget_1",
+    receiptUrl: "https://dispatch.example/nano?receipt=nano_budget_1",
+    resultContribution: approved,
+  });
+
+  assert.equal(model.available, true);
+  assert.equal(model.handoffMode, "local_preview");
+  assert.equal(model.taskContextStatus, "Draft task context");
+  assert.equal(model.sourceContributionState, "starter_or_draft");
+  assert.equal(model.proofStatusLabel, "Approved, not paid yet");
+  assert.equal(model.txLink, null);
+  assert.match(model.nanoGoal, /stablecoin brief/);
+  assert.match(model.taskBrief, /Proof status: Approved, not paid yet/);
+  assert.match(model.taskBrief, /Receipt: https:\/\/dispatch\.example\/nano\?receipt=nano_budget_1/);
+  assert.match(model.warnings.join(" "), /Local preview only/);
+  assert.match(model.warnings.join(" "), /verified Arc proof/);
+  assert.doesNotMatch(`${model.helper} ${model.copyText}`, /backend|task funded|payment released|agent earnings/i);
+});
+
+test("Nano Dispatch task handoff rejects local pending and failed proof as verified context", () => {
+  const cases = [
+    buildNanoResultContributionModel({
+      budget: { amount: 0.1 },
+      sourceReceipt: { proof: { proofType: "local", paymentState: "recorded" }, paymentState: "recorded" },
+    }),
+    buildNanoResultContributionModel({
+      budget: { amount: 0.1 },
+      sourceReceipt: { proof: { proofType: "arc_tx", paymentState: "recorded", txHash: "0x123" }, paymentState: "recorded" },
+    }),
+    buildNanoResultContributionModel({
+      budget: { amount: 0.1 },
+      sourceReceipt: { proof: { proofType: "arc_tx", paymentState: "failed", txHash: `0x${"b".repeat(64)}` }, paymentState: "failed" },
+    }),
+  ];
+
+  for (const resultContribution of cases) {
+    const model = buildNanoDispatchTaskHandoffModel({
+      budget: { budgetId: "nano_budget_case", amount: 0.1 },
+      resultContribution,
+    });
+    assert.equal(model.taskContextStatus, "Draft task context");
+    assert.equal(model.sourceContributionState, "starter_or_draft");
+    assert.equal(model.txLink, null);
+    assert.doesNotMatch(model.helper, /verified source-payment receipt/);
+  }
+});
+
+test("Nano Dispatch task handoff marks verified Arc proof as source-backed context", () => {
+  const txHash = `0x${"d".repeat(64)}`;
+  const resultContribution = buildNanoResultContributionModel({
+    goal: "Create a brief about source payments",
+    budget: { budgetId: "nano_budget_verified", amount: 0.1 },
+    sourceRow: {
+      label: "Dispatch Source Unlock",
+      typeLabel: "Source",
+      verified: true,
+      contributionSummary: "Verified source contribution improved the final brief.",
+      txLink: `https://testnet.arcscan.app/tx/${txHash}`,
+    },
+    sourceReceipt: {
+      receiptId: "receipt_verified",
+      contributionSummary: "Verified source contribution improved the final brief.",
+      paymentState: "recorded",
+      proof: { proofType: "arc_tx", paymentState: "recorded", txHash },
+    },
+  });
+  const model = buildNanoDispatchTaskHandoffModel({
+    goal: "Create a brief about source payments",
+    budget: { budgetId: "nano_budget_verified", amount: 0.1 },
+    nanoRunId: "nano_budget_verified",
+    receiptUrl: "https://dispatch.example/nano?receipt=nano_budget_verified",
+    resultContribution,
+  });
+
+  assert.equal(model.taskContextStatus, "Verified source-backed context");
+  assert.equal(model.sourceContributionState, "verified_source_backed");
+  assert.equal(model.proofStatusLabel, "Paid with proof");
+  assert.match(model.txLink, /testnet\.arcscan\.app/);
+  assert.match(model.helper, /verified source-payment receipt/);
+  assert.match(model.taskBrief, /Verified source contribution improved the final brief/);
+  assert.match(model.copyText, /Verified Arc transaction/);
+  assert.equal(model.backendAttached, false);
+  assert.equal(model.fakeTaskCreated, false);
+});
+
+test("Nano Dispatch task handoff brief is deterministic and avoids public judge wording", () => {
+  const input = {
+    goal: "Create a stablecoin payment brief",
+    budget: { budgetId: "nano_budget_same", amount: 0.1 },
+    nanoRunId: "nano_budget_same",
+    receiptUrl: "https://dispatch.example/nano?receipt=nano_budget_same",
+    resultContribution: buildNanoResultContributionModel({
+      goal: "Create a stablecoin payment brief",
+      budget: { amount: 0.1 },
+      sourceRow: { label: "Dispatch Source Unlock", typeLabel: "Source", verified: false },
+    }),
+  };
+  const first = buildNanoDispatchTaskHandoffModel(input);
+  const second = buildNanoDispatchTaskHandoffModel(input);
+
+  assert.equal(first.taskTitle, "Source-backed stablecoin brief");
+  assert.equal(first.taskBrief, second.taskBrief);
+  assert.equal(first.copyText, second.copyText);
+  assert.doesNotMatch(`${first.taskBrief} ${first.copyText} ${first.helper}`, /judge/i);
+  assert.doesNotMatch(`${first.taskBrief} ${first.copyText}`, /fake|funded task created|backend-attached|backend/i);
 });
 
 test("Nano receipt proof view handles wallet required and unavailable states without inventing data", () => {

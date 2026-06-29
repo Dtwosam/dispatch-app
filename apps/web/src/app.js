@@ -78,6 +78,7 @@ import {
   buildNanoRecipientRegistry,
   buildNanoRecipientWalletModel,
   buildNanoResetDraftState,
+  buildNanoDispatchTaskHandoffModel,
   buildNanoReceiptDetailModel,
   buildNanoReceiptProofViewModel,
   buildNanoReceiptShareUrl,
@@ -3045,6 +3046,13 @@ function renderNanoPageSimplified() {
     walletConnected,
     shareUrl: receiptShareUrl,
   });
+  const taskHandoffModel = buildNanoDispatchTaskHandoffModel({
+    goal: state.nano.budgetGoal || budget?.goal || activity?.runContext?.goal || "",
+    budget,
+    nanoRunId: activeReceiptBudgetId,
+    receiptUrl: receiptShareUrl,
+    resultContribution,
+  });
   const firstUnapprovedIntent = intents.find((intent) => intent.status === "proposed");
   const primaryAction = (() => {
     if (!walletConnected) {
@@ -3517,6 +3525,52 @@ function renderNanoPageSimplified() {
         </article>
       </section>
 
+      <article class="nano-panel nano-task-handoff reveal-on-scroll" id="nanoTaskHandoff">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">Dispatch task handoff</p>
+            <h2>Use Nano with a Dispatch task</h2>
+            <p>${escapeHtml(taskHandoffModel.helper)}</p>
+          </div>
+          <span class="status-chip ${taskHandoffModel.sourceContributionState === "verified_source_backed" ? "good" : "pending"}">${escapeHtml(taskHandoffModel.taskContextStatus)}</span>
+        </div>
+        ${taskHandoffModel.available ? `
+          <div class="nano-result-fields">
+            <div><span>Task context</span><strong>${escapeHtml(taskHandoffModel.localPreviewLabel)}</strong></div>
+            <div><span>Nano goal</span><strong>${escapeHtml(taskHandoffModel.nanoGoal)}</strong></div>
+            <div><span>Result summary</span><strong>${escapeHtml(taskHandoffModel.finalOutput)}</strong></div>
+            <div><span>Source contribution</span><strong>${escapeHtml(taskHandoffModel.sourceContributionSummary)}</strong></div>
+            <div><span>Proof status</span><strong>${escapeHtml(taskHandoffModel.proofStatusLabel)}</strong></div>
+            <div><span>Receipt link</span><strong>${taskHandoffModel.receiptUrl ? "Available" : "No receipt URL yet"}</strong></div>
+          </div>
+          <div class="nano-proof-box">
+            <h3>Suggested task brief</h3>
+            <p>${escapeHtml(taskHandoffModel.taskBrief)}</p>
+            <label class="nano-field">
+              <span>Copyable task context</span>
+              <textarea id="nanoTaskContextCopy" rows="6" readonly>${escapeHtml(taskHandoffModel.copyText)}</textarea>
+              <small>This is local task context only; it is not attached to a saved Dispatch task.</small>
+            </label>
+            <div class="nano-quiet-actions">
+              ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View receipt</button>` : ""}
+              <button type="button" data-nano-copy-task-context>Copy task context</button>
+              <button type="button" data-nano-open-task-draft>Open task draft</button>
+            </div>
+            ${taskHandoffModel.txLink ? `<a class="hero-secondary nano-result-cta" href="${escapeHtml(taskHandoffModel.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
+          </div>
+          ${taskHandoffModel.warnings.length ? `
+            <div class="nano-handoff-warnings">
+              ${taskHandoffModel.warnings.map((warning) => `<span>${escapeHtml(warning)}</span>`).join("")}
+            </div>
+          ` : ""}
+        ` : `
+          <div class="empty-inline nano-empty-inline">
+            <span class="empty-inline__mark" aria-hidden="true"></span>
+            <div><strong>No Nano task context yet.</strong><p>Create a Nano run before using it as Dispatch task context.</p></div>
+          </div>
+        `}
+      </article>
+
       <article class="nano-panel reveal-on-scroll" id="nanoPaymentTrail">
         <div class="nano-section-head">
           <div>
@@ -3760,6 +3814,23 @@ function renderNanoPageSimplified() {
       history.pushState({}, "", next.pathname + next.search);
       renderNanoPageSimplified();
     });
+  });
+  document.querySelector("[data-nano-copy-task-context]")?.addEventListener("click", async () => {
+    const text = document.getElementById("nanoTaskContextCopy")?.value || "";
+    if (!text.trim()) {
+      updateStatus("Task context unavailable", "Create a Nano run before copying task context.", "warn");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      updateStatus("Task context copied", "Paste it into a Dispatch task draft when ready.", "success");
+    } catch {
+      updateStatus("Copy unavailable", "Task context is shown for manual copy.", "warn");
+    }
+  });
+  document.querySelector("[data-nano-open-task-draft]")?.addEventListener("click", () => {
+    updateStatus("Opening task draft", "Nano context is local preview only; no saved Dispatch task was created.", "neutral");
+    navigate("/post-task");
   });
   document.getElementById("nanoRefresh")?.addEventListener("click", async () => {
     await withNanoAction("refresh", refreshNanoData);
