@@ -39,6 +39,8 @@ import {
   buildNanoReceiptStatusModel,
   buildNanoRecipientWalletModel,
   buildNanoReceiptDetailModel,
+  buildNanoReceiptProofViewModel,
+  buildNanoReceiptShareUrl,
   buildNanoResultContributionModel,
   buildNanoResetDraftState,
   buildNanoRunHistoryModel,
@@ -839,6 +841,152 @@ test("Nano result contribution does not claim real external source access or pla
   assert.doesNotMatch(`${plannedTool.helper} ${plannedTool.warning}`, /judge/i);
   assert.match(gateway.helper, /planned next/);
   assert.match(x402.helper, /planned next/);
+});
+
+test("Nano receipt proof view handles wallet required and unavailable states without inventing data", () => {
+  const walletRequired = buildNanoReceiptProofViewModel({
+    budgetId: "nano_budget_1",
+    walletConnected: false,
+  });
+  assert.equal(walletRequired.available, false);
+  assert.equal(walletRequired.state, "wallet_required");
+  assert.deepEqual(walletRequired.rows, []);
+  assert.match(walletRequired.helper, /wallet-scoped/);
+
+  const unavailable = buildNanoReceiptProofViewModel({
+    budgetId: "nano_budget_missing",
+    walletConnected: true,
+  });
+  assert.equal(unavailable.available, false);
+  assert.equal(unavailable.state, "unavailable");
+  assert.match(unavailable.title, /unavailable/i);
+  assert.deepEqual(unavailable.rows, []);
+});
+
+test("Nano receipt proof view builds safe share URL and exposes only selected run data", () => {
+  const url = buildNanoReceiptShareUrl({
+    budgetId: "nano_budget_abc 123",
+    origin: "https://dispatch.example",
+    apiBase: "https://dispatch-router.onrender.com",
+  });
+  assert.equal(url, "https://dispatch.example/nano?receipt=nano_budget_abc+123&apiBase=https%3A%2F%2Fdispatch-router.onrender.com");
+
+  const model = buildNanoReceiptProofViewModel({
+    walletConnected: true,
+    shareUrl: url,
+    activity: {
+      budget: {
+        budgetId: "nano_budget_abcdefghijklmnopqrstuvwxyz",
+        ownerWallet: "0x1111111111111111111111111111111111111111",
+        goal: "Create a stablecoin brief",
+        amount: 0.1,
+      },
+      spendIntents: [],
+      receipts: [],
+    },
+  });
+  assert.equal(model.available, true);
+  assert.equal(model.shortBudgetId, "nano_b...wxyz");
+  assert.equal(model.ownerWallet, "0x1111...1111");
+  assert.equal(model.goal, "Create a stablecoin brief");
+  assert.equal(model.budgetAmount, "0.10 USDC");
+  assert.equal(model.noUnrelatedHistory, true);
+  assert.equal(model.shareUrl, url);
+});
+
+test("Nano receipt proof view separates approved from paid and blocks unverified proof", () => {
+  const local = buildNanoReceiptProofViewModel({
+    walletConnected: true,
+    activity: {
+      budget: { budgetId: "nano_budget_local", goal: "Brief", amount: 0.1 },
+      spendIntents: [
+        {
+          intentId: "intent_source",
+          status: "approved",
+          amount: 0.01,
+          reason: "Adds context.",
+          payee: { payeeId: "source_unlock", type: "source", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+        },
+      ],
+      receipts: [
+        {
+          receiptId: "receipt_local",
+          intentId: "intent_source",
+          amount: 0.01,
+          paymentState: "recorded",
+          proof: { proofType: "local", paymentState: "recorded", txHash: null },
+        },
+      ],
+    },
+  });
+  assert.equal(local.approvedAmount, "0.01 USDC");
+  assert.equal(local.verifiedPaidAmount, "0 USDC");
+  assert.equal(local.rows[0].status, "Local receipt");
+  assert.equal(local.rows[0].txLink, null);
+  assert.equal(local.result.locked, true);
+  assert.match(local.result.warning, /not a verified payment/);
+
+  const rejected = buildNanoReceiptProofViewModel({
+    walletConnected: true,
+    activity: {
+      budget: { budgetId: "nano_budget_rejected", goal: "Brief", amount: 0.1 },
+      spendIntents: [
+        { intentId: "intent_source", status: "payment_recorded", amount: 0.01, reason: "Adds context.", payee: { payeeId: "source_unlock", type: "source", label: "Source unlock" } },
+      ],
+      receipts: [
+        { receiptId: "receipt_rejected", intentId: "intent_source", amount: 0.01, paymentState: "failed", proof: { proofType: "arc_tx", paymentState: "failed", txHash: `0x${"b".repeat(64)}` } },
+      ],
+    },
+  });
+  assert.equal(rejected.verifiedPaidAmount, "0 USDC");
+  assert.equal(rejected.rows[0].status, "Proof rejected");
+  assert.equal(rejected.result.locked, true);
+});
+
+test("Nano receipt proof view unlocks with verified Arc proof and valid tx only", () => {
+  const txHash = `0x${"c".repeat(64)}`;
+  const model = buildNanoReceiptProofViewModel({
+    walletConnected: true,
+    activity: {
+      budget: { budgetId: "nano_budget_verified", goal: "Brief", amount: 0.1 },
+      runContext: { goal: "Brief" },
+      spendIntents: [
+        {
+          intentId: "intent_source",
+          status: "payment_recorded",
+          amount: 0.01,
+          reason: "Adds source-backed context.",
+          payee: { payeeId: "source_unlock", type: "source", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+        },
+        {
+          intentId: "intent_tool",
+          status: "approved",
+          amount: 0.02,
+          reason: "Checks claims.",
+          payee: { payeeId: "claim_check_tool", type: "tool", label: "Claim-check Tool", walletAddress: null },
+        },
+      ],
+      receipts: [
+        {
+          receiptId: "receipt_verified",
+          intentId: "intent_source",
+          amount: 0.01,
+          contributionSummary: "Verified source contribution improved the final output.",
+          paymentState: "recorded",
+          proof: { proofType: "arc_tx", paymentState: "recorded", txHash },
+        },
+      ],
+    },
+  });
+
+  assert.equal(model.verifiedPaidAmount, "0.01 USDC");
+  assert.equal(model.rows[0].status, "Paid with proof");
+  assert.match(model.rows[0].txLink, /testnet\.arcscan\.app/);
+  assert.equal(model.rows[1].plannedOnly, true);
+  assert.equal(model.rows[1].txLink, null);
+  assert.equal(model.result.unlocked, true);
+  assert.match(model.result.finalOutput, /verified contribution/);
+  assert.match(model.helper, /Nano verified the Arc payment/);
 });
 
 test("Nano budget guardrails calculate active budget totals without implying escrow", () => {

@@ -610,6 +610,108 @@ export function buildNanoResultContributionModel({
   };
 }
 
+export function buildNanoReceiptShareUrl({ budgetId = "", origin = "", apiBase = "" } = {}) {
+  const id = String(budgetId || "").trim();
+  if (!id) return "";
+  const base = origin ? `${String(origin).replace(/\/$/, "")}/nano` : "/nano";
+  const params = new URLSearchParams();
+  params.set("receipt", id);
+  if (apiBase) params.set("apiBase", apiBase);
+  return `${base}?${params.toString()}`;
+}
+
+export function buildNanoReceiptProofViewModel({
+  activity = null,
+  budgetId = "",
+  walletConnected = false,
+  shareUrl = "",
+} = {}) {
+  if (!walletConnected) {
+    return {
+      available: false,
+      state: "wallet_required",
+      title: "Connect wallet to view this receipt.",
+      helper: "Nano receipts are loaded from wallet-scoped router activity.",
+      rows: [],
+      result: buildNanoResultContributionModel(),
+      shareUrl,
+    };
+  }
+  if (!activity?.budget) {
+    return {
+      available: false,
+      state: "unavailable",
+      title: "Receipt unavailable.",
+      helper: "This Nano receipt is unavailable from the current router response.",
+      rows: [],
+      result: buildNanoResultContributionModel(),
+      shareUrl,
+    };
+  }
+
+  const receiptsByIntent = new Map((activity.receipts || []).map((receipt) => [receipt.intentId, receipt]));
+  const registry = buildNanoRecipientRegistry();
+  const planRows = buildNanoMultiSpendPlanRows({
+    intents: activity.spendIntents || [],
+    receiptsByIntent,
+    recipientRegistry: registry,
+  });
+  const sourceRow = planRows.rows.find((row) => row.payeeId === "source_unlock") || planRows.rows[0] || null;
+  const sourceIntent = (activity.spendIntents || []).find((intent) => intent?.intentId === sourceRow?.intentId)
+    || (activity.spendIntents || []).find((intent) => intent?.payee?.payeeId === "source_unlock")
+    || null;
+  const sourceReceipt = sourceIntent ? receiptsByIntent.get(sourceIntent.intentId) : null;
+  const sourceUnlock = buildNanoSourceUnlockPresentation({
+    hasBudget: true,
+    intent: sourceIntent,
+    receipt: sourceReceipt,
+  });
+  const result = buildNanoResultContributionModel({
+    goal: activity.runContext?.goal || activity.budget?.goal || "",
+    budget: activity.budget,
+    sourceRow,
+    sourceUnlock,
+    sourceIntent,
+    sourceReceipt,
+    verifiedContributions: planRows.verifiedRows,
+  });
+  const approvedAmount = planRows.rows
+    .filter((row) => ["approved", "payment_recorded"].includes(String(row.intentStatus || "").toLowerCase()))
+    .reduce((total, row) => total + Number(row.amountValue || 0), 0);
+  const verifiedPaidAmount = planRows.verifiedRows.reduce((total, row) => total + Number(row.amountValue || 0), 0);
+  const rows = planRows.rows.map((row) => ({
+    label: row.label,
+    type: row.typeLabel,
+    amount: row.amount,
+    recipient: row.recipient,
+    status: row.proofLabel,
+    tone: row.proofTone,
+    contribution: row.verified ? row.contributionSummary : "Locked until verified Arc proof.",
+    txLink: row.verified ? row.txLink : null,
+    plannedOnly: row.plannedOnly,
+  }));
+
+  return {
+    available: true,
+    state: "available",
+    title: "Dispatch Nano receipt/proof",
+    helper: result.unlocked
+      ? "Nano verified the Arc payment before unlocking this source-backed result."
+      : "Approved means the user allowed the spend. Paid with proof means Nano verified the Arc payment.",
+    budgetId: activity.budget?.budgetId || budgetId,
+    shortBudgetId: shortWallet(activity.budget?.budgetId || budgetId),
+    ownerWallet: activity.budget?.ownerWallet ? shortWallet(activity.budget.ownerWallet) : "Wallet not available",
+    goal: activity.runContext?.goal || activity.budget?.goal || "No goal recorded.",
+    budgetAmount: formatNanoUsdc(activity.budget?.amount || 0),
+    approvedAmount: formatNanoUsdc(approvedAmount),
+    verifiedPaidAmount: formatNanoUsdc(verifiedPaidAmount),
+    rows,
+    result,
+    shareUrl,
+    noUnrelatedHistory: true,
+  };
+}
+
 export function nanoApiUnavailableMessage() {
   return "Nano router is unavailable. Budget creation and proof checks need the Dispatch router API.";
 }

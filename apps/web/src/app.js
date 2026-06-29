@@ -79,6 +79,8 @@ import {
   buildNanoRecipientWalletModel,
   buildNanoResetDraftState,
   buildNanoReceiptDetailModel,
+  buildNanoReceiptProofViewModel,
+  buildNanoReceiptShareUrl,
   buildNanoResultContributionModel,
   buildNanoRunHistoryModel,
   buildNanoSelectedRunModel,
@@ -2925,6 +2927,20 @@ function renderNanoPageSimplified() {
   const walletBalance = state.walletNetwork.usdcBalance == null
     ? "Balance unavailable"
     : `${Number(state.walletNetwork.usdcBalance).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`;
+  const nanoSearchParams = new URLSearchParams(window.location.search);
+  const receiptBudgetId = nanoSearchParams.get("receipt") || "";
+  const apiBaseParam = nanoSearchParams.get("apiBase") || "";
+  if (receiptBudgetId && walletConnected && state.nano.selectedBudgetId !== receiptBudgetId) {
+    state.nano.selectedBudgetId = receiptBudgetId;
+    state.nano.activity = state.nano.runActivities?.[receiptBudgetId] || null;
+  }
+  const receiptActivity = receiptBudgetId
+    ? state.nano.runActivities?.[receiptBudgetId]
+      || (state.nano.activity?.budget?.budgetId === receiptBudgetId ? state.nano.activity : null)
+    : null;
+  if (receiptBudgetId && walletConnected && !receiptActivity && !state.nano.activityLoading) {
+    refreshNanoActivity(receiptBudgetId).then(() => renderNanoPageSimplified());
+  }
   const budget = selectedNanoBudget();
   const budgetStatus = buildNanoBudgetStatusModel(budget);
   const activity = state.nano.activity;
@@ -3017,6 +3033,18 @@ function renderNanoPageSimplified() {
     sourceReceipt,
     verifiedContributions: multiSpendPlan.verifiedRows,
   });
+  const activeReceiptBudgetId = receiptBudgetId || budget?.budgetId || state.nano.selectedBudgetId || "";
+  const receiptShareUrl = buildNanoReceiptShareUrl({
+    budgetId: activeReceiptBudgetId,
+    origin: window.location.origin,
+    apiBase: apiBaseParam,
+  });
+  const receiptProofModel = buildNanoReceiptProofViewModel({
+    activity: receiptBudgetId ? receiptActivity : (state.nano.runActivities?.[activeReceiptBudgetId] || activity),
+    budgetId: activeReceiptBudgetId,
+    walletConnected,
+    shareUrl: receiptShareUrl,
+  });
   const firstUnapprovedIntent = intents.find((intent) => intent.status === "proposed");
   const primaryAction = (() => {
     if (!walletConnected) {
@@ -3084,6 +3112,95 @@ function renderNanoPageSimplified() {
   const submittedArcTxLink = ["pending", "verified"].includes(state.nano.arcProofStatus)
     ? buildArcTransactionLink(state.nano.arcProofTxHash)
     : null;
+
+  if (receiptBudgetId) {
+    el.appRoot.innerHTML = `
+      <section data-structure="nano-receipt-proof" class="nano-page nano-page--simple">
+        <header class="nano-hero reveal-on-scroll is-visible">
+          <div>
+            <p class="mini-label">Dispatch Nano receipt</p>
+            <h1>Receipt and proof trail</h1>
+            <p>Open one Nano run and verify what was approved, what was paid, and what result contribution unlocked.</p>
+          </div>
+          <div class="nano-hero__actions">
+            ${receiptProofModel.state === "wallet_required" ? `<button class="hero-primary" type="button" data-wallet="open">Connect wallet</button>` : ""}
+            <button class="hero-secondary" type="button" id="nanoBackToRun">Back to Nano</button>
+          </div>
+        </header>
+
+        <article class="nano-panel nano-receipt-proof reveal-on-scroll">
+          <div class="nano-section-head">
+            <div>
+              <p class="mini-label">${receiptProofModel.available ? "Router-backed receipt" : "Receipt state"}</p>
+              <h2>${escapeHtml(receiptProofModel.title)}</h2>
+              <p>${escapeHtml(receiptProofModel.helper)}</p>
+            </div>
+            <span class="status-chip ${receiptProofModel.result?.tone === "good" ? "good" : receiptProofModel.result?.tone === "warn" ? "warn" : "pending"}">${escapeHtml(receiptProofModel.result?.proofStatusLabel || "Not available")}</span>
+          </div>
+
+          ${receiptProofModel.available ? `
+            <div class="nano-result-fields">
+              <div><span>Run</span><strong>${escapeHtml(receiptProofModel.shortBudgetId)}</strong></div>
+              <div><span>Owner wallet</span><strong>${escapeHtml(receiptProofModel.ownerWallet)}</strong></div>
+              <div><span>Goal</span><strong>${escapeHtml(receiptProofModel.goal)}</strong></div>
+              <div><span>Budget</span><strong>${escapeHtml(receiptProofModel.budgetAmount)}</strong></div>
+              <div><span>Approved</span><strong>${escapeHtml(receiptProofModel.approvedAmount)}</strong></div>
+              <div><span>Verified paid</span><strong>${escapeHtml(receiptProofModel.verifiedPaidAmount)}</strong></div>
+            </div>
+
+            <div class="nano-trail-table nano-receipt-proof-table">
+              <div class="nano-trail-head"><span>Spend</span><span>Recipient</span><span>Amount</span><span>Proof</span></div>
+              ${receiptProofModel.rows.map((row) => `
+                <article class="nano-trail-row">
+                  <span>
+                    <strong>${escapeHtml(row.label)}</strong>
+                    <small>${escapeHtml(row.type)}${row.plannedOnly ? " · Planned/starter" : ""}</small>
+                  </span>
+                  <span>${escapeHtml(row.recipient)}${row.txLink ? `<a href="${escapeHtml(row.txLink)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}</span>
+                  <span>${escapeHtml(row.amount)}</span>
+                  <span><span class="status-chip ${row.tone === "good" ? "good" : row.tone === "warn" ? "warn" : "pending"}">${escapeHtml(row.status)}</span></span>
+                </article>
+              `).join("")}
+            </div>
+
+            <div class="nano-result-copy">
+              <strong>${escapeHtml(receiptProofModel.result.resultTitle)}</strong>
+              <p>${escapeHtml(receiptProofModel.result.helper)}</p>
+              <ul>
+                ${receiptProofModel.result.contributionBullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
+              </ul>
+              <strong>Final output</strong>
+              <p>${escapeHtml(receiptProofModel.result.finalOutput)}</p>
+            </div>
+
+            <div class="nano-proof-box">
+              <h3>Share receipt</h3>
+              <p>Approved means the user allowed the spend. Paid with proof means Nano verified the Arc payment.</p>
+              <label class="nano-field">
+                <span>Direct URL</span>
+                <input readonly value="${escapeHtml(receiptProofModel.shareUrl)}" />
+              </label>
+              ${receiptProofModel.result.txLink ? `<a class="hero-secondary" href="${escapeHtml(receiptProofModel.result.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : `<p class="nano-helper nano-helper--warn">This receipt is not marked paid because verified Arc proof is missing.</p>`}
+            </div>
+          ` : `
+            <div class="empty-inline nano-empty-inline">
+              <span class="empty-inline__mark" aria-hidden="true"></span>
+              <div><strong>${escapeHtml(receiptProofModel.title)}</strong><p>${escapeHtml(receiptProofModel.helper)}</p></div>
+            </div>
+          `}
+        </article>
+      </section>
+    `;
+
+    document.getElementById("nanoBackToRun")?.addEventListener("click", () => {
+      const next = new URL(window.location.href);
+      next.searchParams.delete("receipt");
+      history.pushState({}, "", next.pathname + next.search);
+      renderNanoPageSimplified();
+    });
+    revealSections(el.appRoot);
+    return;
+  }
 
   el.appRoot.innerHTML = `
     <section data-structure="nano-source-payment" class="nano-page nano-page--simple">
@@ -3394,6 +3511,7 @@ function renderNanoPageSimplified() {
             <p>${escapeHtml(resultContribution.finalOutput)}</p>
           </div>
           ${resultContribution.txLink ? `<a class="hero-secondary nano-result-cta" href="${escapeHtml(resultContribution.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
+          ${activeReceiptBudgetId ? `<button class="hero-secondary nano-result-cta" type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View receipt</button>` : ""}
           ${resultContribution.warning ? `<p class="nano-helper nano-helper--warn">${escapeHtml(resultContribution.warning)}</p>` : ""}
           <button class="hero-secondary nano-result-cta" type="button" id="nanoViewResult">${escapeHtml(resultPreview.cta)}</button>
         </article>
@@ -3406,7 +3524,10 @@ function renderNanoPageSimplified() {
             <h2>Payment trail</h2>
             <p>Every agent spend is visible before and after payment.</p>
           </div>
-          <span class="meta-pill">${receipts.length} proof record${receipts.length === 1 ? "" : "s"}</span>
+          <div class="nano-quiet-actions">
+            <span class="meta-pill">${receipts.length} proof record${receipts.length === 1 ? "" : "s"}</span>
+            ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View receipt</button>` : ""}
+          </div>
         </div>
         ${intents.length ? `
           <div class="nano-trail-table">
@@ -3471,6 +3592,7 @@ function renderNanoPageSimplified() {
                   <div><span>Updated</span><strong>${escapeHtml(run.updated)}</strong></div>
                 </div>
                 <button class="${run.selected ? "hero-secondary" : "hero-primary"}" type="button" data-nano-run-id="${escapeHtml(run.budgetId)}">${escapeHtml(run.buttonLabel)}</button>
+                <button class="hero-secondary" type="button" data-nano-receipt-id="${escapeHtml(run.budgetId)}">View receipt</button>
                 ${!run.detailAvailable ? `<p class="nano-helper">Run detail unavailable from the current router response.</p>` : ""}
               </article>
             `).join("")}
@@ -3627,6 +3749,16 @@ function renderNanoPageSimplified() {
         renderNanoPageSimplified();
       }
       document.getElementById("nanoReceiptDetail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  document.querySelectorAll("[data-nano-receipt-id]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const budgetId = node.dataset.nanoReceiptId;
+      if (!budgetId) return;
+      const next = new URL(window.location.href);
+      next.searchParams.set("receipt", budgetId);
+      history.pushState({}, "", next.pathname + next.search);
+      renderNanoPageSimplified();
     });
   });
   document.getElementById("nanoRefresh")?.addEventListener("click", async () => {
