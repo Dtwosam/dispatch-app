@@ -2403,6 +2403,59 @@ button[data-open-dispute] {
   overflow-wrap: anywhere;
 }
 
+.nano-guardrail-panel {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0 18px;
+  padding: 18px;
+  border: 1px solid rgba(142, 255, 240, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.nano-guardrail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nano-guardrail-grid div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nano-guardrail-grid span,
+.nano-guardrail-warnings span {
+  display: block;
+  color: var(--text-subtle);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.nano-guardrail-grid strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.nano-guardrail-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nano-guardrail-warnings span {
+  padding: 7px 10px;
+  border: 1px solid rgba(246, 196, 83, 0.14);
+  border-radius: 999px;
+  background: rgba(246, 196, 83, 0.055);
+}
+
 .nano-source-card {
   border-color: rgba(142, 255, 240, 0.13);
 }
@@ -2691,6 +2744,7 @@ button[data-open-dispute] {
   .nano-decision-grid,
   .nano-source-facts,
   .nano-result-fields,
+  .nano-guardrail-grid,
   .nano-run-card__facts {
     grid-template-columns: 1fr;
   }
@@ -2714,6 +2768,7 @@ button[data-open-dispute] {
   .nano-form-grid,
   .nano-how-grid,
   .nano-demo-facts,
+  .nano-guardrail-grid,
   .nano-receipt-detail-row {
     grid-template-columns: 1fr;
   }

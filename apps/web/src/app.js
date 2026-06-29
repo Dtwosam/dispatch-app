@@ -69,6 +69,7 @@ import {
   buildTaskDisputeDisplayModel,
   buildArcTransactionLink,
   buildNanoAgentDecisionPresentation,
+  buildNanoBudgetGuardrailModel,
   buildNanoBudgetStatusModel,
   buildNanoMetricsModel,
   buildNanoMultiSpendPlanRows,
@@ -2964,8 +2965,6 @@ function renderNanoPageSimplified() {
     ? { ...arcProofIntent, payee: { ...arcProofIntent.payee, walletAddress: arcProofPayeeWallet || null } }
     : null;
   const arcProofReceipt = arcProofIntent ? receiptsByIntent.get(arcProofIntent.intentId) : null;
-  const nanoPayAction = buildNanoPaymentActionModel(arcProofIntentForAction, arcProofReceipt);
-  const canPayNanoOnArc = nanoPayAction.enabled;
   const canVerifyArcProof = Boolean(arcProofIntent && !arcProofReceipt && state.nano.arcProofTxHash.trim());
   const hasApprovedSpend = intents.some((intent) => intent.status === "approved");
   const hasPendingApprovedSpend = intents.some((intent) => intent.status === "approved" && !receiptsByIntent.has(intent.intentId));
@@ -2980,6 +2979,14 @@ function renderNanoPageSimplified() {
     intents,
     receiptsByIntent,
   });
+  const budgetGuardrails = buildNanoBudgetGuardrailModel({
+    budget,
+    spendRows: multiSpendPlan.rows,
+  });
+  const nanoPayAction = buildNanoPaymentActionModel(arcProofIntentForAction, arcProofReceipt);
+  const guardrailBlocksPayment = Boolean(nanoPayAction.enabled && !budgetGuardrails.canPayPayableNow);
+  const canPayNanoOnArc = Boolean(nanoPayAction.enabled && budgetGuardrails.canPayPayableNow);
+  const nanoPayActionReason = guardrailBlocksPayment ? "This spend exceeds the remaining budget." : nanoPayAction.reason;
   const hasVerifiedSourceProof = Boolean(sourceUnlock.canShowInResult);
   const hasVerifiedReceipt = hasVerifiedSourceProof;
   const hasProofPending = state.nano.arcProofStatus === "pending" || Boolean(state.nano.arcProofTxHash.trim() && arcProofIntent && !arcProofReceipt);
@@ -3028,6 +3035,9 @@ function renderNanoPageSimplified() {
     }
     if (canVerifyArcProof) {
       return { label: "Verify Arc proof", mode: "verify", disabled: Boolean(state.nano.actionPending), reason: "Verify the Arc transaction hash before marking anything paid." };
+    }
+    if (guardrailBlocksPayment) {
+      return { label: "Pay source on Arc", mode: "pay", disabled: true, reason: "This spend exceeds the remaining budget." };
     }
     if (canPayNanoOnArc) {
       return { label: "Pay source on Arc", mode: "pay", disabled: Boolean(state.nano.actionPending), reason: "Payment is only marked paid after verified Arc proof." };
@@ -3155,7 +3165,7 @@ function renderNanoPageSimplified() {
           </div>
         </div>
         <div class="nano-demo-action">
-          <button class="hero-primary" type="button" ${primaryButtonAttributes} ${primaryAction.disabled ? "disabled" : ""}>${state.nano.actionPending === "arcProof" ? "Verifying Arc proof" : state.nano.actionPending ? "Working..." : escapeHtml(primaryAction.label)}</button>
+          <button class="hero-primary" type="button" ${primaryButtonAttributes} data-nano-guardrail-blocked="${guardrailBlocksPayment ? "true" : "false"}" ${primaryAction.disabled ? "disabled" : ""}>${state.nano.actionPending === "arcProof" ? "Verifying Arc proof" : state.nano.actionPending ? "Working..." : escapeHtml(primaryAction.label)}</button>
           <p>${escapeHtml(primaryAction.reason)}</p>
           <button class="hero-secondary" type="button" id="nanoRefresh" ${state.nano.budgetsLoading ? "disabled" : ""}>Refresh</button>
           ${budget ? `<button class="hero-secondary" type="button" id="nanoStartNewBudgetSecondary">Start new run</button>` : ""}
@@ -3223,6 +3233,27 @@ function renderNanoPageSimplified() {
           ${renderNanoBudgetOptions()}
           ${state.nano.budgetsLoading ? `<p class="nano-helper">Loading your Nano budgets...</p>` : ""}
           ${state.nano.budgetsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(nanoApiUnavailableMessage())}</p>` : ""}
+          <div class="nano-guardrail-panel" aria-label="Budget guardrails">
+            <div class="nano-section-head">
+              <div>
+                <p class="mini-label">Budget control</p>
+                <h3>${escapeHtml(budgetGuardrails.budgetStatus)}</h3>
+                <p>${escapeHtml(budgetGuardrails.helper)}</p>
+              </div>
+              <span class="status-chip ${budgetGuardrails.tone === "good" ? "good" : budgetGuardrails.tone === "warn" ? "warn" : "pending"}">${escapeHtml(formatNanoUsdc(budgetGuardrails.remainingBudgetUsdc))} remains</span>
+            </div>
+            <div class="nano-guardrail-grid">
+              ${budgetGuardrails.fields.map(([label, value]) => `
+                <div>
+                  <span>${escapeHtml(label)}</span>
+                  <strong>${escapeHtml(value)}</strong>
+                </div>
+              `).join("")}
+            </div>
+            <div class="nano-guardrail-warnings">
+              ${budgetGuardrails.warnings.map((warning) => `<span>${escapeHtml(warning)}</span>`).join("")}
+            </div>
+          </div>
           <div class="nano-spend-plan">
             ${multiSpendPlan.rows.map((row) => {
               return `
@@ -3285,7 +3316,7 @@ function renderNanoPageSimplified() {
               <input id="nanoArcProofTxHash" type="text" value="${escapeHtml(state.nano.arcProofTxHash)}" placeholder="0x..." />
               <small>Paste the Arc Testnet transaction hash if the wallet transfer was already submitted.</small>
             </label>
-            <p class="nano-helper">${escapeHtml(nanoPayAction.reason)}</p>
+            <p class="nano-helper">${escapeHtml(nanoPayActionReason)}</p>
             ${submittedArcTxLink ? `
               <p class="nano-helper">
                 Submitted Arc transaction:
@@ -3532,9 +3563,15 @@ function renderNanoPageSimplified() {
     if (helper) helper.textContent = model.helper;
     const primaryButton = document.getElementById("nanoPrimaryAction");
     if (primaryButton?.dataset.nanoAction === "pay") {
-      primaryButton.disabled = !model.valid || Boolean(state.nano.actionPending);
+      primaryButton.disabled = !model.valid || primaryButton.dataset.nanoGuardrailBlocked === "true" || Boolean(state.nano.actionPending);
       const reason = document.querySelector(".nano-demo-action p");
-      if (reason) reason.textContent = model.valid ? "Payment is only marked paid after verified Arc proof." : "Add a recipient wallet before paying on Arc.";
+      if (reason) {
+        reason.textContent = model.valid
+          ? primaryButton.dataset.nanoGuardrailBlocked === "true"
+            ? "This spend exceeds the remaining budget."
+            : "Payment is only marked paid after verified Arc proof."
+          : "Add a recipient wallet before paying on Arc.";
+      }
     }
   });
   document.getElementById("nanoArcProofTxHash")?.addEventListener("input", (event) => {
@@ -3610,6 +3647,10 @@ function renderNanoPageSimplified() {
       return;
     }
     if (action === "pay") {
+      if (guardrailBlocksPayment) {
+        updateStatus("Nano payment blocked", "This spend exceeds the remaining budget.", "warn");
+        return;
+      }
       await withNanoAction("nanoArcPay", payNanoSpendOnArc);
       return;
     }

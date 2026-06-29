@@ -551,6 +551,7 @@ export function buildNanoMultiSpendPlanRows({ planRows = nanoSourcePaymentSpendP
       typeLabel: labelize(intent?.payee?.type || plan?.type || "tool"),
       amount: formatNanoUsdc(intent?.amount ?? plan?.amount ?? 0),
       amountValue: Number(intent?.amount ?? plan?.amount ?? 0),
+      intentStatus: String(intent?.status || "").toLowerCase(),
       reason: intent?.reason || plan?.reason || "No reason recorded.",
       contributionSummary: receipt?.contributionSummary || plan?.contributionSummary || "",
       recipient: intent?.payee?.walletAddress ? shortWallet(intent.payee.walletAddress) : "No recipient wallet",
@@ -595,6 +596,75 @@ export function buildNanoMultiSpendPlanRows({ planRows = nanoSourcePaymentSpendP
     payableRows: rows.filter((row) => row.canPayOnArc),
     verifiedRows: rows.filter((row) => row.verified),
     helper: "Only the source unlock can be paid in the current live Arc flow. Other spend intents show where Nano can expand next and are never marked paid without proof.",
+  };
+}
+
+function normalizeNanoAmount(value) {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return 0;
+  return Math.max(0, Number(amount.toFixed(6)));
+}
+
+export function buildNanoBudgetGuardrailModel({ budget = null, spendRows = [] } = {}) {
+  const rows = Array.isArray(spendRows) ? spendRows : [];
+  const totalBudgetUsdc = normalizeNanoAmount(budget?.amount);
+  const payableNowUsdc = normalizeNanoAmount(
+    rows
+      .filter((row) => row?.canPayOnArc)
+      .reduce((total, row) => total + Number(row?.amountValue || 0), 0),
+  );
+  const plannedSpendUsdc = normalizeNanoAmount(
+    rows
+      .filter((row) => row?.plannedOnly || row?.starterOnly)
+      .reduce((total, row) => total + Number(row?.amountValue || 0), 0),
+  );
+  const approvedUsdc = normalizeNanoAmount(
+    rows
+      .filter((row) => ["approved", "payment_recorded"].includes(String(row?.intentStatus || "").toLowerCase()))
+      .reduce((total, row) => total + Number(row?.amountValue || 0), 0),
+  );
+  const verifiedPaidUsdc = normalizeNanoAmount(
+    rows
+      .filter((row) => row?.verified)
+      .reduce((total, row) => total + Number(row?.amountValue || 0), 0),
+  );
+  const remainingBudgetUsdc = normalizeNanoAmount(Math.max(0, totalBudgetUsdc - verifiedPaidUsdc));
+  const remainingAfterPayableUsdc = normalizeNanoAmount(Math.max(0, remainingBudgetUsdc - payableNowUsdc));
+  const warnings = [];
+
+  if (payableNowUsdc > remainingBudgetUsdc) warnings.push("This spend exceeds the remaining budget.");
+  if (plannedSpendUsdc > totalBudgetUsdc && totalBudgetUsdc > 0) warnings.push("Planned rows are not live paid flows yet.");
+  if (approvedUsdc > verifiedPaidUsdc) warnings.push("Approved, not paid yet.");
+  if (rows.some((row) => row?.plannedOnly || row?.starterOnly)) warnings.push("Planned rows are not live paid flows yet.");
+  warnings.push("Verified paid only counts Arc proof receipts.");
+
+  const budgetStatus = !budget
+    ? "No active budget"
+    : payableNowUsdc > remainingBudgetUsdc
+      ? "Payment blocked"
+      : "Budget controlled";
+
+  return {
+    totalBudgetUsdc,
+    payableNowUsdc,
+    plannedSpendUsdc,
+    approvedUsdc,
+    verifiedPaidUsdc,
+    remainingBudgetUsdc,
+    remainingAfterPayableUsdc,
+    budgetStatus,
+    tone: payableNowUsdc > remainingBudgetUsdc ? "warn" : budget ? "good" : "pending",
+    canPayPayableNow: Boolean(payableNowUsdc > 0 && payableNowUsdc <= remainingBudgetUsdc),
+    warnings: [...new Set(warnings)],
+    helper: "Budget is a user-approved spending limit. It is not escrow. A spend is paid only after Arc proof verifies the payment.",
+    fields: [
+      ["Budget", formatNanoUsdc(totalBudgetUsdc)],
+      ["Payable now", formatNanoUsdc(payableNowUsdc)],
+      ["Planned next", formatNanoUsdc(plannedSpendUsdc)],
+      ["Approved", formatNanoUsdc(approvedUsdc)],
+      ["Verified paid", formatNanoUsdc(verifiedPaidUsdc)],
+      ["Remaining after verified payments", formatNanoUsdc(remainingBudgetUsdc)],
+    ],
   };
 }
 

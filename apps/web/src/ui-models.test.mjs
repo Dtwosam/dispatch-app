@@ -28,6 +28,7 @@ import {
   buildTaskTemplateBrief,
   buildWalletScopedDashboardModel,
   buildNanoAgentDecisionPresentation,
+  buildNanoBudgetGuardrailModel,
   buildNanoBudgetStatusModel,
   buildNanoCurrentStepModel,
   buildNanoMetricsModel,
@@ -668,6 +669,173 @@ test("Nano result preview references only verified unlocked contributions", () =
     verifiedContributions: [{ verified: true, contributionSummary: "Should stay hidden without source proof." }],
   });
   assert.equal(locked.body, "The result preview is waiting for source proof.");
+});
+
+test("Nano budget guardrails calculate active budget totals without implying escrow", () => {
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [
+      {
+        intentId: "intent_source",
+        status: "approved",
+        amount: 0.01,
+        reason: "Adds source-backed context.",
+        payee: { payeeId: "source_unlock", type: "source", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+      },
+    ],
+    receiptsByIntent: new Map(),
+  });
+  const guardrails = buildNanoBudgetGuardrailModel({
+    budget: { amount: 0.1 },
+    spendRows: rows.rows,
+  });
+
+  assert.equal(guardrails.totalBudgetUsdc, 0.1);
+  assert.equal(guardrails.payableNowUsdc, 0.01);
+  assert.equal(guardrails.plannedSpendUsdc, 0.03);
+  assert.equal(guardrails.approvedUsdc, 0.01);
+  assert.equal(guardrails.verifiedPaidUsdc, 0);
+  assert.equal(guardrails.remainingBudgetUsdc, 0.1);
+  assert.equal(guardrails.remainingAfterPayableUsdc, 0.09);
+  assert.equal(guardrails.canPayPayableNow, true);
+  assert.match(guardrails.warnings.join(" "), /Approved, not paid yet/);
+  assert.doesNotMatch(guardrails.helper, /refund/i);
+  assert.match(guardrails.helper, /not escrow/i);
+});
+
+test("Nano budget guardrails count planned starter rows as planned, not paid", () => {
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [],
+    receiptsByIntent: new Map(),
+  });
+  const guardrails = buildNanoBudgetGuardrailModel({
+    budget: { amount: 0.1 },
+    spendRows: rows.rows,
+  });
+
+  assert.equal(guardrails.payableNowUsdc, 0);
+  assert.equal(guardrails.plannedSpendUsdc, 0.03);
+  assert.equal(guardrails.verifiedPaidUsdc, 0);
+  assert.equal(guardrails.remainingBudgetUsdc, 0.1);
+  assert.match(guardrails.warnings.join(" "), /Planned rows are not live paid flows yet/);
+});
+
+test("Nano budget guardrails do not count local or rejected receipts as verified paid", () => {
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [
+      {
+        intentId: "intent_source",
+        status: "payment_recorded",
+        amount: 0.01,
+        reason: "Adds source-backed context.",
+        payee: { payeeId: "source_unlock", type: "source", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+      },
+      {
+        intentId: "intent_tool",
+        status: "payment_recorded",
+        amount: 0.02,
+        reason: "Checks claims.",
+        payee: { payeeId: "claim_check_tool", type: "tool", label: "Claim-check tool", walletAddress: null },
+      },
+    ],
+    receiptsByIntent: new Map([
+      ["intent_source", {
+        receiptId: "receipt_local",
+        intentId: "intent_source",
+        paymentState: "recorded",
+        proof: { proofType: "local", paymentState: "recorded", txHash: null },
+      }],
+      ["intent_tool", {
+        receiptId: "receipt_rejected",
+        intentId: "intent_tool",
+        paymentState: "failed",
+        proof: { proofType: "arc_tx", paymentState: "failed", txHash: `0x${"d".repeat(64)}` },
+      }],
+    ]),
+  });
+  const guardrails = buildNanoBudgetGuardrailModel({
+    budget: { amount: 0.1 },
+    spendRows: rows.rows,
+  });
+
+  assert.equal(guardrails.verifiedPaidUsdc, 0);
+  assert.equal(guardrails.remainingBudgetUsdc, 0.1);
+  assert.match(guardrails.warnings.join(" "), /Verified paid only counts Arc proof receipts/);
+});
+
+test("Nano budget guardrails count only verified Arc proof as paid", () => {
+  const txHash = `0x${"e".repeat(64)}`;
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [
+      {
+        intentId: "intent_source",
+        status: "payment_recorded",
+        amount: 0.01,
+        reason: "Adds source-backed context.",
+        payee: { payeeId: "source_unlock", type: "source", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+      },
+    ],
+    receiptsByIntent: new Map([
+      ["intent_source", {
+        receiptId: "receipt_source",
+        intentId: "intent_source",
+        paymentState: "recorded",
+        proof: { proofType: "arc_tx", paymentState: "recorded", txHash },
+      }],
+    ]),
+  });
+  const guardrails = buildNanoBudgetGuardrailModel({
+    budget: { amount: 0.1 },
+    spendRows: rows.rows,
+  });
+
+  assert.equal(guardrails.verifiedPaidUsdc, 0.01);
+  assert.equal(guardrails.remainingBudgetUsdc, 0.09);
+  assert.equal(guardrails.payableNowUsdc, 0);
+  assert.equal(guardrails.canPayPayableNow, false);
+});
+
+test("Nano budget guardrails floor remaining budget and block oversized payable spend", () => {
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [
+      {
+        intentId: "intent_source",
+        status: "approved",
+        amount: 0.12,
+        reason: "Adds source-backed context.",
+        payee: { payeeId: "source_unlock", type: "source", label: "Source unlock", walletAddress: "0x2222222222222222222222222222222222222222" },
+      },
+    ],
+    receiptsByIntent: new Map(),
+  });
+  const guardrails = buildNanoBudgetGuardrailModel({
+    budget: { amount: 0.1 },
+    spendRows: rows.rows,
+  });
+
+  assert.equal(guardrails.remainingBudgetUsdc, 0.1);
+  assert.equal(guardrails.remainingAfterPayableUsdc, 0);
+  assert.equal(guardrails.canPayPayableNow, false);
+  assert.equal(guardrails.budgetStatus, "Payment blocked");
+  assert.match(guardrails.warnings.join(" "), /This spend exceeds the remaining budget/);
+});
+
+test("Nano budget guardrails preserve planned-only Gateway and x402 honesty", () => {
+  const gateway = buildNanoReceiptStatusModel({
+    proof: { proofType: "circle_gateway", paymentState: "recorded" },
+  });
+  const x402 = buildNanoReceiptStatusModel({
+    proof: { proofType: "x402", paymentState: "recorded" },
+  });
+  const rows = buildNanoMultiSpendPlanRows({
+    intents: [],
+    receiptsByIntent: new Map(),
+  });
+  const guardrails = buildNanoBudgetGuardrailModel({ budget: { amount: 0.1 }, spendRows: rows.rows });
+
+  assert.match(gateway.helper, /planned next/);
+  assert.match(x402.helper, /planned next/);
+  assert.match(guardrails.warnings.join(" "), /Planned rows are not live paid flows yet/);
+  assert.doesNotMatch(`${guardrails.helper} ${guardrails.warnings.join(" ")}`, /judge/i);
 });
 
 test("Nano agent decision presentation separates starter and active decision states", () => {
