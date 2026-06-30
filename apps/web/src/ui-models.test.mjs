@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildAgentIdentityBadges,
   buildAgentDisplayModel,
@@ -2099,6 +2100,22 @@ test("Nano economy stats do not switch into wallet-private activity stats", () =
   assert.equal(stats["Receipts created"].value, "Real receipts only");
   assert.equal(stats["Dispatch agents"].value, "5 built-in");
   assert.doesNotMatch(JSON.stringify(model), /Your stats|Your earnings|Your agents|99|wallet-private/i);
+});
+
+test("Nano public stats render before wallet-gated console in the Nano page template", () => {
+  const appSource = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+  const statsIndex = appSource.indexOf('<section class="nano-economy-section reveal-on-scroll is-visible"');
+  const consoleIndex = appSource.indexOf('<section class="nano-panel nano-run-console');
+
+  assert.ok(statsIndex > -1, "public stats section should be visible without waiting for reveal observer");
+  assert.ok(consoleIndex > statsIndex, "public stats should render before the wallet/action console");
+
+  const statsSectionEnd = appSource.indexOf('<section class="nano-panel nano-run-console', statsIndex);
+  const statsSection = appSource.slice(statsIndex, statsSectionEnd);
+  assert.match(statsSection, /Public Nano economy/);
+  assert.match(statsSection, /Public Nano economy stats/);
+  assert.match(statsSection, /nanoEconomyStats\.stats/);
+  assert.doesNotMatch(statsSection, /data-wallet|Connect wallet|Agents paid|Your stats|Your earnings|fake volume|paid users/i);
 });
 
 test("Nano metrics count only verified Arc proof as paid usage", () => {
