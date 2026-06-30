@@ -278,3 +278,20 @@ When improving Dispatch:
 - preserve data honesty
 - do not deploy unless explicitly instructed
 
+
+## Dispatch Nano Phase 15C Active Build Order
+
+For Dispatch Nano Phase 15C work, use `docs/lepton-nano-phase15c-build-order.md` as the active source-of-truth build order.
+
+Phase 15C must proceed in this order:
+
+1. 15C.0 — Local base lock
+2. 15C.1 — Proof console blueprint + full UI/UX matrix
+3. 15C.2 — Hero + Nano economy stats
+4. 15C.3 — Nano run console shell
+5. 15C.4 — Move core flow into console
+6. 15C.5 — Collapse supporting details
+7. 15C.6 — Premium CSS/mobile/accessibility polish
+8. 15C.7 — Full verification + preview QA
+
+Do not skip phases. Do not push Phase 15B/15C until the final proof-console interface is verified.
