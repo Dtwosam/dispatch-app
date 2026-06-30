@@ -171,6 +171,8 @@ export function createInitialState() {
       metrics: null,
       metricsLoading: false,
       metricsError: "",
+      selectedNanoAgentId: "",
+      agentSelectionError: "",
       budgetGoal: "Create a short brief about stablecoin payments.",
       budgetPreset: "0.10",
       customBudgetAmount: "",

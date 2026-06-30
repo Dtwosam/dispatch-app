@@ -70,6 +70,7 @@ import {
   buildArcTransactionLink,
   buildNanoAgentDecisionPresentation,
   buildNanoAgentEvaluationPanelModel,
+  buildNanoAgentSelectorModel,
   buildNanoBudgetGuardrailModel,
   buildNanoBudgetStatusModel,
   buildNanoJudgeCommandCenterModel,
@@ -101,6 +102,7 @@ import {
   getTaskBriefTemplate,
   nanoBudgetPresets,
   nanoApiUnavailableMessage,
+  nanoAgentSelectionFaq,
   nanoSourcePaymentSpendPlanRows,
   shortWallet,
   taskBriefTemplates,
@@ -2973,6 +2975,10 @@ function renderNanoPageSimplified() {
   });
   const budgetValidation = validateNanoBudgetAmount(state.nano.budgetAmount);
   const goalValid = Boolean(state.nano.budgetGoal.trim());
+  const agentSelector = buildNanoAgentSelectorModel({ selectedAgentId: state.nano.selectedNanoAgentId });
+  const selectedNanoAgent = agentSelector.selectedAgent;
+  const selectedNanoAgentName = agentSelector.selectedAgentName;
+  const agentSelected = Boolean(selectedNanoAgent);
   const sourcePayoutWalletModel = buildNanoRecipientWalletModel(state.nano.sourcePayoutWallet);
   const sourcePlan = nanoPlannedSpendRows.find((plan) => plan.payeeId === "source_unlock");
   const sourceIntent = intents.find((intent) => intent.payee.payeeId === "source_unlock") || null;
@@ -3015,7 +3021,12 @@ function renderNanoPageSimplified() {
   const hasVerifiedSourceProof = Boolean(sourceUnlock.canShowInResult);
   const hasVerifiedReceipt = hasVerifiedSourceProof;
   const hasProofPending = state.nano.arcProofStatus === "pending" || Boolean(state.nano.arcProofTxHash.trim() && arcProofIntent && !arcProofReceipt);
-  const agentDecision = buildNanoAgentDecisionPresentation({ hasBudget: Boolean(budget), intent: sourceIntent, receipt: sourceReceipt });
+  const agentDecision = buildNanoAgentDecisionPresentation({
+    hasBudget: Boolean(budget),
+    intent: sourceIntent,
+    receipt: sourceReceipt,
+    selectedAgentName: selectedNanoAgentName,
+  });
   const runProgress = buildNanoRunProgressPresentation({
     hasBudget: Boolean(budget),
     hasSpendPlan: hasFullNanoPlan,
@@ -3090,8 +3101,11 @@ function renderNanoPageSimplified() {
     if (!budgetValidation.valid) {
       return { label: "Create Nano budget", mode: "budget", disabled: true, reason: "Choose a valid USDC budget between 0.10 and 5.00." };
     }
+    if (!agentSelected) {
+      return { label: "Create Nano budget", mode: "budget", disabled: true, reason: agentSelector.emptyStateCopy };
+    }
     if (!goalValid) {
-      return { label: "Create Nano budget", mode: "budget", disabled: true, reason: "Add an agent goal before creating a budget." };
+      return { label: "Create Nano budget", mode: "budget", disabled: true, reason: "Add a goal before creating a budget." };
     }
     if (!budget) {
       return { label: "Create Nano budget", mode: "budget", disabled: Boolean(state.nano.actionPending), reason: "Create a small budget to start the source-payment run." };
@@ -3100,10 +3114,10 @@ function renderNanoPageSimplified() {
       return { label: "Review source payment", mode: "plan", disabled: Boolean(state.nano.actionPending), reason: "The agent will propose the source/tool unlock before payment." };
     }
     if (hasFullNanoPlan && !budget.fundingProof && firstUnapprovedIntent) {
-      return { label: "Approve source spend", mode: "fundingProofThenApprove", disabled: Boolean(state.nano.actionPending), reason: "Approve the source/tool spend before payment." };
+      return { label: "Approve source spend", mode: "fundingProofThenApprove", disabled: Boolean(state.nano.actionPending), reason: "Approve this source unlock request. Approval is not payment." };
     }
     if (canApproveAny) {
-      return { label: "Approve source spend", mode: "approve", disabled: Boolean(state.nano.actionPending), reason: "Approve the source/tool spend before payment." };
+      return { label: "Approve source spend", mode: "approve", disabled: Boolean(state.nano.actionPending), reason: "Approve this source unlock request. Approval is not payment." };
     }
     if (hasPendingApprovedSpend && !sourcePayoutWalletModel.valid && !arcProofPayeeWallet) {
       return { label: "Pay source on Arc", mode: "pay", disabled: true, reason: "Add a recipient wallet before paying on Arc." };
@@ -3169,6 +3183,35 @@ function renderNanoPageSimplified() {
       </div>
     ` : ""}
     <div class="nano-console-form">
+      <section class="nano-agent-selector" aria-labelledby="nanoAgentSelectorTitle">
+        <div class="nano-agent-selector__head">
+          <div>
+            <p class="mini-label">Choose source agent</p>
+            <h4 id="nanoAgentSelectorTitle">${escapeHtml(agentSelector.title)}</h4>
+            <p>${escapeHtml(agentSelector.helper)}</p>
+          </div>
+          <span class="status-chip ${selectedNanoAgent ? "good" : "pending"}">${escapeHtml(selectedNanoAgent ? agentSelector.selectedStateLabel : "Required")}</span>
+        </div>
+        <div class="nano-agent-grid" role="group" aria-label="Dispatch agents for this Nano run">
+          ${agentSelector.agents.map((agent) => `
+            <button
+              class="nano-agent-card ${agent.isSelected ? "is-selected" : ""}"
+              type="button"
+              data-nano-agent-id="${escapeHtml(agent.id)}"
+              aria-pressed="${agent.isSelected ? "true" : "false"}"
+              aria-label="${escapeHtml(agent.ariaLabel)}"
+            >
+              <span class="nano-agent-card__status">${escapeHtml(agent.statusLabel)}</span>
+              <strong>${escapeHtml(agent.name)}</strong>
+              <p>${escapeHtml(agent.description)}</p>
+              <small>${escapeHtml(agent.bestFor)}</small>
+              ${agent.isSelected ? `<span class="nano-agent-card__selected">Selected source agent</span>` : ""}
+            </button>
+          `).join("")}
+        </div>
+        <p class="nano-helper ${selectedNanoAgent ? "" : "nano-helper--warn"}">${escapeHtml(selectedNanoAgent ? agentSelector.selectedStateCopy : agentSelector.emptyStateCopy)}</p>
+        ${state.nano.agentSelectionError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.agentSelectionError)}</p>` : ""}
+      </section>
       <div class="nano-budget-presets" role="group" aria-label="Budget presets">
         ${[...nanoBudgetPresets, "Custom"].map((preset) => `
           <button type="button" class="nano-preset ${state.nano.budgetPreset === preset ? "is-active" : ""}" data-nano-preset="${escapeHtml(preset)}">
@@ -3187,7 +3230,7 @@ function renderNanoPageSimplified() {
         <label class="nano-field nano-field--wide">
           <span>Goal</span>
           <textarea id="nanoGoal" rows="3" placeholder="Create a short brief about stablecoin payments.">${escapeHtml(state.nano.budgetGoal)}</textarea>
-          <small>${goalValid ? "Tell the agent what this Nano run should produce." : "Enter a goal before creating a budget."}</small>
+          <small>${goalValid ? "Tell this agent what result you want from this Nano run." : "Enter a goal before creating a budget."}</small>
         </label>
       </div>
     </div>
@@ -3308,7 +3351,7 @@ function renderNanoPageSimplified() {
           <div>
             <p class="mini-label">Spend approval</p>
             <h4>${escapeHtml(spendPlanPresentation.label)}</h4>
-            <p>Approval is not payment. Paid only after verified Arc proof.</p>
+            <p>You approve the source unlock request, pay on Arc, and Nano checks proof before unlocking the result.</p>
           </div>
           <span class="status-chip ${budgetGuardrails.tone === "good" ? "good" : budgetGuardrails.tone === "warn" ? "warn" : "pending"}">${escapeHtml(formatNanoUsdc(budgetGuardrails.remainingBudgetUsdc))} remains</span>
         </div>
@@ -3337,7 +3380,7 @@ function renderNanoPageSimplified() {
         <label class="nano-field">
           <span>Arc transaction hash</span>
           <input id="nanoArcProofTxHash" type="text" value="${escapeHtml(state.nano.arcProofTxHash)}" placeholder="0x..." />
-          <small>Paste the Arc Testnet transaction hash if the wallet transfer was already submitted.</small>
+          <small>The source unlocks only after Arc proof verifies payment.</small>
         </label>
         ${submittedArcTxLink ? `
           <p class="nano-helper">
@@ -3387,7 +3430,7 @@ function renderNanoPageSimplified() {
       <div>
         <p class="mini-label">Result</p>
         <h3>${hasVerifiedReceipt ? "Result unlocked" : "Result locked"}</h3>
-        <p>${hasVerifiedReceipt ? "The verified source is now used in the final result." : "Nano has not verified Arc proof yet. The source cannot be used in the result."}</p>
+        <p>${hasVerifiedReceipt ? "Source-backed result unlocked after Arc proof verified payment." : "Result locked until the approved source unlock has verified Arc proof."}</p>
       </div>
       <span class="status-chip ${resultContribution.tone === "good" ? "good" : resultContribution.tone === "warn" ? "warn" : "pending"}">${escapeHtml(resultContribution.proofStatusLabel)}</span>
     </div>
@@ -3405,6 +3448,7 @@ function renderNanoPageSimplified() {
     </div>
     <div class="nano-result-copy">
       <strong>What changed because of the source</strong>
+      <p>${escapeHtml(selectedNanoAgentName && hasVerifiedReceipt ? `${selectedNanoAgentName} produced this source-backed result.` : selectedNanoAgentName ? `${selectedNanoAgentName} requested this source unlock. Result locked until the approved source unlock has verified Arc proof.` : "Result locked until the approved source unlock has verified Arc proof.")}</p>
       <ul>
         ${resultContribution.contributionBullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
       </ul>
@@ -3651,6 +3695,10 @@ function renderNanoPageSimplified() {
               <article>
                 <strong>What is the receipt for?</strong>
                 <p>The receipt shows the run trail: goal, agent decision, approved source spend, proof state, source unlock, and result contribution.</p>
+              </article>
+              <article>
+                <strong>${escapeHtml(nanoAgentSelectionFaq.question)}</strong>
+                <p>${escapeHtml(nanoAgentSelectionFaq.answer)}</p>
               </article>
               <article>
                 <strong>Can I start another budget?</strong>
@@ -3911,6 +3959,16 @@ function renderNanoPageSimplified() {
       renderNanoPageSimplified();
     });
   });
+  document.querySelectorAll("[data-nano-agent-id]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.nano.selectedNanoAgentId = node.dataset.nanoAgentId || "";
+      state.nano.agentSelectionError = "";
+      renderNanoPageSimplified();
+      requestAnimationFrame(() => {
+        document.getElementById("nanoGoal")?.focus();
+      });
+    });
+  });
   document.getElementById("nanoCustomBudgetAmount")?.addEventListener("input", (event) => {
     state.nano.customBudgetAmount = event.target.value;
     state.nano.budgetAmount = event.target.value;
@@ -3920,7 +3978,7 @@ function renderNanoPageSimplified() {
     if (helper) helper.textContent = validation.message || "Use 0.10 to 5.00 USDC.";
     const primaryButton = document.getElementById("nanoPrimaryAction");
     if (primaryButton?.dataset.nanoAction === "budget") {
-      primaryButton.disabled = !(validation.valid && state.nano.budgetGoal.trim()) || Boolean(state.nano.actionPending);
+      primaryButton.disabled = !(validation.valid && state.nano.budgetGoal.trim() && state.nano.selectedNanoAgentId) || Boolean(state.nano.actionPending);
     }
   });
   document.getElementById("nanoGoal")?.addEventListener("input", (event) => {
@@ -4102,7 +4160,13 @@ async function createNanoBudgetDraft() {
     state.nano.budgetAmountError = budgetValidation.message;
     throw new Error(budgetValidation.message);
   }
+  const agentSelector = buildNanoAgentSelectorModel({ selectedAgentId: state.nano.selectedNanoAgentId });
+  if (!agentSelector.selectedAgent) {
+    state.nano.agentSelectionError = agentSelector.emptyStateCopy;
+    throw new Error(agentSelector.emptyStateCopy);
+  }
   if (!state.nano.budgetGoal.trim()) throw new Error("Enter a goal before creating a budget.");
+  state.nano.agentSelectionError = "";
   const amount = budgetValidation.amount;
   const response = await sendJson("/api/nano/budgets/draft", "POST", {
     ownerWallet: state.wallet,

@@ -120,6 +120,82 @@ export function buildNanoPaymentActionModel(intent, receipt) {
 
 export const nanoBudgetPresets = ["0.10", "0.25", "0.50", "1.00"];
 
+// Mirrors getUserFacingBuiltInPlatformAgents() in apps/router/src/services/platformAgentCatalog.ts.
+export const nanoDispatchAgentOptions = [
+  {
+    id: "platform_thread_writer",
+    slug: "thread-writer",
+    name: "Thread Writer",
+    category: "writing",
+    description: "Turns links, notes, or rough ideas into Twitter/X threads.",
+    bestFor: "Threads, hooks, and calls to action.",
+  },
+  {
+    id: "platform_summarizer",
+    slug: "summarizer",
+    name: "Summarizer",
+    category: "summarization",
+    description: "Summarizes documents, notes, articles, or long text into key points.",
+    bestFor: "Summaries, key points, and action items.",
+  },
+  {
+    id: "platform_rewriter",
+    slug: "rewriter",
+    name: "Rewriter",
+    category: "writing",
+    description: "Rewrites text so it sounds clearer, better, and more polished.",
+    bestFor: "Rewriting, clarity, and tone.",
+  },
+  {
+    id: "platform_research_brief",
+    slug: "research-brief",
+    name: "Research Brief",
+    category: "research",
+    description: "Researches a topic and gives a clear, structured breakdown.",
+    bestFor: "Research, insights, and risks.",
+  },
+  {
+    id: "platform_content_repurposer",
+    slug: "content-repurposer",
+    name: "Content Repurposer",
+    category: "marketing",
+    description: "Turns one piece of content into multiple usable formats.",
+    bestFor: "Repurposing, threads, and captions.",
+  },
+];
+
+export const nanoAgentSelectionFaq = {
+  question: "What does the selected agent do?",
+  answer: "The selected Dispatch agent reads the goal, decides whether a source is worth unlocking, and requests the source spend. You still approve the spend, pay on Arc, and Nano unlocks the result only after proof verifies.",
+};
+
+export function buildNanoAgentSelectorModel({ selectedAgentId = "" } = {}) {
+  const selectedId = String(selectedAgentId || "").trim();
+  const agents = nanoDispatchAgentOptions.map((agent) => ({
+    ...agent,
+    categoryLabel: labelize(agent.category),
+    isSelected: agent.id === selectedId,
+    statusLabel: agent.id === selectedId ? "Selected source agent" : "Dispatch agent",
+    ariaLabel: `Select ${agent.name} for this Nano run`,
+  }));
+  const selectedAgent = agents.find((agent) => agent.isSelected) || null;
+  return {
+    title: "Choose source agent",
+    helper: "Pick the Dispatch agent that will decide which source is worth unlocking for this run.",
+    selectedStateLabel: "Selected source agent",
+    selectedStateCopy: selectedAgent
+      ? `${selectedAgent.name} will request source unlocks when this run needs paid context.`
+      : "",
+    emptyStateCopy: "Choose a source agent before creating a Nano budget.",
+    selectedAgent,
+    selectedAgentId: selectedAgent?.id || "",
+    selectedAgentName: selectedAgent?.name || "",
+    agents,
+    required: true,
+    noFakeMetrics: true,
+  };
+}
+
 export const nanoSourcePaymentSpendPlanRows = [
   {
     payeeId: "source_unlock",
@@ -472,9 +548,10 @@ export function buildNanoSpendPlanPresentation({ hasBudget = false } = {}) {
     };
 }
 
-export function buildNanoAgentDecisionPresentation({ hasBudget = false, intent = null, receipt = null } = {}) {
+export function buildNanoAgentDecisionPresentation({ hasBudget = false, intent = null, receipt = null, selectedAgentName = "" } = {}) {
   const receiptStatus = receipt ? buildNanoReceiptStatusModel(receipt) : null;
   const intentStatus = intent ? buildNanoSpendIntentStatusModel(intent, receipt) : null;
+  const agentName = String(selectedAgentName || "").trim() || "The selected agent";
   const statusLabel = receiptStatus?.label
     || (intent?.status === "approved" ? "Approved" : null)
     || (hasBudget ? "Waiting for approval" : "Starter decision");
@@ -484,7 +561,7 @@ export function buildNanoAgentDecisionPresentation({ hasBudget = false, intent =
   return {
     label: hasBudget ? "Active decision" : "Starter decision",
     title: "Agent decision",
-    copy: "The agent chose a source/tool payment because the goal needs grounded context.",
+    copy: `${agentName} requested a starter source unlock because this result needs grounded context.`,
     resource: "Source unlock",
     costLabel: "Source unlock",
     reason: "Adds source-backed context for the final result.",
@@ -493,7 +570,7 @@ export function buildNanoAgentDecisionPresentation({ hasBudget = false, intent =
     status: statusLabel,
     tone,
     helper: hasBudget
-      ? "Review this source payment before approving it."
+      ? `${agentName} requested this source spend.`
       : "Starter decision only. Create a budget to activate the spend.",
   };
 }

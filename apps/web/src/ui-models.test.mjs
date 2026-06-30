@@ -29,6 +29,7 @@ import {
   buildWalletScopedDashboardModel,
   buildNanoAgentDecisionPresentation,
   buildNanoAgentEvaluationPanelModel,
+  buildNanoAgentSelectorModel,
   buildNanoBudgetGuardrailModel,
   buildNanoBudgetStatusModel,
   buildNanoCurrentStepModel,
@@ -58,6 +59,8 @@ import {
   getTaskBriefTemplate,
   nanoBudgetPresets,
   nanoApiUnavailableMessage,
+  nanoAgentSelectionFaq,
+  nanoDispatchAgentOptions,
   nanoRecipientRegistryProfiles,
   nanoSourcePaymentSpendPlanRows,
   taskBriefTemplates,
@@ -473,6 +476,7 @@ test("Nano start new budget resets draft state without disconnecting wallet", ()
     budgetPreset: "1.00",
     customBudgetAmount: "3",
     sourcePayoutWallet: "0x1111111111111111111111111111111111111111",
+    selectedNanoAgentId: "platform_research_brief",
     arcProofTxHash: `0x${"a".repeat(64)}`,
     actionPending: "arcProof",
   };
@@ -488,6 +492,7 @@ test("Nano start new budget resets draft state without disconnecting wallet", ()
   assert.equal(reset.actionPending, "");
   assert.equal(reset.sourcePayoutWallet, "0x1111111111111111111111111111111111111111");
   assert.equal(reset.budgetGoal, "Keep this goal");
+  assert.equal(reset.selectedNanoAgentId, "platform_research_brief");
 
   const preserved = buildNanoResetDraftState(current, { preserveHistory: true });
   assert.deepEqual(preserved.budgets, current.budgets);
@@ -504,6 +509,76 @@ test("Nano start new budget resets draft state without disconnecting wallet", ()
   assert.equal(consoleAfterReset.activeStepKey, "goal");
   assert.equal(consoleAfterReset.activePanel.primaryActionLabel, "Create Nano budget");
   assert.doesNotMatch(JSON.stringify(consoleAfterReset), /Paid with proof|Result unlocked|Source unlocked/);
+});
+
+test("Nano Dispatch agent selector exposes only real built-in agents without fake metrics", () => {
+  const selector = buildNanoAgentSelectorModel();
+
+  assert.equal(nanoDispatchAgentOptions.length, 5);
+  assert.deepEqual(nanoDispatchAgentOptions.map((agent) => agent.name), [
+    "Thread Writer",
+    "Summarizer",
+    "Rewriter",
+    "Research Brief",
+    "Content Repurposer",
+  ]);
+  assert.deepEqual(selector.agents.map((agent) => agent.id), [
+    "platform_thread_writer",
+    "platform_summarizer",
+    "platform_rewriter",
+    "platform_research_brief",
+    "platform_content_repurposer",
+  ]);
+  assert.equal(selector.selectedAgent, null);
+  assert.equal(selector.required, true);
+  assert.equal(selector.title, "Choose source agent");
+  assert.equal(selector.helper, "Pick the Dispatch agent that will decide which source is worth unlocking for this run.");
+  assert.equal(selector.emptyStateCopy, "Choose a source agent before creating a Nano budget.");
+  assert.equal(selector.noFakeMetrics, true);
+  selector.agents.forEach((agent) => {
+    assert.equal(agent.statusLabel, "Dispatch agent");
+    assert.equal(agent.isSelected, false);
+    assert.equal(agent.ariaLabel, `Select ${agent.name} for this Nano run`);
+    assert.equal(Object.hasOwn(agent, "rating"), false);
+    assert.equal(Object.hasOwn(agent, "earnings"), false);
+    assert.equal(Object.hasOwn(agent, "completedJobs"), false);
+    assert.equal(Object.hasOwn(agent, "availability"), false);
+  });
+});
+
+test("Nano selected built-in agent stays in Goal state before budget and names source/result copy safely", () => {
+  const selector = buildNanoAgentSelectorModel({ selectedAgentId: "platform_research_brief" });
+  const consoleModel = buildNanoRunConsoleModel({ walletConnected: true, budget: null });
+  const decision = buildNanoAgentDecisionPresentation({
+    hasBudget: true,
+    selectedAgentName: selector.selectedAgentName,
+    intent: { status: "proposed" },
+  });
+  const lockedResult = buildNanoResultContributionModel({
+    goal: "Brief",
+    budget: { amount: 0.1 },
+    sourceIntent: { status: "approved" },
+    sourceReceipt: null,
+  });
+
+  assert.equal(selector.selectedAgent?.name, "Research Brief");
+  assert.equal(selector.selectedAgent?.statusLabel, "Selected source agent");
+  assert.equal(selector.selectedStateCopy, "Research Brief will request source unlocks when this run needs paid context.");
+  assert.equal(consoleModel.activeStepKey, "goal");
+  assert.equal(consoleModel.activePanel.primaryActionLabel, "Create Nano budget");
+  assert.match(decision.copy, /Research Brief requested a starter source unlock/);
+  assert.match(decision.helper, /Research Brief requested this source spend/);
+  assert.equal(lockedResult.unlocked, false);
+  assert.equal(lockedResult.proofStatusLabel, "Approved, not paid yet");
+  assert.doesNotMatch(`${decision.copy} ${decision.helper} ${lockedResult.finalOutput}`, /Paid with proof|Result unlocked|Source unlocked/);
+});
+
+test("Nano agent selection FAQ avoids payout and fake proof claims", () => {
+  assert.equal(nanoAgentSelectionFaq.question, "What does the selected agent do?");
+  assert.match(nanoAgentSelectionFaq.answer, /decides whether a source is worth unlocking/);
+  assert.match(nanoAgentSelectionFaq.answer, /You still approve the spend, pay on Arc/);
+  assert.match(nanoAgentSelectionFaq.answer, /Nano unlocks the result only after proof verifies/);
+  assert.doesNotMatch(nanoAgentSelectionFaq.answer, /payout|earnings|paid agent|Gateway|x402|Circle Wallets|nanopayments/i);
 });
 
 test("Nano spend plan labels distinguish starter from active state", () => {
@@ -1307,7 +1382,7 @@ test("Nano agent decision presentation separates starter and active decision sta
   assert.match(starter.helper, /Starter decision only/);
   assert.equal(active.label, "Active decision");
   assert.equal(active.status, "Waiting for approval");
-  assert.match(active.helper, /Review this source payment/);
+  assert.match(active.helper, /requested this source spend/);
 });
 
 test("Nano agent evaluation panel chooses only Source Unlock for live payment", () => {
