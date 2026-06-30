@@ -3183,6 +3183,13 @@ function renderNanoPageSimplified() {
       </div>
     ` : ""}
     <div class="nano-console-form">
+      <div class="nano-form-grid nano-form-grid--compact">
+        <label class="nano-field nano-field--wide">
+          <span>Goal</span>
+          <textarea id="nanoGoal" rows="3" placeholder="Create a short brief about stablecoin payments.">${escapeHtml(state.nano.budgetGoal)}</textarea>
+          <small>${goalValid ? "Tell this agent what result you want from this Nano run." : "Enter a goal before creating a budget."}</small>
+        </label>
+      </div>
       <section class="nano-agent-selector" aria-labelledby="nanoAgentSelectorTitle">
         <div class="nano-agent-selector__head">
           <div>
@@ -3210,20 +3217,15 @@ function renderNanoPageSimplified() {
           </button>
         `).join("")}
       </div>
-      <div class="nano-form-grid nano-form-grid--compact">
-        ${state.nano.budgetPreset === "Custom" ? `
+      ${state.nano.budgetPreset === "Custom" ? `
+        <div class="nano-form-grid nano-form-grid--compact">
           <label class="nano-field">
             <span>Custom budget</span>
             <input id="nanoCustomBudgetAmount" type="text" inputmode="decimal" value="${escapeHtml(state.nano.customBudgetAmount)}" placeholder="0.10" />
             <small>${escapeHtml(budgetValidation.message || "Use 0.10 to 5.00 USDC.")}</small>
           </label>
-        ` : ""}
-        <label class="nano-field nano-field--wide">
-          <span>Goal</span>
-          <textarea id="nanoGoal" rows="3" placeholder="Create a short brief about stablecoin payments.">${escapeHtml(state.nano.budgetGoal)}</textarea>
-          <small>${goalValid ? "Tell this agent what result you want from this Nano run." : "Enter a goal before creating a budget."}</small>
-        </label>
-      </div>
+        </div>
+      ` : ""}
     </div>
     <div class="nano-console-facts">
       <div><span>Budget</span><strong>${escapeHtml(activeBudgetAmount)}</strong></div>
