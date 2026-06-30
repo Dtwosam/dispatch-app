@@ -3186,30 +3186,21 @@ function renderNanoPageSimplified() {
       <section class="nano-agent-selector" aria-labelledby="nanoAgentSelectorTitle">
         <div class="nano-agent-selector__head">
           <div>
-            <p class="mini-label">Choose source agent</p>
             <h4 id="nanoAgentSelectorTitle">${escapeHtml(agentSelector.title)}</h4>
             <p>${escapeHtml(agentSelector.helper)}</p>
           </div>
-          <span class="status-chip ${selectedNanoAgent ? "good" : "pending"}">${escapeHtml(selectedNanoAgent ? agentSelector.selectedStateLabel : "Required")}</span>
         </div>
-        <div class="nano-agent-grid" role="group" aria-label="Dispatch agents for this Nano run">
-          ${agentSelector.agents.map((agent) => `
-            <button
-              class="nano-agent-card ${agent.isSelected ? "is-selected" : ""}"
-              type="button"
-              data-nano-agent-id="${escapeHtml(agent.id)}"
-              aria-pressed="${agent.isSelected ? "true" : "false"}"
-              aria-label="${escapeHtml(agent.ariaLabel)}"
-            >
-              <span class="nano-agent-card__status">${escapeHtml(agent.statusLabel)}</span>
-              <strong>${escapeHtml(agent.name)}</strong>
-              <p>${escapeHtml(agent.description)}</p>
-              <small>${escapeHtml(agent.bestFor)}</small>
-              ${agent.isSelected ? `<span class="nano-agent-card__selected">Selected source agent</span>` : ""}
-            </button>
-          `).join("")}
-        </div>
-        <p class="nano-helper ${selectedNanoAgent ? "" : "nano-helper--warn"}">${escapeHtml(selectedNanoAgent ? agentSelector.selectedStateCopy : agentSelector.emptyStateCopy)}</p>
+        <label class="nano-agent-select">
+          <span>Source agent</span>
+          <select id="nanoSourceAgent" aria-describedby="nanoSourceAgentSummary">
+            <option value="">Choose source agent</option>
+            ${agentSelector.agents.map((agent) => `
+              <option value="${escapeHtml(agent.id)}" ${agent.isSelected ? "selected" : ""}>${escapeHtml(agent.name)}</option>
+            `).join("")}
+          </select>
+        </label>
+        <p class="nano-helper ${selectedNanoAgent ? "" : "nano-helper--warn"}" id="nanoSourceAgentSummary">${escapeHtml(selectedNanoAgent ? agentSelector.selectedStateCopy : agentSelector.emptyStateCopy)}</p>
+        ${selectedNanoAgent ? `<p class="nano-agent-selected-capability">${escapeHtml(selectedNanoAgent.bestFor)}</p>` : ""}
         ${state.nano.agentSelectionError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.agentSelectionError)}</p>` : ""}
       </section>
       <div class="nano-budget-presets" role="group" aria-label="Budget presets">
@@ -3959,14 +3950,12 @@ function renderNanoPageSimplified() {
       renderNanoPageSimplified();
     });
   });
-  document.querySelectorAll("[data-nano-agent-id]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.nano.selectedNanoAgentId = node.dataset.nanoAgentId || "";
-      state.nano.agentSelectionError = "";
-      renderNanoPageSimplified();
-      requestAnimationFrame(() => {
-        document.getElementById("nanoGoal")?.focus();
-      });
+  document.getElementById("nanoSourceAgent")?.addEventListener("change", (event) => {
+    state.nano.selectedNanoAgentId = event.target.value || "";
+    state.nano.agentSelectionError = "";
+    renderNanoPageSimplified();
+    requestAnimationFrame(() => {
+      document.getElementById("nanoGoal")?.focus();
     });
   });
   document.getElementById("nanoCustomBudgetAmount")?.addEventListener("input", (event) => {

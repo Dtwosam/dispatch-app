@@ -532,7 +532,7 @@ test("Nano Dispatch agent selector exposes only real built-in agents without fak
   assert.equal(selector.selectedAgent, null);
   assert.equal(selector.required, true);
   assert.equal(selector.title, "Choose source agent");
-  assert.equal(selector.helper, "Pick the Dispatch agent that will decide which source is worth unlocking for this run.");
+  assert.equal(selector.helper, "Choose who should request source unlocks for this run.");
   assert.equal(selector.emptyStateCopy, "Choose a source agent before creating a Nano budget.");
   assert.equal(selector.noFakeMetrics, true);
   selector.agents.forEach((agent) => {
@@ -563,7 +563,7 @@ test("Nano selected built-in agent stays in Goal state before budget and names s
 
   assert.equal(selector.selectedAgent?.name, "Research Brief");
   assert.equal(selector.selectedAgent?.statusLabel, "Selected source agent");
-  assert.equal(selector.selectedStateCopy, "Research Brief will request source unlocks when this run needs paid context.");
+  assert.equal(selector.selectedStateCopy, "Research Brief will request source unlocks when paid context is needed.");
   assert.equal(consoleModel.activeStepKey, "goal");
   assert.equal(consoleModel.activePanel.primaryActionLabel, "Create Nano budget");
   assert.match(decision.copy, /Research Brief requested a starter source unlock/);

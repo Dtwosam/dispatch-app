@@ -181,10 +181,10 @@ export function buildNanoAgentSelectorModel({ selectedAgentId = "" } = {}) {
   const selectedAgent = agents.find((agent) => agent.isSelected) || null;
   return {
     title: "Choose source agent",
-    helper: "Pick the Dispatch agent that will decide which source is worth unlocking for this run.",
+    helper: "Choose who should request source unlocks for this run.",
     selectedStateLabel: "Selected source agent",
     selectedStateCopy: selectedAgent
-      ? `${selectedAgent.name} will request source unlocks when this run needs paid context.`
+      ? `${selectedAgent.name} will request source unlocks when paid context is needed.`
       : "",
     emptyStateCopy: "Choose a source agent before creating a Nano budget.",
     selectedAgent,
