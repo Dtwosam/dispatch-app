@@ -480,6 +480,7 @@ test("Nano start new budget resets draft state without disconnecting wallet", ()
 
   assert.equal(reset.selectedBudgetId, "");
   assert.equal(reset.activity, null);
+  assert.equal(reset.newBudgetDraft, true);
   assert.equal(reset.budgetAmount, "0.10");
   assert.equal(reset.budgetPreset, "0.10");
   assert.equal(reset.customBudgetAmount, "");
@@ -494,6 +495,15 @@ test("Nano start new budget resets draft state without disconnecting wallet", ()
   assert.deepEqual(preserved.runActivities, current.runActivities);
   assert.equal(preserved.selectedBudgetId, "");
   assert.equal(preserved.activity, null);
+  assert.equal(preserved.newBudgetDraft, true);
+
+  const consoleAfterReset = buildNanoRunConsoleModel({
+    walletConnected: true,
+    budget: preserved.selectedBudgetId ? preserved.budgets[0] : null,
+  });
+  assert.equal(consoleAfterReset.activeStepKey, "goal");
+  assert.equal(consoleAfterReset.activePanel.primaryActionLabel, "Create Nano budget");
+  assert.doesNotMatch(JSON.stringify(consoleAfterReset), /Paid with proof|Result unlocked|Source unlocked/);
 });
 
 test("Nano spend plan labels distinguish starter from active state", () => {

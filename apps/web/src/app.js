@@ -2427,10 +2427,9 @@ function nanoWalletParam() {
 }
 
 function selectedNanoBudget() {
-  return state.nano.activity?.budget
-    || state.nano.budgets.find((budget) => budget.budgetId === state.nano.selectedBudgetId)
-    || state.nano.budgets[0]
-    || null;
+  if (state.nano.activity?.budget) return state.nano.activity.budget;
+  if (!state.nano.selectedBudgetId) return null;
+  return state.nano.budgets.find((budget) => budget.budgetId === state.nano.selectedBudgetId) || null;
 }
 
 function selectedNanoReceiptsByIntent() {
@@ -2562,7 +2561,7 @@ async function refreshNanoData() {
     if (budgetsResult.status === "fulfilled") {
       state.nano.budgets = budgetsResult.value.items || [];
       state.nano.budgetsLoaded = true;
-      if (!state.nano.selectedBudgetId || !state.nano.budgets.some((budget) => budget.budgetId === state.nano.selectedBudgetId)) {
+      if (!state.nano.newBudgetDraft && (!state.nano.selectedBudgetId || !state.nano.budgets.some((budget) => budget.budgetId === state.nano.selectedBudgetId))) {
         state.nano.selectedBudgetId = state.nano.budgets[0]?.budgetId || "";
       }
     } else {
@@ -2936,6 +2935,7 @@ function renderNanoPageSimplified() {
   const receiptBudgetId = nanoSearchParams.get("receipt") || "";
   const apiBaseParam = nanoSearchParams.get("apiBase") || "";
   if (receiptBudgetId && walletConnected && state.nano.selectedBudgetId !== receiptBudgetId) {
+    state.nano.newBudgetDraft = false;
     state.nano.selectedBudgetId = receiptBudgetId;
     state.nano.activity = state.nano.runActivities?.[receiptBudgetId] || null;
   }
@@ -3949,6 +3949,7 @@ function renderNanoPageSimplified() {
     state.nano.arcProofTxHash = event.target.value;
   });
   document.getElementById("nanoBudgetSelect")?.addEventListener("change", async (event) => {
+    state.nano.newBudgetDraft = false;
     state.nano.selectedBudgetId = event.target.value;
     state.nano.activity = state.nano.runActivities?.[event.target.value] || null;
     resetNanoProofDraftFields();
@@ -3960,6 +3961,7 @@ function renderNanoPageSimplified() {
     node.addEventListener("click", async () => {
       const budgetId = node.dataset.nanoRunId;
       if (!budgetId) return;
+      state.nano.newBudgetDraft = false;
       state.nano.selectedBudgetId = budgetId;
       state.nano.activity = state.nano.runActivities?.[budgetId] || null;
       resetNanoProofDraftFields();
@@ -4115,6 +4117,19 @@ async function createNanoBudgetDraft() {
       notes: ["Phase 2 UI records proof metadata only; it does not execute payments."],
     },
   }, validateNanoBudgetDraftResponse);
+  state.nano.newBudgetDraft = false;
+  state.nano.budgets = [
+    response.budget,
+    ...(state.nano.budgets || []).filter((budget) => budget.budgetId !== response.budget.budgetId),
+  ];
+  state.nano.activity = {
+    budget: response.budget,
+    runContext: response.runContext,
+    spendIntents: [],
+    receipts: [],
+    availableBudget: response.budget.amount,
+  };
+  state.nano.runActivities = { ...(state.nano.runActivities || {}), [response.budget.budgetId]: state.nano.activity };
   state.nano.selectedBudgetId = response.budget.budgetId;
 }
 

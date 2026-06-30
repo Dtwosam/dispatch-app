@@ -418,6 +418,7 @@ export function buildNanoResetDraftState(current = {}, options = {}) {
     budgets: preserveHistory ? (current.budgets || []) : [],
     budgetsLoaded: preserveHistory ? Boolean(current.budgetsLoaded) : false,
     budgetsError: preserveHistory ? (current.budgetsError || "") : "",
+    newBudgetDraft: true,
     selectedBudgetId: "",
     activity: null,
     activityError: "",
