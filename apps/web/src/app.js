@@ -3045,6 +3045,7 @@ function renderNanoPageSimplified() {
     hasSpendPlan: hasFullNanoPlan,
     hasApprovedSpend: sourceIntent?.status === "approved" || hasApprovedSpend,
     hasProofPending,
+    proofStatusOverride: state.nano.arcProofStatus,
     sourceUnlock,
     resultContribution,
   });
@@ -3145,6 +3146,291 @@ function renderNanoPageSimplified() {
   const submittedArcTxLink = ["pending", "verified"].includes(state.nano.arcProofStatus)
     ? buildArcTransactionLink(state.nano.arcProofTxHash)
     : null;
+  const nanoPrimaryActionButton = `
+    <button class="hero-primary" type="button" ${primaryButtonAttributes} data-nano-guardrail-blocked="${guardrailBlocksPayment ? "true" : "false"}" ${primaryAction.disabled ? "disabled" : ""}>${state.nano.actionPending === "arcProof" ? "Verifying Arc proof" : state.nano.actionPending ? "Working..." : escapeHtml(primaryAction.label)}</button>
+    <p class="nano-helper">${escapeHtml(primaryAction.reason)}</p>
+  `;
+  const nanoGoalConsoleContent = `
+    <div class="nano-console-content__head">
+      <div>
+        <p class="mini-label">Goal</p>
+        <h3>Goal</h3>
+        <p>Tell the agent what result you want, then create a small USDC budget.</p>
+      </div>
+      <span class="status-chip ${budgetStatus.tone === "good" ? "good" : budgetStatus.tone === "warn" ? "warn" : "pending"}">${escapeHtml(budgetStatus.label)}</span>
+    </div>
+    ${selectedRunModel.active ? `
+      <div class="nano-console-summary" aria-live="polite">
+        <div>
+          <strong>${escapeHtml(selectedRunModel.label)}</strong>
+          <p>${escapeHtml(selectedRunModel.helper)}</p>
+        </div>
+        <button class="hero-secondary" type="button" id="nanoStartNewBudget">Start new run</button>
+      </div>
+    ` : ""}
+    <div class="nano-console-form">
+      <div class="nano-budget-presets" role="group" aria-label="Budget presets">
+        ${[...nanoBudgetPresets, "Custom"].map((preset) => `
+          <button type="button" class="nano-preset ${state.nano.budgetPreset === preset ? "is-active" : ""}" data-nano-preset="${escapeHtml(preset)}">
+            ${escapeHtml(preset === "Custom" ? "Custom" : `${preset} USDC`)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="nano-form-grid nano-form-grid--compact">
+        ${state.nano.budgetPreset === "Custom" ? `
+          <label class="nano-field">
+            <span>Custom budget</span>
+            <input id="nanoCustomBudgetAmount" type="text" inputmode="decimal" value="${escapeHtml(state.nano.customBudgetAmount)}" placeholder="0.10" />
+            <small>${escapeHtml(budgetValidation.message || "Use 0.10 to 5.00 USDC.")}</small>
+          </label>
+        ` : ""}
+        <label class="nano-field nano-field--wide">
+          <span>Goal</span>
+          <textarea id="nanoGoal" rows="3" placeholder="Create a short brief about stablecoin payments.">${escapeHtml(state.nano.budgetGoal)}</textarea>
+          <small>${goalValid ? "Tell the agent what this Nano run should produce." : "Enter a goal before creating a budget."}</small>
+        </label>
+      </div>
+    </div>
+    <div class="nano-console-facts">
+      <div><span>Budget</span><strong>${escapeHtml(activeBudgetAmount)}</strong></div>
+      <div><span>Wallet</span><strong>${walletConnected ? escapeHtml(shortWallet(state.wallet)) : "Wallet required"}</strong></div>
+      <div><span>Network</span><strong>${walletWrongNetwork ? "Wrong network" : "Arc Testnet"}</strong></div>
+      <div><span>Balance</span><strong>${walletConnected ? escapeHtml(walletBalance) : "Connect wallet"}</strong></div>
+    </div>
+    ${renderNanoBudgetOptions()}
+    ${state.nano.budgetsLoading ? `<p class="nano-helper">Loading your Nano budgets...</p>` : ""}
+    ${state.nano.budgetsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(nanoApiUnavailableMessage())}</p>` : ""}
+    <div class="nano-console-actions">
+      ${nanoPrimaryActionButton}
+      <button class="hero-secondary" type="button" id="nanoRefresh" ${state.nano.budgetsLoading ? "disabled" : ""}>Refresh</button>
+      ${budget ? `<button class="hero-secondary" type="button" id="nanoStartNewBudgetSecondary">Start new run</button>` : ""}
+    </div>
+    <p class="nano-helper">Creating a budget is not payment.</p>
+  `;
+  const nanoSourceConsoleContent = `
+    <div class="nano-console-content__head">
+      <div>
+        <p class="mini-label">Source</p>
+        <h3>Source</h3>
+        <p>The agent chooses one starter source worth paying for.</p>
+      </div>
+      <span class="status-chip ${sourceUnlock.tone === "good" ? "good" : sourceUnlock.tone === "warn" ? "warn" : "pending"}">${escapeHtml(sourceUnlock.proofStatus)}</span>
+    </div>
+    <div class="nano-console-source-grid">
+      <article class="nano-console-subpanel">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">${escapeHtml(agentDecision.label)}</p>
+            <h4>${escapeHtml(agentDecision.title)}</h4>
+            <p>${escapeHtml(agentDecision.copy)}</p>
+          </div>
+          <span class="status-chip ${agentDecision.tone === "good" ? "good" : agentDecision.tone === "warn" ? "warn" : "pending"}">${escapeHtml(agentDecision.status)}</span>
+        </div>
+        <div class="nano-decision-grid">
+          <div><span>Resource</span><strong>${escapeHtml(agentDecision.resource)}</strong></div>
+          <div><span>Cost</span><strong>${escapeHtml(formatNanoUsdc(sourcePlan?.amount || 0.01))}</strong></div>
+          <div><span>Reason</span><strong>${escapeHtml(agentDecision.reason)}</strong></div>
+          <div><span>Expected value</span><strong>${escapeHtml(agentDecision.expectedValue)}</strong></div>
+          <div><span>Decision</span><strong>${escapeHtml(agentDecision.decision)}</strong></div>
+        </div>
+        <p class="nano-helper">${escapeHtml(agentDecision.helper)}</p>
+      </article>
+      <article class="nano-console-subpanel nano-source-card" id="nanoSourceUnlock">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">${escapeHtml(sourceUnlock.capsuleLabel)}</p>
+            <h4>${escapeHtml(sourceUnlock.capsuleTitle)}</h4>
+            <p>${escapeHtml(sourceUnlock.capsuleHelper)}</p>
+          </div>
+          <span class="status-chip ${sourceUnlock.tone === "good" ? "good" : sourceUnlock.tone === "warn" ? "warn" : "pending"}">${escapeHtml(sourceUnlock.capsuleStateLabel)}</span>
+        </div>
+        <div class="nano-source-facts">
+          <div><span>Price</span><strong>${escapeHtml(sourceUnlock.priceLabel)}</strong></div>
+          <div><span>Recipient wallet</span><strong>${escapeHtml(sourceUnlock.recipient)}</strong></div>
+          <div><span>Reason</span><strong>${escapeHtml(sourceUnlock.reason)}</strong></div>
+        </div>
+        <div class="nano-source-capsule nano-source-capsule--${sourceUnlock.unlocked ? "unlocked" : "locked"}">
+          <div>
+            <span>${sourceUnlock.unlocked ? "Starter source unlocked" : "Starter source locked"}</span>
+            <p>${escapeHtml(sourceUnlock.capsuleSummary)}</p>
+          </div>
+          <div>
+            <span>Contribution used by result</span>
+            <p>${escapeHtml(sourceUnlock.capsuleContribution)}</p>
+          </div>
+        </div>
+        <div class="nano-quiet-actions">
+          ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : ""}
+          ${sourceUnlock.txLink ? `<a href="${escapeHtml(sourceUnlock.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
+        </div>
+        ${!sourceUnlock.unlocked ? `<p class="nano-helper nano-helper--warn">${escapeHtml(sourceUnlock.lockedSummary)}</p>` : ""}
+        <p class="nano-helper">This is a Dispatch-hosted starter source capsule, not claimed external source access.</p>
+      </article>
+    </div>
+    <div class="nano-console-evaluation" aria-label="Agent evaluation">
+      ${agentEvaluation.options.map((option) => `
+        <article class="nano-evaluation-option nano-evaluation-option--${escapeHtml(option.state)}">
+          <div>
+            <span class="nano-payee-type">${escapeHtml(option.stateLabel)}</span>
+            <strong>${escapeHtml(option.label)}</strong>
+            <p>${escapeHtml(option.costValueReason)}</p>
+          </div>
+          <div class="nano-evaluation-facts">
+            <div><span>Cost</span><strong>${escapeHtml(option.amount)}</strong></div>
+            <div><span>Budget impact</span><strong>${escapeHtml(option.budgetImpact)}</strong></div>
+            <div><span>Decision</span><strong>${escapeHtml(option.decisionReason)}</strong></div>
+            <div><span>Payment</span><strong>${escapeHtml(option.payActionLabel)}</strong></div>
+          </div>
+        </article>
+      `).join("")}
+    </div>
+    <div class="nano-proof-box nano-console-note">
+      <h3>Why Source Unlock is worth paying for</h3>
+      <p>${escapeHtml(agentEvaluation.whySourceWorthPaying)}</p>
+      <p>${escapeHtml(agentEvaluation.helper)}</p>
+    </div>
+    <div class="nano-console-actions">
+      ${nanoPrimaryActionButton}
+    </div>
+  `;
+  const nanoPayProofConsoleContent = `
+    <div class="nano-console-content__head">
+      <div>
+        <p class="mini-label">Pay + proof</p>
+        <h3>Pay + proof</h3>
+        <p>Approve the source spend, pay on Arc, then verify proof.</p>
+      </div>
+      <span class="status-chip ${hasVerifiedReceipt ? "good" : state.nano.arcProofStatus === "rejected" || state.nano.arcProofStatus === "unavailable" ? "warn" : "pending"}">${escapeHtml(proofStateLabel)}</span>
+    </div>
+    <div class="nano-console-pay-grid">
+      <article class="nano-console-subpanel">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">Spend approval</p>
+            <h4>${escapeHtml(spendPlanPresentation.label)}</h4>
+            <p>Approval is not payment. Paid only after verified Arc proof.</p>
+          </div>
+          <span class="status-chip ${budgetGuardrails.tone === "good" ? "good" : budgetGuardrails.tone === "warn" ? "warn" : "pending"}">${escapeHtml(formatNanoUsdc(budgetGuardrails.remainingBudgetUsdc))} remains</span>
+        </div>
+        <div class="nano-guardrail-grid">
+          ${budgetGuardrails.fields.map(([label, value]) => `
+            <div>
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+            </div>
+          `).join("")}
+        </div>
+        <div class="nano-guardrail-warnings">
+          ${budgetGuardrails.warnings.map((warning) => `<span>${escapeHtml(warning)}</span>`).join("")}
+        </div>
+      </article>
+      <article class="nano-console-subpanel">
+        <div class="nano-recipient-summary">
+          <span>Planned spend recipient</span>
+          <strong>${escapeHtml(nanoPayAction.recipient.label)}</strong>
+        </div>
+        <label class="nano-field">
+          <span>Recipient wallet</span>
+          <input id="nanoSourcePayoutWallet" type="text" value="${escapeHtml(state.nano.sourcePayoutWallet)}" placeholder="0x recipient wallet" />
+          <small>${escapeHtml(sourcePayoutWalletModel.wallet ? sourcePayoutWalletModel.helper : spendPlanPresentation.recipientHelper)}</small>
+        </label>
+        <label class="nano-field">
+          <span>Arc transaction hash</span>
+          <input id="nanoArcProofTxHash" type="text" value="${escapeHtml(state.nano.arcProofTxHash)}" placeholder="0x..." />
+          <small>Paste the Arc Testnet transaction hash if the wallet transfer was already submitted.</small>
+        </label>
+        ${submittedArcTxLink ? `
+          <p class="nano-helper">
+            Submitted Arc transaction:
+            <a href="${escapeHtml(submittedArcTxLink)}" target="_blank" rel="noreferrer">${escapeHtml(shortWallet(state.nano.arcProofTxHash))}</a>
+          </p>
+        ` : ""}
+        ${state.nano.arcProofMessage ? `<p class="nano-helper ${state.nano.arcProofStatus === "rejected" || state.nano.arcProofStatus === "unavailable" ? "nano-helper--warn" : ""}">${escapeHtml(state.nano.arcProofMessage)}</p>` : ""}
+      </article>
+    </div>
+    <div class="nano-spend-plan nano-spend-plan--console">
+      ${multiSpendPlan.rows.map((row) => `
+        <article class="nano-spend-row ${row.primary ? "nano-spend-row--primary" : row.plannedOnly ? "nano-spend-row--planned" : ""}">
+          <div>
+            <span class="nano-payee-type">${escapeHtml(row.typeLabel)}</span>
+            <span class="meta-pill">${escapeHtml(row.recipientAvailability)}</span>
+            <strong>${escapeHtml(row.label)}</strong>
+            <p>${escapeHtml(row.reason)}</p>
+          </div>
+          <div class="nano-spend-row__meta">
+            <strong>${escapeHtml(row.amount)}</strong>
+            <span class="status-chip ${row.proofTone === "good" ? "good" : row.proofTone === "warn" ? "warn" : "pending"}">${escapeHtml(row.proofLabel)}</span>
+            <small>${escapeHtml(row.payActionLabel)}</small>
+            ${row.txLink ? `<a href="${escapeHtml(row.txLink)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
+          </div>
+        </article>
+      `).join("")}
+      <article class="nano-spend-row nano-spend-row--quiet">
+        <div>
+          <strong>Main agent keeps remaining budget</strong>
+          <p>Remaining budget after helper spends.</p>
+        </div>
+        <div class="nano-spend-row__meta">
+          <strong>${escapeHtml(formatNanoUsdc(mainAgentRemainder))}</strong>
+          <span class="status-chip pending">Remainder</span>
+        </div>
+      </article>
+    </div>
+    <p class="nano-helper">${escapeHtml(multiSpendPlan.helper)}</p>
+    <div class="nano-console-actions">
+      ${nanoPrimaryActionButton}
+      <p class="nano-helper">${escapeHtml(nanoPayActionReason)}</p>
+    </div>
+  `;
+  const nanoResultConsoleContent = `
+    <div class="nano-console-content__head">
+      <div>
+        <p class="mini-label">Result</p>
+        <h3>${hasVerifiedReceipt ? "Result unlocked" : "Result locked"}</h3>
+        <p>${hasVerifiedReceipt ? "The verified source is now used in the final result." : "Nano has not verified Arc proof yet. The source cannot be used in the result."}</p>
+      </div>
+      <span class="status-chip ${resultContribution.tone === "good" ? "good" : resultContribution.tone === "warn" ? "warn" : "pending"}">${escapeHtml(resultContribution.proofStatusLabel)}</span>
+    </div>
+    <div class="nano-result-fields">
+      <div><span>Goal</span><strong>${escapeHtml(resultContribution.goal)}</strong></div>
+      <div><span>Source/tool used</span><strong>${escapeHtml(resultContribution.sourceUsedLabel)}</strong></div>
+      <div><span>Type</span><strong>${escapeHtml(resultContribution.sourceType)}</strong></div>
+      <div><span>Contribution</span><strong>${escapeHtml(resultContribution.sourceContributionSummary)}</strong></div>
+      <div><span>Receipt</span><strong>${escapeHtml(resultContribution.receiptReference)}</strong></div>
+      <div><span>Proof status</span><strong>${escapeHtml(resultContribution.proofStatusLabel)}</strong></div>
+    </div>
+    <div class="nano-result-contrast">
+      <div><span>Before source</span><strong>${escapeHtml(resultContribution.beforeSourceCopy)}</strong></div>
+      <div><span>After source</span><strong>${escapeHtml(resultContribution.afterSourceCopy)}</strong></div>
+    </div>
+    <div class="nano-result-copy">
+      <strong>What changed because of the source</strong>
+      <ul>
+        ${resultContribution.contributionBullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
+      </ul>
+      <strong>Final output</strong>
+      <p>${escapeHtml(resultContribution.finalOutput)}</p>
+    </div>
+    <div class="nano-console-trail" id="nanoPaymentTrail">
+      <div>
+        <strong>Payment trail summary</strong>
+        <p>Track the source spend from approval to Arc proof to receipt.</p>
+      </div>
+      <span class="meta-pill">${receipts.length} proof record${receipts.length === 1 ? "" : "s"}</span>
+    </div>
+    ${resultContribution.warning ? `<p class="nano-helper nano-helper--warn">${escapeHtml(resultContribution.warning)}</p>` : ""}
+    <div class="nano-console-actions">
+      ${activeReceiptBudgetId ? `<button class="hero-primary" type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : `<button class="hero-primary" type="button" id="nanoViewResult">${escapeHtml(resultPreview.cta)}</button>`}
+      ${resultContribution.txLink ? `<a class="hero-secondary nano-result-cta" href="${escapeHtml(resultContribution.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
+      ${activeReceiptBudgetId ? `<button class="hero-secondary nano-result-cta" type="button" id="nanoViewResult">${escapeHtml(resultPreview.cta)}</button>` : ""}
+    </div>
+  `;
+  const nanoConsoleContentByStep = {
+    goal: nanoGoalConsoleContent,
+    source: nanoSourceConsoleContent,
+    pay_proof: nanoPayProofConsoleContent,
+    result: nanoResultConsoleContent,
+  };
 
   if (receiptBudgetId) {
     el.appRoot.innerHTML = `
@@ -3264,7 +3550,7 @@ function renderNanoPageSimplified() {
         `).join("")}
       </section>
 
-      <section class="nano-panel nano-run-console reveal-on-scroll" aria-labelledby="nanoRunConsoleTitle">
+      <section class="nano-panel nano-run-console reveal-on-scroll" id="nanoRunStart" aria-labelledby="nanoRunConsoleTitle">
         <div class="nano-run-console__head">
           <div>
             <span class="nano-console-eyebrow">${escapeHtml(nanoRunConsole.eyebrow)}</span>
@@ -3285,371 +3571,11 @@ function renderNanoPageSimplified() {
             </article>
           `).join("")}
         </div>
-        <div class="nano-console-active">
-          <div>
-            <p class="mini-label">Current step</p>
-            <h3>${escapeHtml(nanoRunConsole.activePanel.title)}</h3>
-            <p>${escapeHtml(nanoRunConsole.activePanel.body)}</p>
-          </div>
-          <div class="nano-console-active__action">
-            <strong>${escapeHtml(nanoRunConsole.activePanel.primaryActionLabel)}</strong>
-            <span>${escapeHtml(nanoRunConsole.activePanel.secondaryText)}</span>
-          </div>
+        <div class="nano-console-active nano-console-active--${escapeHtml(nanoRunConsole.activeStepKey)}">
+          ${nanoConsoleContentByStep[nanoRunConsole.activeStepKey] || nanoGoalConsoleContent}
         </div>
-        <p class="nano-helper">Use the controls below to complete the current run.</p>
+        <p class="nano-helper">Use this console to complete the current run. Supporting details stay below for inspection.</p>
       </section>
-
-      <section class="nano-panel nano-how reveal-on-scroll">
-        <div class="nano-section-head">
-          <div>
-            <p class="mini-label">What happens</p>
-            <h2>One source payment, checked by proof.</h2>
-          </div>
-        </div>
-        <div class="nano-how-grid">
-          ${[
-            ["1", "Give a goal", "Tell the agent what result you want."],
-            ["2", "Approve source spend", "The agent asks to buy one small source."],
-            ["3", "Pay on Arc", "You send the tiny USDC payment."],
-            ["4", "Proof unlocks result", "Nano checks proof before the source is used."],
-            ["5", "Share receipt", "The receipt shows the payment and result trail."],
-          ].map(([number, title, helper]) => `
-            <article>
-              <strong>${number}</strong>
-              <h3>${title}</h3>
-              <p>${helper}</p>
-            </article>
-          `).join("")}
-        </div>
-      </section>
-
-      <section class="nano-panel nano-demo-card reveal-on-scroll" id="nanoRunStart">
-        <div>
-          <p class="mini-label">Goal and budget</p>
-          <h2>Start with a goal</h2>
-          <p class="nano-helper">Nano first prepares a tiny source spend. Nothing is paid until you approve and complete the Arc payment.</p>
-          <div class="nano-budget-presets" role="group" aria-label="Budget presets">
-            ${[...nanoBudgetPresets, "Custom"].map((preset) => `
-              <button type="button" class="nano-preset ${state.nano.budgetPreset === preset ? "is-active" : ""}" data-nano-preset="${escapeHtml(preset)}">
-                ${escapeHtml(preset === "Custom" ? "Custom" : `${preset} USDC`)}
-              </button>
-            `).join("")}
-          </div>
-          <div class="nano-demo-facts">
-            <div><span>Budget</span><strong>${escapeHtml(activeBudgetAmount)}</strong></div>
-            <div><span>Wallet</span><strong>${walletConnected ? escapeHtml(shortWallet(state.wallet)) : "Wallet required"}</strong></div>
-            <div><span>Network</span><strong>${walletWrongNetwork ? "Wrong network" : "Arc Testnet"}</strong></div>
-            <div><span>Balance</span><strong>${walletConnected ? escapeHtml(walletBalance) : "Connect wallet"}</strong></div>
-          </div>
-          <div class="nano-form-grid nano-form-grid--compact">
-            ${state.nano.budgetPreset === "Custom" ? `
-              <label class="nano-field">
-                <span>Custom budget</span>
-                <input id="nanoCustomBudgetAmount" type="text" inputmode="decimal" value="${escapeHtml(state.nano.customBudgetAmount)}" placeholder="0.10" />
-                <small>${escapeHtml(budgetValidation.message || "Use 0.10 to 5.00 USDC.")}</small>
-              </label>
-            ` : ""}
-            <label class="nano-field nano-field--wide">
-              <span>Goal</span>
-              <textarea id="nanoGoal" rows="3" placeholder="Create a short brief about stablecoin payments.">${escapeHtml(state.nano.budgetGoal)}</textarea>
-              <small>${goalValid ? "Tell the agent what this Nano run should produce." : "Enter a goal before creating a budget."}</small>
-            </label>
-          </div>
-        </div>
-        <div class="nano-demo-action">
-          <button class="hero-primary" type="button" ${primaryButtonAttributes} data-nano-guardrail-blocked="${guardrailBlocksPayment ? "true" : "false"}" ${primaryAction.disabled ? "disabled" : ""}>${state.nano.actionPending === "arcProof" ? "Verifying Arc proof" : state.nano.actionPending ? "Working..." : escapeHtml(primaryAction.label)}</button>
-          <p>${escapeHtml(primaryAction.reason)}</p>
-          <button class="hero-secondary" type="button" id="nanoRefresh" ${state.nano.budgetsLoading ? "disabled" : ""}>Refresh</button>
-          ${budget ? `<button class="hero-secondary" type="button" id="nanoStartNewBudgetSecondary">Start new run</button>` : ""}
-        </div>
-      </section>
-
-      ${selectedRunModel.active ? `
-        <section class="nano-selected-run reveal-on-scroll" aria-live="polite">
-          <div>
-            <strong>${escapeHtml(selectedRunModel.label)}</strong>
-            <p>${escapeHtml(selectedRunModel.helper)}</p>
-          </div>
-          <button class="hero-secondary" type="button" id="nanoStartNewBudget">Start new run</button>
-        </section>
-      ` : ""}
-
-      <section class="nano-two-col">
-        <article class="nano-panel nano-decision-card reveal-on-scroll">
-          <div class="nano-section-head">
-            <div>
-              <p class="mini-label">${escapeHtml(agentDecision.label)}</p>
-              <h2>${escapeHtml(agentDecision.title)}</h2>
-              <p>${escapeHtml(agentDecision.copy)}</p>
-            </div>
-            <span class="status-chip ${agentDecision.tone === "good" ? "good" : agentDecision.tone === "warn" ? "warn" : "pending"}">${escapeHtml(agentDecision.status)}</span>
-          </div>
-          <div class="nano-decision-grid">
-            <div><span>Resource</span><strong>${escapeHtml(agentDecision.resource)}</strong></div>
-            <div><span>Cost</span><strong>${escapeHtml(formatNanoUsdc(sourcePlan?.amount || 0.01))}</strong></div>
-            <div><span>Reason</span><strong>${escapeHtml(agentDecision.reason)}</strong></div>
-            <div><span>Expected value</span><strong>${escapeHtml(agentDecision.expectedValue)}</strong></div>
-            <div><span>Decision</span><strong>${escapeHtml(agentDecision.decision)}</strong></div>
-          </div>
-          <p class="nano-helper">${escapeHtml(agentDecision.helper)}</p>
-        </article>
-
-        <article class="nano-panel nano-source-card reveal-on-scroll" id="nanoSourceUnlock">
-          <div class="nano-section-head">
-            <div>
-              <p class="mini-label">${escapeHtml(sourceUnlock.capsuleLabel)}</p>
-              <h2>${escapeHtml(sourceUnlock.capsuleTitle)}</h2>
-              <p>${escapeHtml(sourceUnlock.capsuleHelper)}</p>
-            </div>
-            <span class="status-chip ${sourceUnlock.tone === "good" ? "good" : sourceUnlock.tone === "warn" ? "warn" : "pending"}">${escapeHtml(sourceUnlock.proofStatus)}</span>
-          </div>
-          <div class="nano-source-facts">
-            <div><span>Capsule state</span><strong>${escapeHtml(sourceUnlock.capsuleStateLabel)}</strong></div>
-            <div><span>Price</span><strong>${escapeHtml(sourceUnlock.priceLabel)}</strong></div>
-            <div><span>Recipient wallet</span><strong>${escapeHtml(sourceUnlock.recipient)}</strong></div>
-            <div><span>Reason</span><strong>${escapeHtml(sourceUnlock.reason)}</strong></div>
-          </div>
-          <div class="nano-source-capsule nano-source-capsule--${sourceUnlock.unlocked ? "unlocked" : "locked"}">
-            <div>
-              <span>${sourceUnlock.unlocked ? "Unlocked source summary" : "Locked source summary"}</span>
-              <p>${escapeHtml(sourceUnlock.capsuleSummary)}</p>
-            </div>
-            <div>
-              <span>Contribution used by result</span>
-              <p>${escapeHtml(sourceUnlock.capsuleContribution)}</p>
-            </div>
-          </div>
-          <div class="nano-quiet-actions">
-            ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : ""}
-            ${sourceUnlock.txLink ? `<a href="${escapeHtml(sourceUnlock.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
-          </div>
-          ${!sourceUnlock.unlocked ? `<p class="nano-helper nano-helper--warn">${escapeHtml(sourceUnlock.lockedSummary)}</p>` : ""}
-          <p class="nano-helper">This is a Dispatch-hosted starter source capsule, not claimed external source access.</p>
-        </article>
-      </section>
-
-      <article class="nano-panel nano-evaluation-panel reveal-on-scroll">
-        <div class="nano-section-head">
-          <div>
-            <p class="mini-label">${escapeHtml(agentEvaluation.modeLabel)}</p>
-            <h2>${escapeHtml(agentEvaluation.title)}</h2>
-            <p>${escapeHtml(agentEvaluation.subtitle)}</p>
-          </div>
-          <span class="meta-pill">Source Unlock chosen</span>
-        </div>
-        <div class="nano-evaluation-grid">
-          ${agentEvaluation.options.map((option) => `
-            <article class="nano-evaluation-option nano-evaluation-option--${escapeHtml(option.state)}">
-              <div>
-                <span class="nano-payee-type">${escapeHtml(option.stateLabel)}</span>
-                <strong>${escapeHtml(option.label)}</strong>
-                <p>${escapeHtml(option.costValueReason)}</p>
-              </div>
-              <div class="nano-evaluation-facts">
-                <div><span>Cost</span><strong>${escapeHtml(option.amount)}</strong></div>
-                <div><span>Budget impact</span><strong>${escapeHtml(option.budgetImpact)}</strong></div>
-                <div><span>Decision</span><strong>${escapeHtml(option.decisionReason)}</strong></div>
-                <div><span>Payment</span><strong>${escapeHtml(option.payActionLabel)}</strong></div>
-              </div>
-            </article>
-          `).join("")}
-        </div>
-        <div class="nano-proof-box">
-          <h3>Why this source is worth paying for</h3>
-          <p>${escapeHtml(agentEvaluation.whySourceWorthPaying)}</p>
-          <p>${escapeHtml(agentEvaluation.helper)}</p>
-        </div>
-      </article>
-
-      <section class="nano-core-stack">
-        <article class="nano-panel nano-budget-panel reveal-on-scroll">
-          <div class="nano-section-head">
-            <div>
-              <p class="mini-label">Spend approval</p>
-              <h2>${escapeHtml(spendPlanPresentation.label)}</h2>
-              <p>Approve the source spend before any Arc payment is marked paid.</p>
-            </div>
-            <span class="status-chip ${budgetStatus.tone === "good" ? "good" : budgetStatus.tone === "warn" ? "warn" : "pending"}">${escapeHtml(runProgress.currentStep)}</span>
-          </div>
-          ${renderNanoBudgetOptions()}
-          ${state.nano.budgetsLoading ? `<p class="nano-helper">Loading your Nano budgets...</p>` : ""}
-          ${state.nano.budgetsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(nanoApiUnavailableMessage())}</p>` : ""}
-          <div class="nano-guardrail-panel" aria-label="Budget guardrails">
-            <div class="nano-section-head">
-              <div>
-                <p class="mini-label">Budget control</p>
-                <h3>${escapeHtml(budgetGuardrails.budgetStatus)}</h3>
-                <p>${escapeHtml(budgetGuardrails.helper)}</p>
-              </div>
-              <span class="status-chip ${budgetGuardrails.tone === "good" ? "good" : budgetGuardrails.tone === "warn" ? "warn" : "pending"}">${escapeHtml(formatNanoUsdc(budgetGuardrails.remainingBudgetUsdc))} remains</span>
-            </div>
-            <div class="nano-guardrail-grid">
-              ${budgetGuardrails.fields.map(([label, value]) => `
-                <div>
-                  <span>${escapeHtml(label)}</span>
-                  <strong>${escapeHtml(value)}</strong>
-                </div>
-              `).join("")}
-            </div>
-            <div class="nano-guardrail-warnings">
-              ${budgetGuardrails.warnings.map((warning) => `<span>${escapeHtml(warning)}</span>`).join("")}
-            </div>
-          </div>
-          <div class="nano-spend-plan">
-            ${multiSpendPlan.rows.map((row) => {
-              return `
-                <article class="nano-spend-row ${row.primary ? "nano-spend-row--primary" : row.plannedOnly ? "nano-spend-row--planned" : ""}">
-                  <div>
-                    <span class="nano-payee-type">${escapeHtml(row.typeLabel)}</span>
-                    <span class="meta-pill">${escapeHtml(row.recipientAvailability)}</span>
-                    <strong>${escapeHtml(row.label)}</strong>
-                    <p>${escapeHtml(row.reason)}</p>
-                    ${row.primary ? `
-                      <label class="nano-field nano-field--inline">
-                        <span>Recipient wallet</span>
-                        <input id="nanoSourcePayoutWallet" type="text" value="${escapeHtml(state.nano.sourcePayoutWallet)}" placeholder="0x recipient wallet" />
-                        <small>${escapeHtml(sourcePayoutWalletModel.wallet ? sourcePayoutWalletModel.helper : spendPlanPresentation.recipientHelper)}</small>
-                      </label>
-                    ` : ""}
-                  </div>
-                  <div class="nano-spend-row__meta">
-                    <strong>${escapeHtml(row.amount)}</strong>
-                    <span class="status-chip ${row.proofTone === "good" ? "good" : row.proofTone === "warn" ? "warn" : "pending"}">${escapeHtml(row.proofLabel)}</span>
-                    <small>${escapeHtml(row.payActionLabel)}</small>
-                    ${row.txLink ? `<a href="${escapeHtml(row.txLink)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
-                  </div>
-                </article>
-              `;
-            }).join("")}
-            <article class="nano-spend-row nano-spend-row--quiet">
-              <div>
-                <strong>Main agent keeps remaining budget</strong>
-                <p>Remaining budget after helper spends.</p>
-              </div>
-              <div class="nano-spend-row__meta">
-                <strong>${escapeHtml(formatNanoUsdc(mainAgentRemainder))}</strong>
-                  <span class="status-chip pending">Remainder</span>
-                </div>
-              </article>
-          </div>
-          <p class="nano-helper">${escapeHtml(multiSpendPlan.helper)}</p>
-        </article>
-
-        <article class="nano-panel nano-proof-check reveal-on-scroll" id="nanoProofGate">
-          <div class="nano-section-head">
-            <div>
-              <p class="mini-label">Pay on Arc</p>
-              <h2>Proof check</h2>
-              <p>Approval is not payment. Nano only marks the source paid after Arc proof matches the amount, token, sender, and recipient.</p>
-            </div>
-            <span class="status-chip ${hasVerifiedReceipt ? "good" : state.nano.arcProofStatus === "rejected" ? "warn" : "pending"}">${escapeHtml(proofStateLabel)}</span>
-          </div>
-          <div class="nano-proof-box">
-            <div class="nano-recipient-summary">
-              <span>Planned spend recipient</span>
-              <strong>${escapeHtml(nanoPayAction.recipient.label)}</strong>
-            </div>
-            <label class="nano-field">
-              <span>Arc transaction hash</span>
-              <input id="nanoArcProofTxHash" type="text" value="${escapeHtml(state.nano.arcProofTxHash)}" placeholder="0x..." />
-              <small>Paste the Arc Testnet transaction hash if the wallet transfer was already submitted.</small>
-            </label>
-            <p class="nano-helper">${escapeHtml(nanoPayActionReason)}</p>
-            ${submittedArcTxLink ? `
-              <p class="nano-helper">
-                Submitted Arc transaction:
-                <a href="${escapeHtml(submittedArcTxLink)}" target="_blank" rel="noreferrer">${escapeHtml(shortWallet(state.nano.arcProofTxHash))}</a>
-              </p>
-            ` : ""}
-            ${state.nano.arcProofMessage ? `<p class="nano-helper ${state.nano.arcProofStatus === "rejected" || state.nano.arcProofStatus === "unavailable" ? "nano-helper--warn" : ""}">${escapeHtml(state.nano.arcProofMessage)}</p>` : ""}
-          </div>
-        </article>
-      </section>
-
-      <article class="nano-panel nano-result-panel reveal-on-scroll" id="nanoResultPreview">
-          <div class="nano-section-head">
-            <div>
-              <p class="mini-label">${escapeHtml(resultContribution.starterOrLiveLabel)}</p>
-              <h2>Result preview</h2>
-              <p>${escapeHtml(resultContribution.helper)}</p>
-            </div>
-            <span class="status-chip ${resultContribution.tone === "good" ? "good" : resultContribution.tone === "warn" ? "warn" : "pending"}">${escapeHtml(resultContribution.proofStatusLabel)}</span>
-          </div>
-          <div class="nano-result-fields">
-            <div><span>Goal</span><strong>${escapeHtml(resultContribution.goal)}</strong></div>
-            <div><span>Source/tool used</span><strong>${escapeHtml(resultContribution.sourceUsedLabel)}</strong></div>
-            <div><span>Type</span><strong>${escapeHtml(resultContribution.sourceType)}</strong></div>
-            <div><span>Contribution</span><strong>${escapeHtml(resultContribution.sourceContributionSummary)}</strong></div>
-            <div><span>Receipt</span><strong>${escapeHtml(resultContribution.receiptReference)}</strong></div>
-            <div><span>Proof status</span><strong>${escapeHtml(resultContribution.proofStatusLabel)}</strong></div>
-          </div>
-          <div class="nano-result-contrast">
-            <div><span>Before source</span><strong>${escapeHtml(resultContribution.beforeSourceCopy)}</strong></div>
-            <div><span>After source</span><strong>${escapeHtml(resultContribution.afterSourceCopy)}</strong></div>
-          </div>
-          <div class="nano-result-copy">
-            <strong>What changed because of the source</strong>
-            <ul>
-              ${resultContribution.contributionBullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
-            </ul>
-            <strong>Final output</strong>
-            <p>${escapeHtml(resultContribution.finalOutput)}</p>
-          </div>
-          ${resultContribution.txLink ? `<a class="hero-secondary nano-result-cta" href="${escapeHtml(resultContribution.txLink)}" target="_blank" rel="noreferrer">View verified transaction</a>` : ""}
-          ${activeReceiptBudgetId ? `<button class="hero-secondary nano-result-cta" type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : ""}
-          ${resultContribution.warning ? `<p class="nano-helper nano-helper--warn">${escapeHtml(resultContribution.warning)}</p>` : ""}
-          <button class="hero-secondary nano-result-cta" type="button" id="nanoViewResult">${escapeHtml(resultPreview.cta)}</button>
-      </article>
-
-      <article class="nano-panel reveal-on-scroll" id="nanoPaymentTrail">
-        <div class="nano-section-head">
-          <div>
-            <p class="mini-label">Payment trail</p>
-            <h2>Payment trail</h2>
-            <p>Track the source spend from approval to Arc proof to receipt.</p>
-          </div>
-          <div class="nano-quiet-actions">
-            <span class="meta-pill">${receipts.length} proof record${receipts.length === 1 ? "" : "s"}</span>
-            ${activeReceiptBudgetId ? `<button type="button" data-nano-receipt-id="${escapeHtml(activeReceiptBudgetId)}">View shareable receipt</button>` : ""}
-          </div>
-        </div>
-        ${intents.length ? `
-          <div class="nano-trail-table">
-            <div class="nano-trail-head"><span>Spend</span><span>Recipient</span><span>Amount</span><span>Proof state</span></div>
-            ${intents.map((intent) => {
-              const receipt = receiptsByIntent.get(intent.intentId);
-              const status = receipt ? buildNanoReceiptStatusModel(receipt) : buildNanoSpendIntentStatusModel(intent, null);
-              const txLink = buildArcTransactionLink(receipt?.proof?.txHash);
-              const timestamp = receipt?.recordedAt || receipt?.proof?.recordedAt || "";
-              return `
-                <article class="nano-trail-row">
-                  <span>
-                    <strong>${escapeHtml(intent.payee.label)}</strong>
-                    <small>${escapeHtml(intent.reason)}</small>
-                  </span>
-                  <span>
-                    ${escapeHtml(intent.payee.walletAddress ? shortWallet(intent.payee.walletAddress) : "No recipient wallet")}
-                    ${txLink ? `<a href="${escapeHtml(txLink)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
-                  </span>
-                  <span>
-                    ${escapeHtml(formatNanoUsdc(intent.amount))}
-                    <small>${escapeHtml(timestamp ? new Date(timestamp).toLocaleString() : "Timestamp pending")}</small>
-                  </span>
-                  <span>
-                    <span class="status-chip ${status.tone === "good" ? "good" : status.tone === "warn" ? "warn" : "pending"}">${escapeHtml(status.label)}</span>
-                  </span>
-                </article>
-              `;
-            }).join("")}
-          </div>
-        ` : `
-          <div class="empty-inline">
-            <span class="empty-inline__mark" aria-hidden="true"></span>
-            <div><strong>No payment trail yet.</strong><p>Payment states appear after a spend is proposed or approved. Paid appears only after verified Arc proof.</p></div>
-          </div>
-        `}
-        ${state.nano.activityError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.activityError)}</p>` : ""}
-      </article>
 
       <article class="nano-panel nano-task-handoff reveal-on-scroll" id="nanoTaskHandoff">
         <div class="nano-section-head">
@@ -3883,7 +3809,7 @@ function renderNanoPageSimplified() {
     const primaryButton = document.getElementById("nanoPrimaryAction");
     if (primaryButton?.dataset.nanoAction === "pay") {
       primaryButton.disabled = !model.valid || primaryButton.dataset.nanoGuardrailBlocked === "true" || Boolean(state.nano.actionPending);
-      const reason = document.querySelector(".nano-demo-action p");
+      const reason = document.querySelector(".nano-console-actions p");
       if (reason) {
         reason.textContent = model.valid
           ? primaryButton.dataset.nanoGuardrailBlocked === "true"

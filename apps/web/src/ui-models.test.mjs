@@ -1635,6 +1635,22 @@ test("Nano run console keeps local pending and rejected proof locked", () => {
   assert.doesNotMatch(JSON.stringify([local, pending, rejected]), /Result unlocked|Source unlocked|Paid with proof/);
 });
 
+test("Nano run console keeps unavailable proof unpaid and locked", () => {
+  const unavailable = buildNanoRunConsoleModel({
+    walletConnected: true,
+    budget: { amount: 1 },
+    hasSpendPlan: true,
+    hasApprovedSpend: true,
+    proofStatusOverride: "unavailable",
+  });
+
+  assert.equal(unavailable.activeStepKey, "pay_proof");
+  assert.equal(unavailable.steps.find((step) => step.key === "pay_proof").stateLabel, "Proof unavailable");
+  assert.equal(unavailable.activePanel.title, "Proof unavailable");
+  assert.equal(unavailable.activePanel.secondaryText, "Unavailable proof is not paid.");
+  assert.doesNotMatch(JSON.stringify(unavailable), /Result unlocked|Source unlocked|Paid with proof/);
+});
+
 test("Nano run console unlocks result only with verified Arc proof", () => {
   const txHash = `0x${"b".repeat(64)}`;
   const source = buildNanoSourceUnlockPresentation({

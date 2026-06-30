@@ -291,20 +291,22 @@ export function buildNanoRunConsoleModel({
   hasSpendPlan = false,
   hasApprovedSpend = false,
   hasProofPending = false,
+  proofStatusOverride = "",
   sourceUnlock = null,
   resultContribution = null,
 } = {}) {
   const hasBudget = Boolean(budget);
-  const proofStatus = String(resultContribution?.proofStatus || "").toLowerCase();
+  const proofStatus = String(proofStatusOverride || resultContribution?.proofStatus || "").toLowerCase();
   const sourceUnlocked = Boolean(sourceUnlock?.canShowInResult || resultContribution?.unlocked);
   const proofRejected = proofStatus === "rejected";
+  const proofUnavailable = proofStatus === "unavailable";
   const proofLocalOrPending = ["local", "pending"].includes(proofStatus);
   const verified = Boolean(sourceUnlocked && resultContribution?.proofStatusLabel === "Paid with proof");
 
   let activeStepKey = "goal";
   if (verified) {
     activeStepKey = "result";
-  } else if (hasApprovedSpend || hasProofPending || proofRejected || proofLocalOrPending) {
+  } else if (hasApprovedSpend || hasProofPending || proofRejected || proofUnavailable || proofLocalOrPending) {
     activeStepKey = "pay_proof";
   } else if (hasBudget || hasSpendPlan) {
     activeStepKey = "source";
@@ -325,6 +327,7 @@ export function buildNanoRunConsoleModel({
     if (key === "pay_proof") {
       if (verified) return { state: "complete", stateLabel: "Paid with proof", tone: "verified", summary: "Arc proof verified the source payment." };
       if (proofRejected) return { state: "current", stateLabel: "Proof rejected", tone: "warn", summary: "Proof did not match the expected Arc payment." };
+      if (proofUnavailable) return { state: "current", stateLabel: "Proof unavailable", tone: "warn", summary: "Arc proof verification is temporarily unavailable." };
       if (hasProofPending || proofLocalOrPending) return { state: "current", stateLabel: "Proof pending", tone: "current", summary: "Proof is waiting for a valid Arc payment match." };
       if (hasApprovedSpend) return { state: "current", stateLabel: "Approved, not paid yet", tone: "current", summary: "Approval is recorded, but payment is not verified yet." };
       if (hasSpendPlan) return { state: "future", stateLabel: "Needs approval", tone: "neutral", summary: "Approve the source spend, pay on Arc, then verify proof." };
@@ -358,6 +361,14 @@ export function buildNanoRunConsoleModel({
           body: "Nano could not match the Arc payment to the expected amount, token, sender, and recipient.",
           primaryActionLabel: "Verify Arc proof",
           secondaryText: "Rejected proof is not paid.",
+        };
+      }
+      if (proofUnavailable) {
+        return {
+          title: "Proof unavailable",
+          body: "Arc proof verification is temporarily unavailable. The source remains locked.",
+          primaryActionLabel: "Verify Arc proof",
+          secondaryText: "Unavailable proof is not paid.",
         };
       }
       if (hasProofPending || proofLocalOrPending) {
