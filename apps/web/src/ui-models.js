@@ -285,6 +285,121 @@ export function buildNanoCurrentStepModel({
   };
 }
 
+export function buildNanoRunConsoleModel({
+  walletConnected = false,
+  budget = null,
+  hasSpendPlan = false,
+  hasApprovedSpend = false,
+  hasProofPending = false,
+  sourceUnlock = null,
+  resultContribution = null,
+} = {}) {
+  const hasBudget = Boolean(budget);
+  const proofStatus = String(resultContribution?.proofStatus || "").toLowerCase();
+  const sourceUnlocked = Boolean(sourceUnlock?.canShowInResult || resultContribution?.unlocked);
+  const proofRejected = proofStatus === "rejected";
+  const proofLocalOrPending = ["local", "pending"].includes(proofStatus);
+  const verified = Boolean(sourceUnlocked && resultContribution?.proofStatusLabel === "Paid with proof");
+
+  let activeStepKey = "goal";
+  if (verified) {
+    activeStepKey = "result";
+  } else if (hasApprovedSpend || hasProofPending || proofRejected || proofLocalOrPending) {
+    activeStepKey = "pay_proof";
+  } else if (hasBudget || hasSpendPlan) {
+    activeStepKey = "source";
+  }
+
+  const stepState = (key) => {
+    if (key === "goal") {
+      return hasBudget
+        ? { state: "complete", stateLabel: "Budget created", tone: "complete", summary: "Goal and budget are ready for the source decision." }
+        : { state: activeStepKey === "goal" ? "current" : "future", stateLabel: walletConnected ? "Start here" : "Wallet needed", tone: walletConnected ? "current" : "blocked", summary: "Set a goal and create a small USDC budget." };
+    }
+    if (key === "source") {
+      if (verified) return { state: "complete", stateLabel: "Source unlocked", tone: "verified", summary: "Starter source unlocked after verified Arc proof." };
+      if (hasSpendPlan) return { state: activeStepKey === "source" ? "current" : "complete", stateLabel: "Source selected", tone: activeStepKey === "source" ? "current" : "complete", summary: "Source Unlock is the chosen payable starter source." };
+      if (hasBudget) return { state: "current", stateLabel: "Starter path", tone: "current", summary: "The agent chooses one starter source worth paying for." };
+      return { state: "future", stateLabel: "Locked", tone: "neutral", summary: "The source step starts after a Nano budget exists." };
+    }
+    if (key === "pay_proof") {
+      if (verified) return { state: "complete", stateLabel: "Paid with proof", tone: "verified", summary: "Arc proof verified the source payment." };
+      if (proofRejected) return { state: "current", stateLabel: "Proof rejected", tone: "warn", summary: "Proof did not match the expected Arc payment." };
+      if (hasProofPending || proofLocalOrPending) return { state: "current", stateLabel: "Proof pending", tone: "current", summary: "Proof is waiting for a valid Arc payment match." };
+      if (hasApprovedSpend) return { state: "current", stateLabel: "Approved, not paid yet", tone: "current", summary: "Approval is recorded, but payment is not verified yet." };
+      if (hasSpendPlan) return { state: "future", stateLabel: "Needs approval", tone: "neutral", summary: "Approve the source spend, pay on Arc, then verify proof." };
+      return { state: "future", stateLabel: "Needs approval", tone: "neutral", summary: "Approve the source spend, pay on Arc, then verify proof." };
+    }
+    if (verified) return { state: "complete", stateLabel: "Result unlocked", tone: "verified", summary: "The verified source can appear in the final result and receipt." };
+    return { state: "future", stateLabel: "Result locked", tone: "neutral", summary: "The result cannot use the source until proof verifies." };
+  };
+
+  const activePanel = (() => {
+    if (activeStepKey === "goal") {
+      return {
+        title: "Start with a goal",
+        body: "Create a small budget so the agent can request one source payment.",
+        primaryActionLabel: walletConnected ? "Create Nano budget" : "Connect wallet",
+        secondaryText: "Approval is not payment.",
+      };
+    }
+    if (activeStepKey === "source") {
+      return {
+        title: "Source selected",
+        body: "The agent picked the starter source, but it stays locked until payment proof verifies.",
+        primaryActionLabel: hasSpendPlan ? "Approve source spend" : "Review source payment",
+        secondaryText: "Starter source, not external marketplace access yet.",
+      };
+    }
+    if (activeStepKey === "pay_proof") {
+      if (proofRejected) {
+        return {
+          title: "Proof rejected",
+          body: "Nano could not match the Arc payment to the expected amount, token, sender, and recipient.",
+          primaryActionLabel: "Verify Arc proof",
+          secondaryText: "Rejected proof is not paid.",
+        };
+      }
+      if (hasProofPending || proofLocalOrPending) {
+        return {
+          title: "Waiting for proof",
+          body: "Nano is waiting for verified Arc proof before the source unlocks.",
+          primaryActionLabel: "Verify Arc proof",
+          secondaryText: "Pending or local proof is not paid.",
+        };
+      }
+      return {
+        title: "Approved, not paid yet",
+        body: "Approval recorded. Pay on Arc and verify proof before Nano unlocks the source.",
+        primaryActionLabel: "Pay source on Arc",
+        secondaryText: "Paid only after verified Arc proof.",
+      };
+    }
+    return {
+      title: "Proof verified",
+      body: "The source payment is verified. The source-backed result and receipt can be inspected below.",
+      primaryActionLabel: "View shareable receipt",
+      secondaryText: "Paid with proof.",
+    };
+  })();
+
+  return {
+    eyebrow: "Proof console",
+    title: "Nano run",
+    intro: "Follow one proof-gated source payment from goal to receipt.",
+    activeStepKey,
+    currentStatus: stepState(activeStepKey).stateLabel,
+    currentTone: stepState(activeStepKey).tone,
+    steps: [
+      { key: "goal", number: "01", title: "Goal", ...stepState("goal") },
+      { key: "source", number: "02", title: "Source", ...stepState("source") },
+      { key: "pay_proof", number: "03", title: "Pay + proof", ...stepState("pay_proof") },
+      { key: "result", number: "04", title: "Result", ...stepState("result") },
+    ],
+    activePanel,
+  };
+}
+
 export function buildNanoResetDraftState(current = {}, options = {}) {
   const preserveHistory = Boolean(options.preserveHistory);
   return {

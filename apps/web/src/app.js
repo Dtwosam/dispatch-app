@@ -87,6 +87,7 @@ import {
   buildNanoReceiptShareUrl,
   buildNanoResultContributionModel,
   buildNanoRunHistoryModel,
+  buildNanoRunConsoleModel,
   buildNanoSelectedRunModel,
   buildNanoRunProgressPresentation,
   buildNanoResultPreviewPresentation,
@@ -3038,6 +3039,15 @@ function renderNanoPageSimplified() {
     sourceReceipt,
     verifiedContributions: multiSpendPlan.verifiedRows,
   });
+  const nanoRunConsole = buildNanoRunConsoleModel({
+    walletConnected,
+    budget,
+    hasSpendPlan: hasFullNanoPlan,
+    hasApprovedSpend: sourceIntent?.status === "approved" || hasApprovedSpend,
+    hasProofPending,
+    sourceUnlock,
+    resultContribution,
+  });
   const agentEvaluation = buildNanoAgentEvaluationPanelModel({
     budget,
     spendRows: multiSpendPlan.rows,
@@ -3252,6 +3262,41 @@ function renderNanoPageSimplified() {
             <small>${escapeHtml(stat.helper)}</small>
           </article>
         `).join("")}
+      </section>
+
+      <section class="nano-panel nano-run-console reveal-on-scroll" aria-labelledby="nanoRunConsoleTitle">
+        <div class="nano-run-console__head">
+          <div>
+            <span class="nano-console-eyebrow">${escapeHtml(nanoRunConsole.eyebrow)}</span>
+            <h2 id="nanoRunConsoleTitle">${escapeHtml(nanoRunConsole.title)}</h2>
+            <p>${escapeHtml(nanoRunConsole.intro)}</p>
+          </div>
+          <span class="status-chip ${nanoRunConsole.currentTone === "verified" ? "good" : nanoRunConsole.currentTone === "warn" || nanoRunConsole.currentTone === "blocked" ? "warn" : "pending"}">${escapeHtml(nanoRunConsole.currentStatus)}</span>
+        </div>
+        <div class="nano-console-steps" aria-label="Nano run steps">
+          ${nanoRunConsole.steps.map((step) => `
+            <article class="nano-console-step nano-console-step--${escapeHtml(step.tone)} ${step.key === nanoRunConsole.activeStepKey ? "is-current" : ""}">
+              <span class="nano-console-step__number">${escapeHtml(step.number)}</span>
+              <div>
+                <h3>${escapeHtml(step.title)}</h3>
+                <span class="nano-console-step__state">${escapeHtml(step.stateLabel)}</span>
+                <p>${escapeHtml(step.summary)}</p>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+        <div class="nano-console-active">
+          <div>
+            <p class="mini-label">Current step</p>
+            <h3>${escapeHtml(nanoRunConsole.activePanel.title)}</h3>
+            <p>${escapeHtml(nanoRunConsole.activePanel.body)}</p>
+          </div>
+          <div class="nano-console-active__action">
+            <strong>${escapeHtml(nanoRunConsole.activePanel.primaryActionLabel)}</strong>
+            <span>${escapeHtml(nanoRunConsole.activePanel.secondaryText)}</span>
+          </div>
+        </div>
+        <p class="nano-helper">Use the controls below to complete the current run.</p>
       </section>
 
       <section class="nano-panel nano-how reveal-on-scroll">

@@ -47,6 +47,7 @@ import {
   buildNanoReceiptShareUrl,
   buildNanoResultContributionModel,
   buildNanoResetDraftState,
+  buildNanoRunConsoleModel,
   buildNanoRunHistoryModel,
   buildNanoSelectedRunModel,
   buildNanoResultPreviewPresentation,
@@ -1561,6 +1562,109 @@ test("Nano run progress follows budget approval proof and result states", () => 
   assert.equal(buildNanoRunProgressPresentation({ hasApprovedSpend: true }).currentStep, "Payment proof pending");
   assert.equal(buildNanoRunProgressPresentation({ hasProofPending: true }).currentCopy, "Waiting for Arc proof to confirm the payment.");
   assert.equal(buildNanoRunProgressPresentation({ hasVerifiedSourceProof: true }).currentStep, "Result ready");
+});
+
+test("Nano run console has exactly the four proof-console steps", () => {
+  const model = buildNanoRunConsoleModel({ walletConnected: true });
+
+  assert.equal(model.title, "Nano run");
+  assert.equal(model.intro, "Follow one proof-gated source payment from goal to receipt.");
+  assert.deepEqual(model.steps.map((step) => step.title), ["Goal", "Source", "Pay + proof", "Result"]);
+  assert.deepEqual(model.steps.map((step) => step.number), ["01", "02", "03", "04"]);
+  assert.equal(model.activeStepKey, "goal");
+  assert.equal(model.activePanel.primaryActionLabel, "Create Nano budget");
+  assert.doesNotMatch(JSON.stringify(model), /Gateway|x402|Circle Wallets|Paid with proof/i);
+});
+
+test("Nano run console advances from budget to approved but unpaid without paid labels", () => {
+  const budgetReady = buildNanoRunConsoleModel({
+    walletConnected: true,
+    budget: { amount: 1 },
+  });
+  const approved = buildNanoRunConsoleModel({
+    walletConnected: true,
+    budget: { amount: 1 },
+    hasSpendPlan: true,
+    hasApprovedSpend: true,
+  });
+
+  assert.equal(budgetReady.activeStepKey, "source");
+  assert.equal(budgetReady.steps.find((step) => step.key === "goal").stateLabel, "Budget created");
+  assert.equal(budgetReady.steps.find((step) => step.key === "source").stateLabel, "Starter path");
+  assert.equal(approved.activeStepKey, "pay_proof");
+  assert.equal(approved.steps.find((step) => step.key === "pay_proof").stateLabel, "Approved, not paid yet");
+  assert.equal(approved.activePanel.title, "Approved, not paid yet");
+  assert.doesNotMatch(JSON.stringify(approved), /Result unlocked|Source unlocked|Paid with proof/);
+});
+
+test("Nano run console keeps local pending and rejected proof locked", () => {
+  const local = buildNanoRunConsoleModel({
+    walletConnected: true,
+    budget: { amount: 1 },
+    hasSpendPlan: true,
+    hasApprovedSpend: true,
+    resultContribution: buildNanoResultContributionModel({
+      budget: { amount: 1 },
+      sourceReceipt: { proof: { proofType: "local", paymentState: "recorded" }, paymentState: "recorded" },
+    }),
+  });
+  const pending = buildNanoRunConsoleModel({
+    walletConnected: true,
+    budget: { amount: 1 },
+    hasSpendPlan: true,
+    hasProofPending: true,
+  });
+  const rejected = buildNanoRunConsoleModel({
+    walletConnected: true,
+    budget: { amount: 1 },
+    hasSpendPlan: true,
+    hasApprovedSpend: true,
+    resultContribution: buildNanoResultContributionModel({
+      budget: { amount: 1 },
+      sourceReceipt: {
+        proof: { proofType: "arc_tx", paymentState: "failed", txHash: `0x${"a".repeat(64)}` },
+        paymentState: "failed",
+      },
+    }),
+  });
+
+  assert.equal(local.activeStepKey, "pay_proof");
+  assert.equal(local.activePanel.secondaryText, "Pending or local proof is not paid.");
+  assert.equal(pending.steps.find((step) => step.key === "pay_proof").stateLabel, "Proof pending");
+  assert.equal(rejected.steps.find((step) => step.key === "pay_proof").stateLabel, "Proof rejected");
+  assert.doesNotMatch(JSON.stringify([local, pending, rejected]), /Result unlocked|Source unlocked|Paid with proof/);
+});
+
+test("Nano run console unlocks result only with verified Arc proof", () => {
+  const txHash = `0x${"b".repeat(64)}`;
+  const source = buildNanoSourceUnlockPresentation({
+    intent: { status: "approved", amount: 0.05, payee: { walletAddress: "0x1111111111111111111111111111111111111111" } },
+    receipt: {
+      paymentState: "recorded",
+      proof: { proofType: "arc_tx", paymentState: "recorded", txHash },
+    },
+  });
+  const result = buildNanoResultContributionModel({
+    budget: { amount: 1 },
+    sourceUnlock: source,
+    sourceReceipt: {
+      paymentState: "recorded",
+      proof: { proofType: "arc_tx", paymentState: "recorded", txHash },
+    },
+  });
+  const model = buildNanoRunConsoleModel({
+    walletConnected: true,
+    budget: { amount: 1 },
+    hasSpendPlan: true,
+    hasApprovedSpend: true,
+    sourceUnlock: source,
+    resultContribution: result,
+  });
+
+  assert.equal(model.activeStepKey, "result");
+  assert.equal(model.steps.find((step) => step.key === "pay_proof").stateLabel, "Paid with proof");
+  assert.equal(model.steps.find((step) => step.key === "result").stateLabel, "Result unlocked");
+  assert.equal(model.activePanel.primaryActionLabel, "View shareable receipt");
 });
 
 test("Nano test path labels live starter and planned claims honestly", () => {
