@@ -34,6 +34,7 @@ import {
   buildNanoCurrentStepModel,
   buildNanoJudgeCommandCenterModel,
   buildNanoMetricsModel,
+  buildNanoEconomyStatsModel,
   buildNanoMultiSpendPlanRows,
   buildNanoPaymentActionModel,
   buildNanoRecipientProfile,
@@ -1798,6 +1799,69 @@ test("Nano metrics use zero fallbacks without inventing payment data", () => {
   assert.equal(model.emptyTitle, "No verified Nano payments yet.");
   assert.match(model.emptyBody, /verify proof/);
   assert.doesNotMatch(Object.values(model).join(" "), /revenue|earnings|traction|paid users/i);
+});
+
+test("Nano economy stats use honest fallback values without fake payment data", () => {
+  const model = buildNanoEconomyStatsModel(null);
+  const stats = Object.fromEntries(model.stats.map((stat) => [stat.label, stat]));
+
+  assert.equal(model.title, "Nano economy");
+  assert.equal(stats["USDC earned"].value, "0.00 verified");
+  assert.equal(stats["Agents paid"].value, "Verified proof only");
+  assert.equal(stats["Sources unlocked"].value, "1 starter path");
+  assert.equal(stats["Receipts created"].value, "Real runs only");
+  assert.equal(stats["Proof checks"].value, "Arc verified");
+  assert.doesNotMatch(JSON.stringify(model), /paid users|traction|growth/i);
+});
+
+test("Nano economy stats count only verified Arc proof for paid values", () => {
+  const verifiedSourceTx = `0x${"a".repeat(64)}`;
+  const verifiedAgentTx = `0x${"b".repeat(64)}`;
+  const rejectedTx = `0x${"c".repeat(64)}`;
+  const model = buildNanoEconomyStatsModel({ receiptCount: 5 }, {
+    activity: {
+      receipts: [
+        {
+          amount: 0.05,
+          paymentState: "recorded",
+          payee: { payeeId: "source_unlock", type: "source" },
+          proof: { proofType: "arc_tx", paymentState: "recorded", txHash: verifiedSourceTx },
+        },
+        {
+          amount: 0.03,
+          paymentState: "recorded",
+          payee: { payeeId: "summary_agent", type: "agent" },
+          proof: { proofType: "arc_tx", paymentState: "recorded", txHash: verifiedAgentTx },
+        },
+        {
+          amount: 0.04,
+          paymentState: "recorded",
+          payee: { payeeId: "local_tool", type: "tool" },
+          proof: { proofType: "local", paymentState: "recorded", txHash: null },
+        },
+        {
+          amount: 0.02,
+          paymentState: "failed",
+          payee: { payeeId: "failed_source", type: "source" },
+          proof: { proofType: "arc_tx", paymentState: "failed", txHash: rejectedTx },
+        },
+        {
+          amount: 0.01,
+          paymentState: "recorded",
+          payee: { payeeId: "gateway_source", type: "source" },
+          proof: { proofType: "circle_gateway", paymentState: "recorded", txHash: verifiedSourceTx },
+        },
+      ],
+    },
+  });
+  const stats = Object.fromEntries(model.stats.map((stat) => [stat.label, stat]));
+
+  assert.equal(stats["USDC earned"].value, "0.08 verified");
+  assert.equal(stats["Agents paid"].value, "1 verified");
+  assert.equal(stats["Sources unlocked"].value, "1 verified");
+  assert.equal(stats["Receipts created"].value, "5 real runs");
+  assert.equal(stats["Proof checks"].value, "2 verified");
+  assert.doesNotMatch(JSON.stringify(model), /Paid with proof/);
 });
 
 test("Nano metrics count only verified Arc proof as paid usage", () => {

@@ -74,6 +74,7 @@ import {
   buildNanoBudgetStatusModel,
   buildNanoJudgeCommandCenterModel,
   buildNanoMetricsModel,
+  buildNanoEconomyStatsModel,
   buildNanoMultiSpendPlanRows,
   buildNanoPaymentActionModel,
   buildNanoReceiptStatusModel,
@@ -2951,6 +2952,7 @@ function renderNanoPageSimplified() {
   const receipts = activity?.receipts || [];
   const receiptsByIntent = selectedNanoReceiptsByIntent();
   const metricsModel = buildNanoMetricsModel(state.nano.metrics, { activity });
+  const nanoEconomyStats = buildNanoEconomyStatsModel(state.nano.metrics, { activity });
   const runHistoryModel = buildNanoRunHistoryModel({
     wallet: state.wallet,
     budgets: state.nano.budgets,
@@ -3228,8 +3230,8 @@ function renderNanoPageSimplified() {
       <header class="nano-hero reveal-on-scroll is-visible">
         <div>
           <p class="mini-label">Dispatch Nano</p>
-          <h1>AI agent source payments</h1>
-          <p>An agent requests one tiny source payment. You approve it, pay on Arc, and Nano unlocks the result only after proof verifies.</p>
+          <h1>AI agents that pay for sources before using them.</h1>
+          <p>Give an agent a goal. It requests one tiny source payment. You approve it, pay on Arc, and Nano unlocks the result only after proof verifies.</p>
         </div>
         <div class="nano-badge-row" aria-label="Nano highlights">
           <span class="meta-pill">Arc Testnet USDC</span>
@@ -3239,8 +3241,18 @@ function renderNanoPageSimplified() {
         <div class="nano-hero__actions">
           <button class="hero-primary" type="button" id="nanoStartNanoRun">Start Nano run</button>
         </div>
-        <p class="nano-helper">Current flow supports Arc Testnet USDC proof. Gateway and x402 settlement are planned next.</p>
+        <p class="nano-helper">Paid states stay locked until verified Arc proof exists.</p>
       </header>
+
+      <section class="nano-economy-strip reveal-on-scroll" aria-label="Nano economy stats">
+        ${nanoEconomyStats.stats.map((stat) => `
+          <article class="nano-economy-card">
+            <span>${escapeHtml(stat.label)}</span>
+            <strong>${escapeHtml(stat.value)}</strong>
+            <small>${escapeHtml(stat.helper)}</small>
+          </article>
+        `).join("")}
+      </section>
 
       <section class="nano-panel nano-how reveal-on-scroll">
         <div class="nano-section-head">

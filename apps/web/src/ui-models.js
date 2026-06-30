@@ -1357,6 +1357,55 @@ export function buildNanoMetricsModel(metrics, options = {}) {
   };
 }
 
+export function buildNanoEconomyStatsModel(metrics, options = {}) {
+  const activity = options.activity || null;
+  const receipts = Array.isArray(activity?.receipts) ? activity.receipts : [];
+  const verifiedArcReceipts = receipts.filter(isVerifiedNanoArcProofReceipt);
+  const verifiedUsdc = verifiedArcReceipts.reduce((total, receipt) => total + Number(receipt?.amount || 0), 0);
+  const verifiedSourceUnlocks = verifiedArcReceipts.filter((receipt) => {
+    const payeeId = String(receipt?.payee?.payeeId || receipt?.payeeId || "").toLowerCase();
+    const payeeType = String(receipt?.payee?.type || "").toLowerCase();
+    return payeeId === "source_unlock" || payeeType === "source";
+  }).length;
+  const verifiedAgentPayouts = verifiedArcReceipts.filter((receipt) => {
+    const payeeType = String(receipt?.payee?.type || "").toLowerCase();
+    return payeeType === "agent";
+  }).length;
+  const realReceiptCount = Number(metrics?.receiptCount ?? receipts.length);
+
+  return {
+    title: "Nano economy",
+    helper: "Verified values only. Starter and planned states stay separate.",
+    stats: [
+      {
+        label: "USDC earned",
+        value: verifiedUsdc > 0 ? `${verifiedUsdc.toFixed(2)} verified` : "0.00 verified",
+        helper: "Verified Arc proof only",
+      },
+      {
+        label: "Agents paid",
+        value: verifiedAgentPayouts > 0 ? `${verifiedAgentPayouts} verified` : "Verified proof only",
+        helper: "No live agent payout count yet",
+      },
+      {
+        label: "Sources unlocked",
+        value: verifiedSourceUnlocks > 0 ? `${verifiedSourceUnlocks} verified` : "1 starter path",
+        helper: "Starter source path only",
+      },
+      {
+        label: "Receipts created",
+        value: realReceiptCount > 0 ? `${realReceiptCount} real run${realReceiptCount === 1 ? "" : "s"}` : "Real runs only",
+        helper: "No sample receipts counted",
+      },
+      {
+        label: "Proof checks",
+        value: verifiedArcReceipts.length > 0 ? `${verifiedArcReceipts.length} verified` : "Arc verified",
+        helper: "No fake proof attempts",
+      },
+    ],
+  };
+}
+
 function latestNanoActivityTimestamp(budget, activity) {
   const timestamps = [
     budget?.updatedAt,
