@@ -2955,7 +2955,7 @@ function renderNanoPageSimplified() {
   const receipts = activity?.receipts || [];
   const receiptsByIntent = selectedNanoReceiptsByIntent();
   const metricsModel = buildNanoMetricsModel(state.nano.metrics, { activity });
-  const nanoEconomyStats = buildNanoEconomyStatsModel(state.nano.metrics, { activity });
+  const nanoEconomyStats = buildNanoEconomyStatsModel();
   const runHistoryModel = buildNanoRunHistoryModel({
     wallet: state.wallet,
     budgets: state.nano.budgets,
@@ -3580,7 +3580,13 @@ function renderNanoPageSimplified() {
         <p class="nano-helper">Paid states stay locked until verified Arc proof exists.</p>
       </header>
 
-      <section class="nano-economy-strip reveal-on-scroll" aria-label="Nano economy stats">
+      <section class="nano-economy-section reveal-on-scroll" aria-labelledby="nanoEconomyStatsTitle">
+        <div class="nano-economy-head">
+          <p class="mini-label">Public Nano economy</p>
+          <h2 id="nanoEconomyStatsTitle">${escapeHtml(nanoEconomyStats.title)}</h2>
+          <p>${escapeHtml(nanoEconomyStats.helper)}</p>
+        </div>
+        <div class="nano-economy-strip" aria-label="Public Nano economy stats">
         ${nanoEconomyStats.stats.map((stat) => `
           <article class="nano-economy-card">
             <span>${escapeHtml(stat.label)}</span>
@@ -3588,6 +3594,7 @@ function renderNanoPageSimplified() {
             <small>${escapeHtml(stat.helper)}</small>
           </article>
         `).join("")}
+        </div>
       </section>
 
       <section class="nano-panel nano-run-console reveal-on-scroll" id="nanoRunStart" aria-labelledby="nanoRunConsoleTitle">

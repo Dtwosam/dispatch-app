@@ -2010,13 +2010,23 @@ test("Nano economy stats use honest fallback values without fake payment data", 
   const model = buildNanoEconomyStatsModel(null);
   const stats = Object.fromEntries(model.stats.map((stat) => [stat.label, stat]));
 
-  assert.equal(model.title, "Nano economy");
-  assert.equal(stats["USDC earned"].value, "0.00 verified");
-  assert.equal(stats["Agents paid"].value, "Verified proof only");
-  assert.equal(stats["Sources unlocked"].value, "1 starter path");
-  assert.equal(stats["Receipts created"].value, "Real runs only");
-  assert.equal(stats["Proof checks"].value, "Arc verified");
-  assert.doesNotMatch(JSON.stringify(model), /paid users|traction|growth/i);
+  assert.equal(model.title, "Platform Nano stats");
+  assert.equal(model.visibility, "public");
+  assert.equal(model.walletScoped, false);
+  assert.match(model.helper, /Public proof and source-unlock metrics/);
+  assert.match(model.helper, /Wallet-specific run history appears after you connect/);
+  assert.equal(stats["USDC verified"].value, "0.00 verified");
+  assert.equal(stats["USDC verified"].helper, "Counts verified Arc proof only.");
+  assert.equal(stats["Source unlocks"].value, "Real runs only");
+  assert.equal(stats["Source unlocks"].helper, "Only unlocked after verified proof.");
+  assert.equal(stats["Receipts created"].value, "Real receipts only");
+  assert.equal(stats["Receipts created"].helper, "No fake receipt count.");
+  assert.equal(stats["Proof checks"].value, "Arc proof");
+  assert.equal(stats["Proof checks"].helper, "Paid means verified proof.");
+  assert.equal(stats["Dispatch agents"].value, "5 built-in");
+  assert.equal(stats["Dispatch agents"].helper, "Available source agents for Nano runs.");
+  assert.equal(stats["Agents paid"], undefined);
+  assert.doesNotMatch(JSON.stringify(model), /paid users|traction|growth|earnings|ratings|reviews|Agents paid/i);
 });
 
 test("Nano economy stats count only verified Arc proof for paid values", () => {
@@ -2024,49 +2034,71 @@ test("Nano economy stats count only verified Arc proof for paid values", () => {
   const verifiedAgentTx = `0x${"b".repeat(64)}`;
   const rejectedTx = `0x${"c".repeat(64)}`;
   const model = buildNanoEconomyStatsModel({ receiptCount: 5 }, {
+    publicReceipts: [
+      {
+        amount: 0.05,
+        paymentState: "recorded",
+        payee: { payeeId: "source_unlock", type: "source" },
+        proof: { proofType: "arc_tx", paymentState: "recorded", txHash: verifiedSourceTx },
+      },
+      {
+        amount: 0.03,
+        paymentState: "recorded",
+        payee: { payeeId: "summary_agent", type: "agent" },
+        proof: { proofType: "arc_tx", paymentState: "recorded", txHash: verifiedAgentTx },
+      },
+      {
+        amount: 0.04,
+        paymentState: "recorded",
+        payee: { payeeId: "local_tool", type: "tool" },
+        proof: { proofType: "local", paymentState: "recorded", txHash: null },
+      },
+      {
+        amount: 0.02,
+        paymentState: "failed",
+        payee: { payeeId: "failed_source", type: "source" },
+        proof: { proofType: "arc_tx", paymentState: "failed", txHash: rejectedTx },
+      },
+      {
+        amount: 0.01,
+        paymentState: "recorded",
+        payee: { payeeId: "gateway_source", type: "source" },
+        proof: { proofType: "circle_gateway", paymentState: "recorded", txHash: verifiedSourceTx },
+      },
+    ],
+  });
+  const stats = Object.fromEntries(model.stats.map((stat) => [stat.label, stat]));
+
+  assert.equal(stats["USDC verified"].value, "0.08 verified");
+  assert.equal(stats["Source unlocks"].value, "1 verified");
+  assert.equal(stats["Receipts created"].value, "5 real receipts");
+  assert.equal(stats["Proof checks"].value, "2 verified");
+  assert.equal(stats["Dispatch agents"].value, "5 built-in");
+  assert.equal(stats["Agents paid"], undefined);
+  assert.doesNotMatch(JSON.stringify(model), /Paid with proof|Agents paid|agent payout/i);
+});
+
+test("Nano economy stats do not switch into wallet-private activity stats", () => {
+  const model = buildNanoEconomyStatsModel(null, {
     activity: {
       receipts: [
         {
-          amount: 0.05,
+          amount: 99,
           paymentState: "recorded",
           payee: { payeeId: "source_unlock", type: "source" },
-          proof: { proofType: "arc_tx", paymentState: "recorded", txHash: verifiedSourceTx },
-        },
-        {
-          amount: 0.03,
-          paymentState: "recorded",
-          payee: { payeeId: "summary_agent", type: "agent" },
-          proof: { proofType: "arc_tx", paymentState: "recorded", txHash: verifiedAgentTx },
-        },
-        {
-          amount: 0.04,
-          paymentState: "recorded",
-          payee: { payeeId: "local_tool", type: "tool" },
-          proof: { proofType: "local", paymentState: "recorded", txHash: null },
-        },
-        {
-          amount: 0.02,
-          paymentState: "failed",
-          payee: { payeeId: "failed_source", type: "source" },
-          proof: { proofType: "arc_tx", paymentState: "failed", txHash: rejectedTx },
-        },
-        {
-          amount: 0.01,
-          paymentState: "recorded",
-          payee: { payeeId: "gateway_source", type: "source" },
-          proof: { proofType: "circle_gateway", paymentState: "recorded", txHash: verifiedSourceTx },
+          proof: { proofType: "arc_tx", paymentState: "recorded", txHash: `0x${"d".repeat(64)}` },
         },
       ],
     },
   });
   const stats = Object.fromEntries(model.stats.map((stat) => [stat.label, stat]));
 
-  assert.equal(stats["USDC earned"].value, "0.08 verified");
-  assert.equal(stats["Agents paid"].value, "1 verified");
-  assert.equal(stats["Sources unlocked"].value, "1 verified");
-  assert.equal(stats["Receipts created"].value, "5 real runs");
-  assert.equal(stats["Proof checks"].value, "2 verified");
-  assert.doesNotMatch(JSON.stringify(model), /Paid with proof/);
+  assert.equal(model.walletScoped, false);
+  assert.equal(stats["USDC verified"].value, "0.00 verified");
+  assert.equal(stats["Source unlocks"].value, "Real runs only");
+  assert.equal(stats["Receipts created"].value, "Real receipts only");
+  assert.equal(stats["Dispatch agents"].value, "5 built-in");
+  assert.doesNotMatch(JSON.stringify(model), /Your stats|Your earnings|Your agents|99|wallet-private/i);
 });
 
 test("Nano metrics count only verified Arc proof as paid usage", () => {
