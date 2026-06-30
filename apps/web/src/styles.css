@@ -10478,3 +10478,652 @@ body {
     margin-top: 32px;
   }
 }
+
+/* Phase 15C.6: scoped Nano proof-console polish. */
+.nano-page--simple {
+  width: min(100%, 1180px);
+  max-width: 1180px;
+  gap: 22px;
+  padding-top: 4px;
+  padding-bottom: 64px;
+  overflow-x: clip;
+}
+
+.nano-page--simple * {
+  min-width: 0;
+}
+
+.nano-page--simple .nano-hero {
+  min-height: 336px;
+  padding: 34px 36px;
+  gap: 18px;
+  border-radius: 30px;
+  align-content: center;
+}
+
+.nano-page--simple .nano-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.nano-page--simple .nano-hero h1 {
+  max-width: 720px;
+  margin-bottom: 0;
+  font-size: clamp(2.125rem, 3.2vw, 2.375rem);
+  line-height: 1.08;
+  font-weight: 780;
+}
+
+.nano-page--simple .nano-hero p:not(.mini-label) {
+  max-width: 680px;
+  font-size: 1rem;
+  line-height: 1.62;
+}
+
+.nano-page--simple .nano-hero__actions {
+  margin-top: 2px;
+}
+
+.nano-page--simple .nano-badge-row {
+  gap: 8px 10px;
+}
+
+.nano-page--simple .nano-badge-row .meta-pill {
+  min-height: 32px;
+  max-width: 100%;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 720;
+  line-height: 1.15;
+  white-space: normal;
+}
+
+.nano-page--simple .nano-economy-strip {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: -2px;
+}
+
+.nano-page--simple .nano-economy-card {
+  min-height: 114px;
+  padding: 18px;
+  border-radius: 22px;
+}
+
+.nano-page--simple .nano-economy-card span {
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.nano-page--simple .nano-economy-card strong {
+  font-size: clamp(1.125rem, 1.55vw, 1.32rem);
+  line-height: 1.15;
+}
+
+.nano-page--simple .nano-economy-card small {
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.nano-page--simple .nano-run-console {
+  gap: 20px;
+  min-height: 500px;
+  margin-top: 24px;
+  padding: 32px;
+  border-radius: 30px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.26);
+}
+
+.nano-page--simple .nano-run-console__head h2 {
+  font-size: clamp(1.42rem, 2vw, 1.6rem);
+  line-height: 1.18;
+}
+
+.nano-page--simple .nano-run-console__head p {
+  max-width: 660px;
+  font-size: 0.92rem;
+  line-height: 1.58;
+}
+
+.nano-page--simple .nano-console-eyebrow {
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.nano-page--simple .nano-console-steps {
+  gap: 12px;
+}
+
+.nano-page--simple .nano-console-step {
+  min-height: 104px;
+  padding: 15px;
+  border-radius: 20px;
+}
+
+.nano-page--simple .nano-console-step h3 {
+  font-size: clamp(0.95rem, 1.25vw, 1.04rem);
+  line-height: 1.3;
+}
+
+.nano-page--simple .nano-console-step__state {
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.nano-page--simple .nano-console-step p {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.79rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.nano-page--simple .nano-console-step--warn .nano-console-step__number,
+.nano-page--simple .nano-console-step--blocked .nano-console-step__number {
+  background: rgba(246, 196, 83, 0.14);
+  color: var(--warn);
+}
+
+.nano-page--simple .nano-console-active {
+  gap: 18px;
+  min-height: 270px;
+  padding: 20px;
+  border-radius: 22px;
+}
+
+.nano-page--simple .nano-console-active h3,
+.nano-page--simple .nano-console-active h4 {
+  font-size: clamp(1.08rem, 1.45vw, 1.22rem);
+  line-height: 1.3;
+}
+
+.nano-page--simple .nano-console-active p {
+  font-size: 0.88rem;
+  line-height: 1.52;
+}
+
+.nano-page--simple .nano-console-source-grid,
+.nano-page--simple .nano-console-pay-grid {
+  gap: 16px;
+}
+
+.nano-page--simple .nano-console-subpanel,
+.nano-page--simple .nano-console-summary,
+.nano-page--simple .nano-console-trail,
+.nano-page--simple .nano-proof-box,
+.nano-page--simple .nano-result-copy,
+.nano-page--simple .nano-source-capsule,
+.nano-page--simple .nano-unlocked-insight {
+  border-radius: 20px;
+}
+
+.nano-page--simple .nano-field span {
+  margin-bottom: 0;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.nano-page--simple .nano-field input,
+.nano-page--simple .nano-field select,
+.nano-page--simple .nano-field textarea {
+  min-height: 46px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.nano-page--simple .nano-field textarea {
+  min-height: 96px;
+}
+
+.nano-page--simple .nano-field small,
+.nano-page--simple .nano-helper {
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.nano-page--simple .nano-budget-presets {
+  gap: 8px;
+}
+
+.nano-page--simple .nano-preset {
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.nano-page--simple .hero-primary,
+.nano-page--simple .nano-console-actions .hero-primary {
+  min-height: 50px;
+  height: auto;
+  padding: 13px 22px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 780;
+  line-height: 1.15;
+}
+
+.nano-page--simple .hero-secondary,
+.nano-page--simple .nano-console-actions .hero-secondary,
+.nano-page--simple .nano-console-actions a {
+  min-height: 44px;
+  height: auto;
+  padding: 12px 18px;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.nano-page--simple .nano-quiet-actions button {
+  min-height: 42px;
+  border-radius: 999px;
+  padding: 11px 16px;
+  line-height: 1.15;
+}
+
+.nano-page--simple .nano-console-actions {
+  gap: 10px;
+}
+
+.nano-page--simple .nano-console-actions .nano-helper {
+  max-width: 620px;
+}
+
+.nano-page--simple .status-chip,
+.nano-page--simple .meta-pill,
+.nano-page--simple .nano-console-step__state,
+.nano-page--simple .nano-payee-type {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nano-page--simple .nano-spend-row,
+.nano-page--simple .nano-receipt-row,
+.nano-page--simple .nano-trail-row,
+.nano-page--simple .nano-run-card,
+.nano-page--simple .nano-receipt-detail-row,
+.nano-page--simple .nano-decision-grid div,
+.nano-page--simple .nano-source-facts div,
+.nano-page--simple .nano-result-fields div,
+.nano-page--simple .nano-result-contrast div,
+.nano-page--simple .nano-console-facts div,
+.nano-page--simple .nano-evaluation-facts div,
+.nano-page--simple .nano-recipient-summary {
+  overflow-wrap: anywhere;
+}
+
+.nano-page--simple a,
+.nano-page--simple button,
+.nano-page--simple input,
+.nano-page--simple textarea,
+.nano-page--simple select,
+.nano-page--simple summary {
+  -webkit-tap-highlight-color: rgba(150, 255, 240, 0.18);
+}
+
+.nano-page--simple a:focus-visible,
+.nano-page--simple button:focus-visible,
+.nano-page--simple input:focus-visible,
+.nano-page--simple textarea:focus-visible,
+.nano-page--simple select:focus-visible,
+.nano-page--simple summary:focus-visible {
+  outline: 2px solid rgba(150, 255, 240, 0.86);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(150, 255, 240, 0.1);
+}
+
+.nano-page--simple .nano-support-details {
+  gap: 12px;
+  margin-top: 40px;
+}
+
+.nano-page--simple .nano-support-details__head h2 {
+  font-size: clamp(1.08rem, 1.45vw, 1.24rem);
+}
+
+.nano-page--simple .nano-support-details__head p:not(.mini-label) {
+  max-width: 660px;
+  font-size: 0.84rem;
+}
+
+.nano-page--simple .nano-support-disclosure {
+  border-radius: 21px;
+  background:
+    linear-gradient(180deg, rgba(13, 36, 58, 0.26), rgba(7, 18, 31, 0.24)),
+    rgba(255, 255, 255, 0.012);
+}
+
+.nano-page--simple .nano-support-disclosure summary {
+  min-height: 78px;
+  padding: 18px 20px;
+}
+
+.nano-page--simple .nano-support-disclosure summary strong {
+  font-size: clamp(0.95rem, 1.1vw, 1.04rem);
+}
+
+.nano-page--simple .nano-support-disclosure summary small {
+  display: -webkit-box;
+  max-width: 620px;
+  overflow: hidden;
+  font-size: 0.78rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.nano-page--simple .nano-support-disclosure__body {
+  gap: 14px;
+  padding: 0 20px 20px;
+}
+
+.nano-page--simple .nano-support-disclosure__indicator {
+  min-height: 30px;
+  padding: 7px 11px;
+}
+
+@media (max-width: 980px) {
+  .nano-page--simple {
+    gap: 20px;
+    padding-bottom: 56px;
+  }
+
+  .nano-page--simple .nano-hero {
+    min-height: 292px;
+    padding: 28px;
+    border-radius: 28px;
+  }
+
+  .nano-page--simple .nano-hero h1 {
+    font-size: clamp(1.95rem, 4vw, 2.125rem);
+  }
+
+  .nano-page--simple .nano-hero p:not(.mini-label) {
+    max-width: 640px;
+    font-size: 0.94rem;
+  }
+
+  .nano-page--simple .nano-economy-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .nano-page--simple .nano-economy-card {
+    min-height: 104px;
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .nano-page--simple .nano-run-console {
+    min-height: 430px;
+    margin-top: 20px;
+    padding: 26px;
+    border-radius: 26px;
+  }
+
+  .nano-page--simple .nano-console-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nano-page--simple .nano-console-source-grid,
+  .nano-page--simple .nano-console-pay-grid,
+  .nano-page--simple .nano-console-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .nano-page--simple .nano-console-summary,
+  .nano-page--simple .nano-console-trail,
+  .nano-page--simple .nano-console-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .nano-page--simple .nano-console-actions .hero-primary,
+  .nano-page--simple .nano-console-actions .hero-secondary,
+  .nano-page--simple .nano-console-actions a {
+    width: 100%;
+  }
+
+  .nano-page--simple .nano-support-details {
+    gap: 11px;
+    margin-top: 32px;
+  }
+
+  .nano-page--simple .nano-support-disclosure {
+    border-radius: 19px;
+  }
+
+  .nano-page--simple .nano-support-disclosure summary {
+    min-height: 72px;
+    padding: 16px 18px;
+  }
+
+  .nano-page--simple .nano-support-disclosure__body {
+    padding: 0 18px 18px;
+  }
+}
+
+@media (max-width: 720px) {
+  .nano-page--simple .nano-economy-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .nano-page--simple {
+    gap: 18px;
+    padding-top: 0;
+    padding-bottom: 46px;
+  }
+
+  .nano-page--simple .nano-hero {
+    min-height: auto;
+    padding: 24px 19px;
+    border-radius: 24px;
+  }
+
+  .nano-page--simple .nano-hero h1 {
+    font-size: clamp(1.75rem, 7vw, 1.875rem);
+    line-height: 1.1;
+  }
+
+  .nano-page--simple .nano-hero p:not(.mini-label) {
+    font-size: 0.88rem;
+    line-height: 1.58;
+  }
+
+  .nano-page--simple .nano-badge-row {
+    gap: 8px;
+  }
+
+  .nano-page--simple .nano-badge-row .meta-pill {
+    min-height: 30px;
+    padding: 7px 10px;
+    font-size: 0.7rem;
+  }
+
+  .nano-page--simple .nano-economy-strip {
+    gap: 10px;
+    margin-top: -2px;
+  }
+
+  .nano-page--simple .nano-economy-card {
+    min-height: 92px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .nano-page--simple .nano-economy-card span,
+  .nano-page--simple .nano-economy-card small {
+    font-size: 0.69rem;
+  }
+
+  .nano-page--simple .nano-economy-card strong {
+    font-size: clamp(1rem, 4.4vw, 1.125rem);
+  }
+
+  .nano-page--simple .nano-run-console {
+    min-height: auto;
+    margin-top: 18px;
+    padding: 20px 17px;
+    border-radius: 23px;
+  }
+
+  .nano-page--simple .nano-run-console__head,
+  .nano-page--simple .nano-console-active,
+  .nano-page--simple .nano-console-content__head,
+  .nano-page--simple .nano-console-summary,
+  .nano-page--simple .nano-console-trail {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .nano-page--simple .nano-run-console__head h2 {
+    font-size: clamp(1.25rem, 5vw, 1.38rem);
+  }
+
+  .nano-page--simple .nano-run-console__head p {
+    font-size: 0.84rem;
+  }
+
+  .nano-page--simple .nano-console-steps {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .nano-page--simple .nano-console-step {
+    min-height: 88px;
+    padding: 14px;
+  }
+
+  .nano-page--simple .nano-console-step p {
+    -webkit-line-clamp: 4;
+  }
+
+  .nano-page--simple .nano-console-active {
+    min-height: auto;
+    gap: 14px;
+    padding: 15px;
+    border-radius: 19px;
+  }
+
+  .nano-page--simple .nano-console-subpanel,
+  .nano-page--simple .nano-console-summary,
+  .nano-page--simple .nano-console-trail,
+  .nano-page--simple .nano-proof-box,
+  .nano-page--simple .nano-result-copy,
+  .nano-page--simple .nano-source-capsule {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .nano-page--simple .nano-form-grid,
+  .nano-page--simple .nano-decision-grid,
+  .nano-page--simple .nano-source-facts,
+  .nano-page--simple .nano-result-fields,
+  .nano-page--simple .nano-result-contrast,
+  .nano-page--simple .nano-guardrail-grid,
+  .nano-page--simple .nano-run-card__facts,
+  .nano-page--simple .nano-evaluation-option,
+  .nano-page--simple .nano-evaluation-facts,
+  .nano-page--simple .nano-receipt-detail-row {
+    grid-template-columns: 1fr;
+  }
+
+  .nano-page--simple .nano-section-head,
+  .nano-page--simple .nano-spend-row,
+  .nano-page--simple .nano-receipt-row,
+  .nano-page--simple .nano-summary-list div {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .nano-page--simple .nano-spend-row__meta,
+  .nano-page--simple .nano-receipt-row > div:last-child {
+    justify-items: start;
+    white-space: normal;
+  }
+
+  .nano-page--simple .nano-action-row > *,
+  .nano-page--simple .nano-hero__actions > *,
+  .nano-page--simple .nano-console-actions > *,
+  .nano-page--simple .nano-quiet-actions button {
+    width: 100%;
+  }
+
+  .nano-page--simple .nano-support-details {
+    gap: 9px;
+    margin-top: 26px;
+  }
+
+  .nano-page--simple .nano-support-details__head {
+    padding: 0 2px 2px;
+  }
+
+  .nano-page--simple .nano-support-details__head h2 {
+    font-size: 1.08rem;
+  }
+
+  .nano-page--simple .nano-support-details__head p:not(.mini-label) {
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  .nano-page--simple .nano-support-disclosure {
+    border-radius: 17px;
+  }
+
+  .nano-page--simple .nano-support-disclosure summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+    min-height: 64px;
+    padding: 14px;
+  }
+
+  .nano-page--simple .nano-support-disclosure summary small {
+    font-size: 0.74rem;
+  }
+
+  .nano-page--simple .nano-support-disclosure summary .meta-pill,
+  .nano-page--simple .nano-support-disclosure summary .status-chip,
+  .nano-page--simple .nano-support-disclosure__indicator {
+    justify-self: start;
+  }
+
+  .nano-page--simple .nano-support-disclosure__body {
+    gap: 12px;
+    padding: 0 14px 14px;
+  }
+
+  .nano-page--simple .nano-metrics-grid,
+  .nano-page--simple .nano-trail-row {
+    grid-template-columns: 1fr;
+  }
+
+  .nano-page--simple .nano-trail-head {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .nano-page--simple .nano-economy-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .nano-page--simple .nano-economy-card {
+    min-height: 86px;
+  }
+
+  .nano-page--simple .nano-budget-presets {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
