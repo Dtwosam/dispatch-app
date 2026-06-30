@@ -2530,6 +2530,21 @@ async function refreshNanoRunHistoryActivities(budgets = state.nano.budgets) {
   state.nano.runHistoryLoading = false;
 }
 
+async function refreshNanoPublicMetrics() {
+  if (state.nano.publicMetricsLoading) return;
+  state.nano.publicMetricsLoading = true;
+  state.nano.publicMetricsError = "";
+  try {
+    state.nano.publicMetrics = await getJson("/api/nano/metrics", validateNanoMetricsResponse);
+    state.nano.publicMetricsLoaded = true;
+  } catch (error) {
+    state.nano.publicMetricsLoaded = true;
+    state.nano.publicMetricsError = nanoApiErrorMessage(error, "Nano public metrics are temporarily unavailable.");
+  } finally {
+    state.nano.publicMetricsLoading = false;
+  }
+}
+
 async function refreshNanoData() {
   if (!state.wallet.trim()) {
     state.nano.budgets = [];
@@ -2539,20 +2554,24 @@ async function refreshNanoData() {
     state.nano.runHistoryLoading = false;
     state.nano.runHistoryError = "";
     state.nano.metrics = null;
+    state.nano.metricsError = "";
     return;
   }
   state.nano.healthLoading = true;
   state.nano.budgetsLoading = true;
+  state.nano.publicMetricsLoading = true;
   state.nano.metricsLoading = true;
   state.nano.runHistoryLoading = true;
   state.nano.healthError = "";
   state.nano.budgetsError = "";
+  state.nano.publicMetricsError = "";
   state.nano.metricsError = "";
   state.nano.runHistoryError = "";
   try {
-    const [healthResult, budgetsResult, metricsResult] = await Promise.allSettled([
+    const [healthResult, budgetsResult, publicMetricsResult, metricsResult] = await Promise.allSettled([
       getJson("/api/nano/health", validateNanoHealthResponse),
       getJson(`/api/nano/budgets?wallet=${nanoWalletParam()}`, validateNanoBudgetListResponse),
+      getJson("/api/nano/metrics", validateNanoMetricsResponse),
       getJson(`/api/nano/metrics?wallet=${nanoWalletParam()}`, validateNanoMetricsResponse),
     ]);
     if (healthResult.status === "fulfilled") {
@@ -2569,6 +2588,12 @@ async function refreshNanoData() {
     } else {
       state.nano.budgetsError = nanoApiErrorMessage(budgetsResult.reason);
     }
+    if (publicMetricsResult.status === "fulfilled") {
+      state.nano.publicMetrics = publicMetricsResult.value;
+      state.nano.publicMetricsLoaded = true;
+    } else {
+      state.nano.publicMetricsError = nanoApiErrorMessage(publicMetricsResult.reason, "Nano public metrics are temporarily unavailable.");
+    }
     if (metricsResult.status === "fulfilled") {
       state.nano.metrics = metricsResult.value;
     } else {
@@ -2583,6 +2608,7 @@ async function refreshNanoData() {
   } finally {
     state.nano.healthLoading = false;
     state.nano.budgetsLoading = false;
+    state.nano.publicMetricsLoading = false;
     state.nano.metricsLoading = false;
     state.nano.runHistoryLoading = false;
   }
@@ -2625,6 +2651,11 @@ function renderNanoPage() {
 
   if (state.wallet.trim() && !state.nano.budgetsLoaded && !state.nano.budgetsLoading) {
     startNanoRefresh();
+  }
+  if (!state.nano.publicMetricsLoaded && !state.nano.publicMetricsLoading) {
+    refreshNanoPublicMetrics().then(() => {
+      if (window.location.pathname === "/nano") renderNanoPageSimplified();
+    });
   }
 
   const walletConnected = Boolean(state.wallet.trim());
@@ -2955,7 +2986,7 @@ function renderNanoPageSimplified() {
   const receipts = activity?.receipts || [];
   const receiptsByIntent = selectedNanoReceiptsByIntent();
   const metricsModel = buildNanoMetricsModel(state.nano.metrics, { activity });
-  const nanoEconomyStats = buildNanoEconomyStatsModel();
+  const nanoEconomyStats = buildNanoEconomyStatsModel(state.nano.publicMetrics);
   const runHistoryModel = buildNanoRunHistoryModel({
     wallet: state.wallet,
     budgets: state.nano.budgets,
@@ -3595,6 +3626,8 @@ function renderNanoPageSimplified() {
           </article>
         `).join("")}
         </div>
+        ${state.nano.publicMetricsLoading ? `<p class="nano-helper">Loading public Nano stats...</p>` : ""}
+        ${state.nano.publicMetricsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.publicMetricsError)}</p>` : ""}
       </section>
 
       <section class="nano-panel nano-run-console reveal-on-scroll" id="nanoRunStart" aria-labelledby="nanoRunConsoleTitle">

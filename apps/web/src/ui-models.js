@@ -1566,11 +1566,14 @@ export function buildNanoEconomyStatsModel(metrics, options = {}) {
   const verifiedArcReceipts = publicReceipts.filter(isVerifiedNanoArcProofReceipt);
   const verifiedUsdcFromReceipts = verifiedArcReceipts.reduce((total, receipt) => total + Number(receipt?.amount || 0), 0);
   const verifiedUsdc = Number(metrics?.totalRecordedPaymentValue || 0) || verifiedUsdcFromReceipts;
+  const hasRouterMetrics = Boolean(metrics);
   const verifiedSourceUnlocks = verifiedArcReceipts.filter((receipt) => {
     const payeeId = String(receipt?.payee?.payeeId || receipt?.payeeId || "").toLowerCase();
     const payeeType = String(receipt?.payee?.type || "").toLowerCase();
     return payeeId === "source_unlock" || payeeType === "source";
   }).length;
+  const sourceRequestCount = Number(metrics?.sourceRequestCount ?? 0);
+  const verifiedUnlockCount = Number(metrics?.verifiedSourceUnlockCount ?? verifiedSourceUnlocks);
   const realReceiptCount = Number(metrics?.receiptCount ?? publicReceipts.length);
 
   return {
@@ -1585,19 +1588,19 @@ export function buildNanoEconomyStatsModel(metrics, options = {}) {
         helper: "Counts verified Arc proof only.",
       },
       {
-        label: "Source unlocks",
-        value: verifiedSourceUnlocks > 0 ? `${verifiedSourceUnlocks} verified` : "Real runs only",
-        helper: "Only unlocked after verified proof.",
+        label: "Source requests",
+        value: hasRouterMetrics ? `${sourceRequestCount} request${sourceRequestCount === 1 ? "" : "s"}` : "Real runs only",
+        helper: "Agent-requested source unlocks.",
       },
       {
-        label: "Receipts created",
-        value: realReceiptCount > 0 ? `${realReceiptCount} real receipt${realReceiptCount === 1 ? "" : "s"}` : "Real receipts only",
-        helper: "No fake receipt count.",
+        label: "Receipts recorded",
+        value: hasRouterMetrics ? `${realReceiptCount} receipt${realReceiptCount === 1 ? "" : "s"}` : "Real receipts only",
+        helper: "Stored Nano receipt records only.",
       },
       {
-        label: "Proof checks",
-        value: verifiedArcReceipts.length > 0 ? `${verifiedArcReceipts.length} verified` : "Arc proof",
-        helper: "Paid means verified proof.",
+        label: "Verified unlocks",
+        value: hasRouterMetrics ? `${verifiedUnlockCount} verified` : "Arc proof",
+        helper: "Unlocked only after verified proof.",
       },
       {
         label: "Dispatch agents",

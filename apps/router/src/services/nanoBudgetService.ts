@@ -39,6 +39,23 @@ function sumAmounts(values: number[]) {
   return Number(values.reduce((total, value) => total + value, 0).toFixed(6));
 }
 
+function isValidArcTxHash(value: string | null | undefined) {
+  return /^0x[a-fA-F0-9]{64}$/.test(value || "");
+}
+
+function isVerifiedArcReceipt(receipt: NanoSpendReceipt) {
+  return (
+    receipt.paymentState === "recorded"
+    && receipt.proof.proofType === "arc_tx"
+    && receipt.proof.paymentState === "recorded"
+    && isValidArcTxHash(receipt.proof.txHash)
+  );
+}
+
+function isSourceUnlockPayee(intentOrReceipt: NanoSpendIntent | NanoSpendReceipt) {
+  return intentOrReceipt.payee.payeeId === "source_unlock" || intentOrReceipt.payee.type === "source";
+}
+
 function defaultPolicy(amount: number, override: Partial<NanoPolicy> | undefined): NanoPolicy {
   const policy: NanoPolicy = {
     maxBudgetAmount: override?.maxBudgetAmount ?? amount,
@@ -268,21 +285,21 @@ export class NanoBudgetService {
     const budgetIds = new Set(budgets.map((budget) => budget.budgetId));
     const intents = [...this.store.nanoSpendIntents.values()].filter((intent) => budgetIds.has(intent.budgetId));
     const receipts = [...this.store.nanoSpendReceipts.values()].filter((receipt) => budgetIds.has(receipt.budgetId));
+    const verifiedArcReceipts = receipts.filter(isVerifiedArcReceipt);
     return {
       generatedAt: nowIso(),
       budgetCount: budgets.length,
       spendIntentCount: intents.length,
       approvedSpendIntentCount: intents.filter((intent) => ["approved", "payment_recorded"].includes(intent.status)).length,
+      sourceRequestCount: intents.filter(isSourceUnlockPayee).length,
       receiptCount: receipts.length,
+      verifiedSourceUnlockCount: verifiedArcReceipts.filter(isSourceUnlockPayee).length,
+      verifiedArcReceiptCount: verifiedArcReceipts.length,
       totalAuthorizedBudget: sumAmounts(budgets.map((budget) => budget.amount)),
       totalApprovedIntentValue: sumAmounts(
         intents.filter((intent) => ["approved", "payment_recorded"].includes(intent.status)).map((intent) => intent.amount),
       ),
-      totalRecordedPaymentValue: sumAmounts(
-        receipts
-          .filter((receipt) => receipt.paymentState === "recorded" && receipt.proof.proofType === "arc_tx")
-          .map((receipt) => receipt.amount),
-      ),
+      totalRecordedPaymentValue: sumAmounts(verifiedArcReceipts.map((receipt) => receipt.amount)),
       availableBudget: sumAmounts(budgets.map((budget) => this.calculateAvailableBudget(budget.budgetId))),
       walletsWithBudgets: new Set(budgets.map((budget) => normalizeWallet(budget.ownerWallet))).size,
     };

@@ -142,7 +142,10 @@ test("records payment proof only from provided proof and updates real-record met
   assert.equal(metrics.budgetCount, 1);
   assert.equal(metrics.spendIntentCount, 1);
   assert.equal(metrics.approvedSpendIntentCount, 1);
+  assert.equal(metrics.sourceRequestCount, 0);
   assert.equal(metrics.receiptCount, 1);
+  assert.equal(metrics.verifiedSourceUnlockCount, 0);
+  assert.equal(metrics.verifiedArcReceiptCount, 0);
   assert.equal(metrics.totalAuthorizedBudget, 1);
   assert.equal(metrics.totalApprovedIntentValue, 0.03);
   assert.equal(metrics.totalRecordedPaymentValue, 0);
@@ -199,6 +202,85 @@ test("counts only verified Arc proof records as recorded payment value", () => {
   });
 
   const metrics = service.calculateMetrics(wallet);
+  assert.equal(metrics.sourceRequestCount, 1);
   assert.equal(metrics.receiptCount, 1);
+  assert.equal(metrics.verifiedSourceUnlockCount, 1);
+  assert.equal(metrics.verifiedArcReceiptCount, 1);
   assert.equal(metrics.totalRecordedPaymentValue, 0.05);
+});
+
+test("public Nano metrics aggregate stored records without using wallet-private scope", () => {
+  const { service } = createService();
+  const first = service.createBudgetDraft({
+    ownerWallet: wallet,
+    goal: "Create a Nano run.",
+    amount: 1,
+  });
+  const second = service.createBudgetDraft({
+    ownerWallet: otherWallet,
+    goal: "Create another Nano run.",
+    amount: 2,
+  });
+  service.recordBudgetFundingProof(first.budget.budgetId, {
+    ownerWallet: wallet,
+    proof: fundingProof(),
+  });
+  service.recordBudgetFundingProof(second.budget.budgetId, {
+    ownerWallet: otherWallet,
+    proof: fundingProof(),
+  });
+  const firstIntent = service.createSpendIntent({
+    budgetId: first.budget.budgetId,
+    ownerWallet: wallet,
+    payee: {
+      payeeId: "source_unlock",
+      type: "source",
+      label: "Source unlock",
+      walletAddress: "0xSource0000000000000000000000000000000001",
+    },
+    amount: 0.05,
+    reason: "Unlock a source for the brief.",
+    estimated: false,
+  });
+  const secondIntent = service.createSpendIntent({
+    budgetId: second.budget.budgetId,
+    ownerWallet: otherWallet,
+    payee: {
+      payeeId: "source_unlock",
+      type: "source",
+      label: "Source unlock",
+      walletAddress: "0xSource0000000000000000000000000000000002",
+    },
+    amount: 0.04,
+    reason: "Unlock a source for the second brief.",
+    estimated: false,
+  });
+  service.approveSpendIntent(firstIntent.intentId, { ownerWallet: wallet });
+  service.approveSpendIntent(secondIntent.intentId, { ownerWallet: otherWallet });
+  service.recordPaymentProof(firstIntent.intentId, {
+    ownerWallet: wallet,
+    proof: fundingProof(),
+    contributionSummary: "Verified Arc payment proof for source unlock.",
+  });
+  service.recordPaymentProof(secondIntent.intentId, {
+    ownerWallet: otherWallet,
+    proof: localPaymentProof(),
+    contributionSummary: "Local source proof only.",
+  });
+
+  const publicMetrics = service.calculateMetrics();
+  const walletMetrics = service.calculateMetrics(wallet);
+
+  assert.equal(publicMetrics.budgetCount, 2);
+  assert.equal(publicMetrics.sourceRequestCount, 2);
+  assert.equal(publicMetrics.receiptCount, 2);
+  assert.equal(publicMetrics.verifiedSourceUnlockCount, 1);
+  assert.equal(publicMetrics.verifiedArcReceiptCount, 1);
+  assert.equal(publicMetrics.totalRecordedPaymentValue, 0.05);
+  assert.equal(publicMetrics.walletsWithBudgets, 2);
+  assert.equal(walletMetrics.budgetCount, 1);
+  assert.equal(walletMetrics.sourceRequestCount, 1);
+  assert.equal(walletMetrics.receiptCount, 1);
+  assert.equal(walletMetrics.verifiedSourceUnlockCount, 1);
+  assert.equal(walletMetrics.walletsWithBudgets, 1);
 });

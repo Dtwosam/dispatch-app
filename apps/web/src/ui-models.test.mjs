@@ -2018,23 +2018,28 @@ test("Nano economy stats use honest fallback values without fake payment data", 
   assert.match(model.helper, /Wallet-specific run history appears after you connect/);
   assert.equal(stats["USDC verified"].value, "0.00 verified");
   assert.equal(stats["USDC verified"].helper, "Counts verified Arc proof only.");
-  assert.equal(stats["Source unlocks"].value, "Real runs only");
-  assert.equal(stats["Source unlocks"].helper, "Only unlocked after verified proof.");
-  assert.equal(stats["Receipts created"].value, "Real receipts only");
-  assert.equal(stats["Receipts created"].helper, "No fake receipt count.");
-  assert.equal(stats["Proof checks"].value, "Arc proof");
-  assert.equal(stats["Proof checks"].helper, "Paid means verified proof.");
+  assert.equal(stats["Source requests"].value, "Real runs only");
+  assert.equal(stats["Source requests"].helper, "Agent-requested source unlocks.");
+  assert.equal(stats["Receipts recorded"].value, "Real receipts only");
+  assert.equal(stats["Receipts recorded"].helper, "Stored Nano receipt records only.");
+  assert.equal(stats["Verified unlocks"].value, "Arc proof");
+  assert.equal(stats["Verified unlocks"].helper, "Unlocked only after verified proof.");
   assert.equal(stats["Dispatch agents"].value, "5 built-in");
   assert.equal(stats["Dispatch agents"].helper, "Available source agents for Nano runs.");
   assert.equal(stats["Agents paid"], undefined);
-  assert.doesNotMatch(JSON.stringify(model), /paid users|traction|growth|earnings|ratings|reviews|Agents paid/i);
+  assert.doesNotMatch(JSON.stringify(model), /paid users|traction|growth|earnings|ratings|reviews|Agents paid|fake volume/i);
 });
 
 test("Nano economy stats count only verified Arc proof for paid values", () => {
   const verifiedSourceTx = `0x${"a".repeat(64)}`;
   const verifiedAgentTx = `0x${"b".repeat(64)}`;
   const rejectedTx = `0x${"c".repeat(64)}`;
-  const model = buildNanoEconomyStatsModel({ receiptCount: 5 }, {
+  const model = buildNanoEconomyStatsModel({
+    receiptCount: 5,
+    sourceRequestCount: 3,
+    verifiedSourceUnlockCount: 1,
+    totalRecordedPaymentValue: 0.05,
+  }, {
     publicReceipts: [
       {
         amount: 0.05,
@@ -2070,10 +2075,10 @@ test("Nano economy stats count only verified Arc proof for paid values", () => {
   });
   const stats = Object.fromEntries(model.stats.map((stat) => [stat.label, stat]));
 
-  assert.equal(stats["USDC verified"].value, "0.08 verified");
-  assert.equal(stats["Source unlocks"].value, "1 verified");
-  assert.equal(stats["Receipts created"].value, "5 real receipts");
-  assert.equal(stats["Proof checks"].value, "2 verified");
+  assert.equal(stats["USDC verified"].value, "0.05 verified");
+  assert.equal(stats["Source requests"].value, "3 requests");
+  assert.equal(stats["Receipts recorded"].value, "5 receipts");
+  assert.equal(stats["Verified unlocks"].value, "1 verified");
   assert.equal(stats["Dispatch agents"].value, "5 built-in");
   assert.equal(stats["Agents paid"], undefined);
   assert.doesNotMatch(JSON.stringify(model), /Paid with proof|Agents paid|agent payout/i);
@@ -2096,8 +2101,8 @@ test("Nano economy stats do not switch into wallet-private activity stats", () =
 
   assert.equal(model.walletScoped, false);
   assert.equal(stats["USDC verified"].value, "0.00 verified");
-  assert.equal(stats["Source unlocks"].value, "Real runs only");
-  assert.equal(stats["Receipts created"].value, "Real receipts only");
+  assert.equal(stats["Source requests"].value, "Real runs only");
+  assert.equal(stats["Receipts recorded"].value, "Real receipts only");
   assert.equal(stats["Dispatch agents"].value, "5 built-in");
   assert.doesNotMatch(JSON.stringify(model), /Your stats|Your earnings|Your agents|99|wallet-private/i);
 });
@@ -2118,6 +2123,9 @@ test("Nano public stats render before wallet-gated console in the Nano page temp
   assert.match(statsSection, /nano-economy-stats__grid/);
   assert.match(statsSection, /nano-economy-stats__card/);
   assert.doesNotMatch(statsSection, /reveal-on-scroll|data-wallet|Connect wallet|Agents paid|Your stats|Your earnings|fake volume|paid users/i);
+  assert.match(appSource, /getJson\("\/api\/nano\/metrics", validateNanoMetricsResponse\)/);
+  assert.match(appSource, /buildNanoEconomyStatsModel\(state\.nano\.publicMetrics\)/);
+  assert.doesNotMatch(statsSection, /metrics\?wallet/);
 });
 
 test("Nano metrics count only verified Arc proof as paid usage", () => {
