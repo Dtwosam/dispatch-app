@@ -3580,15 +3580,15 @@ function renderNanoPageSimplified() {
         <p class="nano-helper">Paid states stay locked until verified Arc proof exists.</p>
       </header>
 
-      <section class="nano-economy-section reveal-on-scroll is-visible" aria-labelledby="nanoEconomyStatsTitle">
-        <div class="nano-economy-head">
+      <section class="nano-economy-stats nano-economy-stats--public" aria-labelledby="nanoEconomyStatsTitle">
+        <div class="nano-economy-stats__head">
           <p class="mini-label">Public Nano economy</p>
           <h2 id="nanoEconomyStatsTitle">${escapeHtml(nanoEconomyStats.title)}</h2>
           <p>${escapeHtml(nanoEconomyStats.helper)}</p>
         </div>
-        <div class="nano-economy-strip" aria-label="Public Nano economy stats">
+        <div class="nano-economy-stats__grid" aria-label="Public Nano economy stats">
         ${nanoEconomyStats.stats.map((stat) => `
-          <article class="nano-economy-card">
+          <article class="nano-economy-stats__card">
             <span>${escapeHtml(stat.label)}</span>
             <strong>${escapeHtml(stat.value)}</strong>
             <small>${escapeHtml(stat.helper)}</small>
