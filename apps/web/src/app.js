@@ -3577,7 +3577,134 @@ function renderNanoPageSimplified() {
         <p class="nano-helper">Use this console to complete the current run. Supporting details stay below for inspection.</p>
       </section>
 
-      <article class="nano-panel nano-task-handoff reveal-on-scroll" id="nanoTaskHandoff">
+      <section class="nano-support-details reveal-on-scroll" aria-labelledby="nanoSupportDetailsTitle">
+        <div class="nano-support-details__head">
+          <div>
+            <p class="mini-label">Details</p>
+            <h2 id="nanoSupportDetailsTitle">Supporting details</h2>
+            <p>Inspect testing notes, live/planned status, history, handoff, receipt metadata, and activity when needed.</p>
+          </div>
+        </div>
+
+        <details class="nano-support-disclosure nano-support-disclosure--test">
+          <summary>
+            <span>
+              <strong>How to test Nano</strong>
+              <small>Run one goal, approve one source spend, verify proof, then inspect the receipt.</small>
+            </span>
+            <span class="meta-pill">Test path</span>
+            <span class="nano-support-disclosure__indicator" aria-hidden="true">Open</span>
+          </summary>
+          <div class="nano-support-disclosure__body">
+            <div class="nano-judge-path">
+              <strong>Walkthrough</strong>
+              <ol>
+                ${judgeCommandCenter.clickPath.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}
+              </ol>
+            </div>
+            <div class="nano-proof-box">
+              <h3>How to produce a shareable receipt</h3>
+              <p>Create a real Nano run, approve the source spend, pay on Arc if comfortable, verify proof with a real transaction hash, then click View shareable receipt.</p>
+              <p>If proof is missing, local, pending, unavailable, or rejected, the receipt remains useful but is not shown as paid.</p>
+            </div>
+            <div class="nano-proof-box">
+              <h3>Why this matters</h3>
+              <p>Most agents only return an answer. Nano shows what the agent wanted to spend, what the user approved, what payment proof exists, and how the proof-verified source improved the result.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="nano-support-disclosure nano-support-disclosure--claims" id="nanoJudgeTestPath">
+          <summary>
+            <span>
+              <strong>What is live vs planned</strong>
+              <small>Arc proof is live; Gateway, x402, Circle Wallets, and nanopayments stay planned until verified.</small>
+            </span>
+            <span class="meta-pill">No fake demo data</span>
+            <span class="nano-support-disclosure__indicator" aria-hidden="true">Open</span>
+          </summary>
+          <div class="nano-support-disclosure__body">
+            <p class="nano-helper">${escapeHtml(judgeCommandCenter.body)}</p>
+            <div class="nano-judge-claims">
+              ${judgeCommandCenter.claimGroups.map((group) => `
+                <article>
+                  <span class="status-chip ${group.tone === "good" ? "good" : "pending"}">${escapeHtml(group.label)}</span>
+                  <ul>
+                    ${group.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                  </ul>
+                </article>
+              `).join("")}
+            </div>
+            <div class="nano-proof-rules">
+              <strong>What counts as paid</strong>
+              ${judgeCommandCenter.proofRules.map((rule) => `<span>${escapeHtml(rule)}</span>`).join("")}
+            </div>
+            <p class="nano-helper">${escapeHtml(judgeCommandCenter.currentState)}</p>
+          </div>
+        </details>
+
+      <details class="nano-support-disclosure nano-support-disclosure--history" id="nanoRunHistory">
+        <summary>
+          <span>
+            <strong>Run history</strong>
+            <small>Real Nano runs and receipt trails appear here.</small>
+          </span>
+          ${runHistoryModel.loading ? `<span class="meta-pill">Loading runs</span>` : `<span class="meta-pill">${runHistoryModel.runCards.length} run${runHistoryModel.runCards.length === 1 ? "" : "s"}</span>`}
+          <span class="nano-support-disclosure__indicator" aria-hidden="true">Open</span>
+        </summary>
+        <div class="nano-support-disclosure__body">
+      <section class="nano-panel nano-run-history">
+        <div class="nano-section-head">
+          <div>
+            <p class="mini-label">Run history</p>
+            <h2>${escapeHtml(runHistoryModel.title)}</h2>
+            <p>${escapeHtml(runHistoryModel.subtitle)}</p>
+          </div>
+          ${runHistoryModel.loading ? `<span class="meta-pill">Loading runs</span>` : `<span class="meta-pill">${runHistoryModel.runCards.length} run${runHistoryModel.runCards.length === 1 ? "" : "s"}</span>`}
+        </div>
+        ${runHistoryModel.runCards.length ? `
+          <div class="nano-run-grid">
+            ${runHistoryModel.runCards.map((run) => `
+              <article class="nano-run-card ${run.selected ? "is-selected" : ""}">
+                <div class="nano-run-card__head">
+                  <strong>${escapeHtml(run.goal)}</strong>
+                  <span class="status-chip ${run.proofTone === "good" ? "good" : run.proofTone === "warn" ? "warn" : "pending"}">${escapeHtml(run.proofStatus)}</span>
+                </div>
+                <div class="nano-run-card__facts">
+                  <div><span>Budget</span><strong>${escapeHtml(run.budget)}</strong></div>
+                  <div><span>Budget status</span><strong>${escapeHtml(run.budgetStatus)}</strong></div>
+                  <div><span>Source status</span><strong>${escapeHtml(run.sourceStatus)}</strong></div>
+                  <div><span>Verified receipts</span><strong>${escapeHtml(run.verifiedReceiptCount)}</strong></div>
+                  <div><span>Updated</span><strong>${escapeHtml(run.updated)}</strong></div>
+                </div>
+                <button class="${run.selected ? "hero-secondary" : "hero-primary"}" type="button" data-nano-run-id="${escapeHtml(run.budgetId)}">${escapeHtml(run.buttonLabel)}</button>
+                <button class="hero-secondary" type="button" data-nano-receipt-id="${escapeHtml(run.budgetId)}">View shareable receipt</button>
+                ${!run.detailAvailable ? `<p class="nano-helper">Run detail unavailable from the current router response.</p>` : ""}
+              </article>
+            `).join("")}
+          </div>
+        ` : `
+          <div class="empty-inline nano-empty-inline">
+            <span class="empty-inline__mark" aria-hidden="true"></span>
+            <div><strong>${escapeHtml(runHistoryModel.emptyTitle)}</strong><p>${escapeHtml(runHistoryModel.emptyBody)}</p></div>
+          </div>
+        `}
+        ${runHistoryModel.error ? `<p class="nano-helper nano-helper--warn">${escapeHtml(runHistoryModel.error)}</p>` : ""}
+      </section>
+        </div>
+      </details>
+
+      <details class="nano-support-disclosure nano-support-disclosure--handoff" id="nanoTaskHandoff">
+        <summary>
+          <span>
+            <strong>Optional Dispatch handoff</strong>
+            <small>Use Nano output as a source-backed handoff into the wider Dispatch workflow.</small>
+          </span>
+          <span class="status-chip ${taskHandoffModel.sourceContributionState === "verified_source_backed" ? "good" : "pending"}">${escapeHtml(taskHandoffModel.taskContextStatus)}</span>
+          <span class="nano-support-disclosure__indicator" aria-hidden="true">Open</span>
+        </summary>
+        <div class="nano-support-disclosure__body">
+        <article class="nano-panel nano-task-handoff">
         <div class="nano-section-head">
           <div>
             <p class="mini-label">Optional Dispatch handoff</p>
@@ -3622,86 +3749,20 @@ function renderNanoPageSimplified() {
           </div>
         `}
       </article>
+        </div>
+      </details>
 
-      <section class="nano-panel nano-run-history reveal-on-scroll" id="nanoRunHistory">
-        <div class="nano-section-head">
-          <div>
-            <p class="mini-label">Run history</p>
-            <h2>${escapeHtml(runHistoryModel.title)}</h2>
-            <p>${escapeHtml(runHistoryModel.subtitle)}</p>
-          </div>
-          ${runHistoryModel.loading ? `<span class="meta-pill">Loading runs</span>` : `<span class="meta-pill">${runHistoryModel.runCards.length} run${runHistoryModel.runCards.length === 1 ? "" : "s"}</span>`}
-        </div>
-        ${runHistoryModel.runCards.length ? `
-          <div class="nano-run-grid">
-            ${runHistoryModel.runCards.map((run) => `
-              <article class="nano-run-card ${run.selected ? "is-selected" : ""}">
-                <div class="nano-run-card__head">
-                  <strong>${escapeHtml(run.goal)}</strong>
-                  <span class="status-chip ${run.proofTone === "good" ? "good" : run.proofTone === "warn" ? "warn" : "pending"}">${escapeHtml(run.proofStatus)}</span>
-                </div>
-                <div class="nano-run-card__facts">
-                  <div><span>Budget</span><strong>${escapeHtml(run.budget)}</strong></div>
-                  <div><span>Budget status</span><strong>${escapeHtml(run.budgetStatus)}</strong></div>
-                  <div><span>Source status</span><strong>${escapeHtml(run.sourceStatus)}</strong></div>
-                  <div><span>Verified receipts</span><strong>${escapeHtml(run.verifiedReceiptCount)}</strong></div>
-                  <div><span>Updated</span><strong>${escapeHtml(run.updated)}</strong></div>
-                </div>
-                <button class="${run.selected ? "hero-secondary" : "hero-primary"}" type="button" data-nano-run-id="${escapeHtml(run.budgetId)}">${escapeHtml(run.buttonLabel)}</button>
-                <button class="hero-secondary" type="button" data-nano-receipt-id="${escapeHtml(run.budgetId)}">View shareable receipt</button>
-                ${!run.detailAvailable ? `<p class="nano-helper">Run detail unavailable from the current router response.</p>` : ""}
-              </article>
-            `).join("")}
-          </div>
-        ` : `
-          <div class="empty-inline nano-empty-inline">
-            <span class="empty-inline__mark" aria-hidden="true"></span>
-            <div><strong>${escapeHtml(runHistoryModel.emptyTitle)}</strong><p>${escapeHtml(runHistoryModel.emptyBody)}</p></div>
-          </div>
-        `}
-        ${runHistoryModel.error ? `<p class="nano-helper nano-helper--warn">${escapeHtml(runHistoryModel.error)}</p>` : ""}
-      </section>
-
-      <section class="nano-panel nano-judge-center nano-supporting-panel reveal-on-scroll" id="nanoJudgeTestPath">
-        <div class="nano-section-head">
-          <div>
-            <p class="mini-label">${escapeHtml(judgeCommandCenter.eyebrow)}</p>
-            <h2>What is live vs planned</h2>
-            <p>${escapeHtml(judgeCommandCenter.body)}</p>
-          </div>
-          <span class="meta-pill">No fake demo data</span>
-        </div>
-        <div class="nano-judge-grid">
-          <div class="nano-judge-path">
-            <strong>How to test Nano</strong>
-            <ol>
-              ${judgeCommandCenter.clickPath.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}
-            </ol>
-          </div>
-          <div class="nano-judge-claims">
-            ${judgeCommandCenter.claimGroups.map((group) => `
-              <article>
-                <span class="status-chip ${group.tone === "good" ? "good" : "pending"}">${escapeHtml(group.label)}</span>
-                <ul>
-                  ${group.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-                </ul>
-              </article>
-            `).join("")}
-          </div>
-        </div>
-        <div class="nano-proof-rules">
-          <strong>What counts as paid</strong>
-          ${judgeCommandCenter.proofRules.map((rule) => `<span>${escapeHtml(rule)}</span>`).join("")}
-        </div>
-        <div class="nano-proof-box">
-          <h3>How to produce a shareable receipt</h3>
-          <p>Create a real Nano run, approve the source spend, pay on Arc if comfortable, verify proof with a real transaction hash, then click View shareable receipt.</p>
-          <p>If proof is missing, local, pending, unavailable, or rejected, the receipt remains useful but is not shown as paid.</p>
-        </div>
-        <p class="nano-helper">${escapeHtml(judgeCommandCenter.currentState)}</p>
-      </section>
-
-      <article class="nano-panel nano-receipt-detail reveal-on-scroll" id="nanoReceiptDetail">
+      <details class="nano-support-disclosure nano-support-disclosure--receipt" id="nanoReceiptDetail">
+        <summary>
+          <span>
+            <strong>Technical receipt details</strong>
+            <small>Inspect payment proof, source state, and receipt metadata.</small>
+          </span>
+          <span class="meta-pill">${receiptDetailModel.rows.length} row${receiptDetailModel.rows.length === 1 ? "" : "s"}</span>
+          <span class="nano-support-disclosure__indicator" aria-hidden="true">Open</span>
+        </summary>
+        <div class="nano-support-disclosure__body">
+      <article class="nano-panel nano-receipt-detail">
         <div class="nano-section-head">
           <div>
             <p class="mini-label">Receipt detail</p>
@@ -3738,7 +3799,19 @@ function renderNanoPageSimplified() {
           </div>
         `}
       </article>
+        </div>
+      </details>
 
+      <details class="nano-support-disclosure nano-support-disclosure--activity">
+        <summary>
+          <span>
+            <strong>Nano activity</strong>
+            <small>Activity appears after real Nano run events.</small>
+          </span>
+          <span class="meta-pill">${escapeHtml(metricsModel.receiptCount)} proof records</span>
+          <span class="nano-support-disclosure__indicator" aria-hidden="true">Open</span>
+        </summary>
+        <div class="nano-support-disclosure__body">
       <section class="nano-bottom-grid">
         <article class="nano-panel reveal-on-scroll">
           <p class="mini-label">${escapeHtml(metricsModel.sourceLabel)}</p>
@@ -3771,6 +3844,9 @@ function renderNanoPageSimplified() {
           <h2>Why this matters</h2>
           <p>Most agents only return an answer. Nano shows what the agent wanted to spend, what the user approved, what payment proof exists, and how the proof-verified source improved the result.</p>
         </article>
+      </section>
+        </div>
+      </details>
       </section>
 
     </section>
@@ -3842,7 +3918,9 @@ function renderNanoPageSimplified() {
         await refreshNanoActivity(budgetId);
         renderNanoPageSimplified();
       }
-      document.getElementById("nanoReceiptDetail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const receiptDetail = document.getElementById("nanoReceiptDetail");
+      if (receiptDetail && "open" in receiptDetail) receiptDetail.open = true;
+      receiptDetail?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
   document.querySelectorAll("[data-nano-receipt-id]").forEach((node) => {
