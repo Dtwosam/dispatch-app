@@ -11127,3 +11127,160 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Phase 15C.7 preview QA fixes: hero context, run restart access, and FAQ. */
+.nano-page--simple .nano-hero-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 60px;
+  margin-bottom: 2px;
+  padding: 14px 18px;
+  border: 1px solid rgba(142, 255, 240, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nano-page--simple .nano-hero-context strong {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 820;
+  line-height: 1.25;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.nano-page--simple .nano-hero-context span {
+  max-width: 600px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.nano-page--simple .nano-run-console__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 9px;
+  max-width: 430px;
+}
+
+.nano-page--simple .nano-run-console__actions .status-chip {
+  min-height: 30px;
+  padding: 7px 10px;
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.nano-page--simple .nano-run-console__actions .hero-secondary {
+  min-width: 152px;
+  min-height: 44px;
+  padding: 12px 18px;
+  font-size: 0.84rem;
+}
+
+.nano-page--simple .nano-support-disclosure--faq {
+  order: 2;
+}
+
+.nano-page--simple .nano-support-disclosure--claims {
+  order: 3;
+}
+
+.nano-page--simple .nano-support-disclosure--history {
+  order: 4;
+}
+
+.nano-page--simple .nano-support-disclosure--handoff {
+  order: 5;
+}
+
+.nano-page--simple .nano-support-disclosure--receipt {
+  order: 6;
+}
+
+.nano-page--simple .nano-support-disclosure--activity {
+  order: 7;
+}
+
+.nano-page--simple .nano-faq-list {
+  display: grid;
+  gap: 12px;
+}
+
+.nano-page--simple .nano-faq-list article {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.016);
+}
+
+.nano-page--simple .nano-faq-list strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.nano-page--simple .nano-faq-list p {
+  margin: 7px 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .nano-page--simple .nano-hero-context {
+    min-height: 56px;
+    padding: 13px 16px;
+    border-radius: 18px;
+  }
+
+  .nano-page--simple .nano-run-console__actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .nano-page--simple .nano-hero-context {
+    display: grid;
+    gap: 7px;
+    min-height: auto;
+    padding: 12px 14px;
+    border-radius: 17px;
+  }
+
+  .nano-page--simple .nano-hero-context span {
+    max-width: none;
+    text-align: left;
+  }
+
+  .nano-page--simple .nano-run-console__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .nano-page--simple .nano-run-console__actions .hero-secondary {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .nano-page--simple .nano-faq-list {
+    gap: 10px;
+  }
+
+  .nano-page--simple .nano-faq-list article {
+    padding: 12px 14px;
+    border-radius: 15px;
+  }
+}

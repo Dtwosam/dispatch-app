@@ -3165,7 +3165,7 @@ function renderNanoPageSimplified() {
           <strong>${escapeHtml(selectedRunModel.label)}</strong>
           <p>${escapeHtml(selectedRunModel.helper)}</p>
         </div>
-        <button class="hero-secondary" type="button" id="nanoStartNewBudget">Start new run</button>
+        <button class="hero-secondary" type="button" id="nanoStartNewBudget">Start new budget</button>
       </div>
     ` : ""}
     <div class="nano-console-form">
@@ -3203,7 +3203,7 @@ function renderNanoPageSimplified() {
     <div class="nano-console-actions">
       ${nanoPrimaryActionButton}
       <button class="hero-secondary" type="button" id="nanoRefresh" ${state.nano.budgetsLoading ? "disabled" : ""}>Refresh</button>
-      ${budget ? `<button class="hero-secondary" type="button" id="nanoStartNewBudgetSecondary">Start new run</button>` : ""}
+      ${budget ? `<button class="hero-secondary" type="button" id="nanoStartNewBudgetSecondary">Start new budget</button>` : ""}
     </div>
     <p class="nano-helper">Creating a budget is not payment.</p>
   `;
@@ -3524,8 +3524,11 @@ function renderNanoPageSimplified() {
   el.appRoot.innerHTML = `
     <section data-structure="nano-source-payment" class="nano-page nano-page--simple">
       <header class="nano-hero reveal-on-scroll is-visible">
+        <div class="nano-hero-context" aria-label="Dispatch Nano context">
+          <strong>Dispatch Nano</strong>
+          <span>AI agent source-payment layer for Arc Testnet USDC proof.</span>
+        </div>
         <div>
-          <p class="mini-label">Dispatch Nano</p>
           <h1>AI agents that pay for sources before using them.</h1>
           <p>Give an agent a goal. It requests one tiny source payment. You approve it, pay on Arc, and Nano unlocks the result only after proof verifies.</p>
         </div>
@@ -3557,7 +3560,11 @@ function renderNanoPageSimplified() {
             <h2 id="nanoRunConsoleTitle">${escapeHtml(nanoRunConsole.title)}</h2>
             <p>${escapeHtml(nanoRunConsole.intro)}</p>
           </div>
-          <span class="status-chip ${nanoRunConsole.currentTone === "verified" ? "good" : nanoRunConsole.currentTone === "warn" || nanoRunConsole.currentTone === "blocked" ? "warn" : "pending"}">${escapeHtml(nanoRunConsole.currentStatus)}</span>
+          <div class="nano-run-console__actions" aria-label="Nano run actions">
+            ${budget ? `<span class="status-chip pending">Continuing current budget</span>` : ""}
+            <span class="status-chip ${nanoRunConsole.currentTone === "verified" ? "good" : nanoRunConsole.currentTone === "warn" || nanoRunConsole.currentTone === "blocked" ? "warn" : "pending"}">${escapeHtml(nanoRunConsole.currentStatus)}</span>
+            ${budget ? `<button class="hero-secondary" type="button" id="nanoStartNewBudgetHeader" aria-label="Start new budget and return to the Nano budget creation flow">Start new budget</button>` : ""}
+          </div>
         </div>
         <div class="nano-console-steps" aria-label="Nano run steps">
           ${nanoRunConsole.steps.map((step) => `
@@ -3610,6 +3617,49 @@ function renderNanoPageSimplified() {
             <div class="nano-proof-box">
               <h3>Why this matters</h3>
               <p>Most agents only return an answer. Nano shows what the agent wanted to spend, what the user approved, what payment proof exists, and how the proof-verified source improved the result.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="nano-support-disclosure nano-support-disclosure--faq">
+          <summary>
+            <span>
+              <strong>FAQ</strong>
+              <small>Quick answers about budgets, approval, proof, receipts, and what is live.</small>
+            </span>
+            <span class="meta-pill">Quick answers</span>
+            <span class="nano-support-disclosure__indicator" aria-hidden="true">Open</span>
+          </summary>
+          <div class="nano-support-disclosure__body">
+            <div class="nano-faq-list">
+              <article>
+                <strong>What is Dispatch Nano?</strong>
+                <p>Dispatch Nano lets an AI agent request a tiny USDC source payment, wait for user approval, verify Arc proof, and unlock the source-backed result with a receipt trail.</p>
+              </article>
+              <article>
+                <strong>Is approval the same as payment?</strong>
+                <p>No. Approval only allows the source spend. Nano shows paid status only after Arc proof verifies the payment.</p>
+              </article>
+              <article>
+                <strong>When does the source unlock?</strong>
+                <p>The starter source unlocks only after verified Arc proof. Local, pending, unavailable, or rejected proof keeps it locked.</p>
+              </article>
+              <article>
+                <strong>What is live right now?</strong>
+                <p>The live path is Arc Testnet USDC proof with a Dispatch-hosted starter source. Gateway, x402, Circle Wallets, and nanopayments remain planned until implemented and verified.</p>
+              </article>
+              <article>
+                <strong>What is the receipt for?</strong>
+                <p>The receipt shows the run trail: goal, agent decision, approved source spend, proof state, source unlock, and result contribution.</p>
+              </article>
+              <article>
+                <strong>Can I start another budget?</strong>
+                <p>Yes. Use Start new budget to return to the budget creation flow without faking a payment or deleting real run history.</p>
+              </article>
+              <article>
+                <strong>Does Nano replace Dispatch marketplace payments?</strong>
+                <p>No. Nano extends Dispatch with source-payment proof. It does not replace the main task review, approval, dispute, or settlement flow.</p>
+              </article>
             </div>
           </div>
         </details>
@@ -3959,14 +4009,16 @@ function renderNanoPageSimplified() {
   document.getElementById("nanoViewResult")?.addEventListener("click", () => {
     document.getElementById("nanoResultPreview")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
-  document.getElementById("nanoStartNewBudget")?.addEventListener("click", () => {
+  const startNewNanoBudget = () => {
     resetNanoDraftFlow();
     renderNanoPageSimplified();
-  });
-  document.getElementById("nanoStartNewBudgetSecondary")?.addEventListener("click", () => {
-    resetNanoDraftFlow();
-    renderNanoPageSimplified();
-  });
+    requestAnimationFrame(() => {
+      document.getElementById("nanoGoal")?.focus();
+    });
+  };
+  document.getElementById("nanoStartNewBudget")?.addEventListener("click", startNewNanoBudget);
+  document.getElementById("nanoStartNewBudgetSecondary")?.addEventListener("click", startNewNanoBudget);
+  document.getElementById("nanoStartNewBudgetHeader")?.addEventListener("click", startNewNanoBudget);
   document.getElementById("nanoPrimaryAction")?.addEventListener("click", async (event) => {
     const action = event.currentTarget.dataset.nanoAction;
     if (action === "switchNetwork") {
