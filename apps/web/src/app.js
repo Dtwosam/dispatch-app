@@ -3635,8 +3635,6 @@ function renderNanoPageSimplified() {
           </article>
         `).join("")}
         </div>
-        ${state.nano.publicMetricsLoading ? `<p class="nano-helper">Loading public Nano stats...</p>` : ""}
-        ${state.nano.publicMetricsError ? `<p class="nano-helper nano-helper--warn">${escapeHtml(state.nano.publicMetricsError)}</p>` : ""}
       </section>
 
       <section class="nano-panel nano-run-console reveal-on-scroll" id="nanoRunStart" aria-labelledby="nanoRunConsoleTitle">

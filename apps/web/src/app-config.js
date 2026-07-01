@@ -84,6 +84,16 @@ export const categories = [
 
 export const wizardSteps = ["Identity", "Behavior", "Tools", "Knowledge", "Schema", "Test Run", "Publish"];
 
+export const NANO_PUBLIC_METRICS_SNAPSHOT = {
+  verifiedUsdc: "0.29",
+  sourceRequestCount: 13,
+  receiptCount: 19,
+  verifiedUnlockCount: 10,
+  dispatchAgentCount: 5,
+  source: "last-verified-router-snapshot",
+  generatedAt: "2026-07-01T11:41:37.302Z",
+};
+
 export const suggestedSkillsByCategory = {
   research: ["research synthesis", "market signals", "decision support"],
   writing: ["homepage copy", "launch copy", "email copy"],
@@ -168,7 +178,7 @@ export function createInitialState() {
       runActivities: {},
       runHistoryLoading: false,
       runHistoryError: "",
-      publicMetrics: null,
+      publicMetrics: { ...NANO_PUBLIC_METRICS_SNAPSHOT },
       publicMetricsLoaded: false,
       publicMetricsLoading: false,
       publicMetricsError: "",

@@ -2030,6 +2030,28 @@ test("Nano economy stats use honest fallback values without fake payment data", 
   assert.doesNotMatch(JSON.stringify(model), /paid users|traction|growth|earnings|ratings|reviews|Agents paid|fake volume/i);
 });
 
+test("Nano economy stats show the last verified public router snapshot immediately", () => {
+  const model = buildNanoEconomyStatsModel({
+    verifiedUsdc: "0.29",
+    sourceRequestCount: 13,
+    receiptCount: 19,
+    verifiedUnlockCount: 10,
+    dispatchAgentCount: 5,
+    source: "last-verified-router-snapshot",
+    generatedAt: "2026-07-01T11:41:37.302Z",
+  });
+  const stats = Object.fromEntries(model.stats.map((stat) => [stat.label, stat]));
+
+  assert.equal(model.walletScoped, false);
+  assert.equal(model.helper, "Last verified router snapshot. Refreshes from public metrics in the background.");
+  assert.equal(stats["USDC verified"].value, "0.29 verified");
+  assert.equal(stats["Source requests"].value, "13 requests");
+  assert.equal(stats["Receipts recorded"].value, "19 receipts");
+  assert.equal(stats["Verified unlocks"].value, "10 verified");
+  assert.equal(stats["Dispatch agents"].value, "5 built-in");
+  assert.doesNotMatch(JSON.stringify(model), /fake users|fake payouts|earnings|ratings|reviews|tx hashes|proof attempts/i);
+});
+
 test("Nano economy stats count only verified Arc proof for paid values", () => {
   const verifiedSourceTx = `0x${"a".repeat(64)}`;
   const verifiedAgentTx = `0x${"b".repeat(64)}`;
@@ -2111,6 +2133,7 @@ test("Nano economy stats do not switch into wallet-private activity stats", () =
 
 test("Nano public stats render before wallet-gated console in the Nano page template", () => {
   const appSource = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+  const configSource = readFileSync(new URL("./app-config.js", import.meta.url), "utf8");
   const statsIndex = appSource.indexOf('<section class="nano-economy-stats nano-economy-stats--public"');
   const consoleIndex = appSource.indexOf('<section class="nano-panel nano-run-console');
 
@@ -2124,10 +2147,18 @@ test("Nano public stats render before wallet-gated console in the Nano page temp
   assert.match(statsSection, /nanoEconomyStats\.stats/);
   assert.match(statsSection, /nano-economy-stats__grid/);
   assert.match(statsSection, /nano-economy-stats__card/);
-  assert.doesNotMatch(statsSection, /reveal-on-scroll|data-wallet|Connect wallet|Agents paid|Your stats|Your earnings|fake volume|paid users/i);
+  assert.doesNotMatch(statsSection, /reveal-on-scroll|data-wallet|Connect wallet|Loading public Nano stats|Agents paid|Your stats|Your earnings|fake volume|paid users/i);
   assert.match(appSource, /getJson\("\/api\/nano\/metrics", validateNanoMetricsResponse\)/);
   assert.match(appSource, /buildNanoEconomyStatsModel\(state\.nano\.publicMetrics\)/);
   assert.doesNotMatch(statsSection, /metrics\?wallet/);
+  assert.match(configSource, /NANO_PUBLIC_METRICS_SNAPSHOT/);
+  assert.match(configSource, /verifiedUsdc: "0\.29"/);
+  assert.match(configSource, /sourceRequestCount: 13/);
+  assert.match(configSource, /receiptCount: 19/);
+  assert.match(configSource, /verifiedUnlockCount: 10/);
+  assert.match(configSource, /dispatchAgentCount: 5/);
+  assert.match(configSource, /publicMetrics: \{ \.\.\.NANO_PUBLIC_METRICS_SNAPSHOT \}/);
+  assert.match(configSource, /publicMetricsLoaded: false/);
 
   const nanoRouteIndex = appSource.indexOf('if (path === "/nano") {');
   const nanoRouteEnd = appSource.indexOf('if (path === "/arc-demo")', nanoRouteIndex);
@@ -2144,6 +2175,7 @@ test("Nano public stats render before wallet-gated console in the Nano page temp
   const publicMetricsFunction = appSource.slice(publicMetricsFunctionIndex, publicMetricsFunctionEnd);
   assert.match(publicMetricsFunction, /\/api\/nano\/metrics/);
   assert.doesNotMatch(publicMetricsFunction, /nanoWalletParam|state\.wallet|metrics\?wallet|budgets\?wallet/);
+  assert.doesNotMatch(publicMetricsFunction, /state\.nano\.publicMetrics = null/);
 });
 
 test("Nano metrics count only verified Arc proof as paid usage", () => {

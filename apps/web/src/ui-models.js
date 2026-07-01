@@ -1567,6 +1567,7 @@ export function buildNanoEconomyStatsModel(metrics, options = {}) {
   const verifiedUsdcFromReceipts = verifiedArcReceipts.reduce((total, receipt) => total + Number(receipt?.amount || 0), 0);
   const verifiedUsdc = Number(metrics?.verifiedUsdc ?? metrics?.totalRecordedPaymentValue ?? 0) || verifiedUsdcFromReceipts;
   const hasRouterMetrics = Boolean(metrics);
+  const isLastVerifiedSnapshot = metrics?.source === "last-verified-router-snapshot";
   const verifiedSourceUnlocks = verifiedArcReceipts.filter((receipt) => {
     const payeeId = String(receipt?.payee?.payeeId || receipt?.payeeId || "").toLowerCase();
     const payeeType = String(receipt?.payee?.type || "").toLowerCase();
@@ -1579,7 +1580,9 @@ export function buildNanoEconomyStatsModel(metrics, options = {}) {
 
   return {
     title: "Platform Nano stats",
-    helper: "Public proof and source-unlock metrics for the Dispatch Nano economy. Wallet-specific run history appears after you connect.",
+    helper: isLastVerifiedSnapshot
+      ? "Last verified router snapshot. Refreshes from public metrics in the background."
+      : "Public proof and source-unlock metrics for the Dispatch Nano economy. Wallet-specific run history appears after you connect.",
     visibility: "public",
     walletScoped: false,
     stats: [
