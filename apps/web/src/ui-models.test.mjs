@@ -2190,8 +2190,8 @@ test("Nano x402/Gateway status copy stays supporting and unpaid in the Nano temp
   assert.ok(statusIndex > heroIndex, "x402/Gateway copy should not appear in the hero");
   assert.ok(statusIndex < proofRulesIndex, "x402/Gateway copy should sit near live/planned proof rules");
   assert.match(statusBlock, /Payment-required endpoint available/);
-  assert.match(statusBlock, /browser flow still uses Arc proof for paid\/unlocked state/);
-  assert.match(statusBlock, /real buyer proof is completed/);
+  assert.match(statusBlock, /local Gateway buyer proof script is available/);
+  assert.match(statusBlock, /browser paid\/unlocked state still uses Arc proof/);
   assert.doesNotMatch(statusBlock, /Gateway payment verified|Nanopayments live|paid with Gateway proof|Gateway receipt verified/i);
 });
 
