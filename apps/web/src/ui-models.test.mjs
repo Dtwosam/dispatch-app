@@ -2192,7 +2192,9 @@ test("Nano x402/Gateway status copy stays supporting and unpaid in the Nano temp
   assert.match(statusBlock, /Payment-required endpoint available/);
   assert.match(statusBlock, /local Gateway buyer proof script is available/);
   assert.match(statusBlock, /browser paid\/unlocked state still uses Arc proof/);
-  assert.doesNotMatch(statusBlock, /Gateway payment verified|Nanopayments live|paid with Gateway proof|Gateway receipt verified/i);
+  assert.match(statusBlock, /Agent Stack\/Circle Wallets are mapped as a readiness path/);
+  assert.match(statusBlock, /not live browser custody/);
+  assert.doesNotMatch(statusBlock, /Gateway payment verified|Nanopayments live|Circle Wallets are active|agent wallets are live|paid with Gateway proof|Gateway receipt verified/i);
 });
 
 test("Nano metrics count only verified Arc proof as paid usage", () => {

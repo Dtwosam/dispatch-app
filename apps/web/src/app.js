@@ -3775,7 +3775,7 @@ function renderNanoPageSimplified() {
             </div>
             <div class="nano-proof-box">
               <h3>x402/Gateway source path</h3>
-              <p><strong>Payment-required endpoint available.</strong> A local Gateway buyer proof script is available; browser paid/unlocked state still uses Arc proof.</p>
+              <p><strong>Payment-required endpoint available.</strong> A local Gateway buyer proof script is available; browser paid/unlocked state still uses Arc proof. Agent Stack/Circle Wallets are mapped as a readiness path for future agent-managed budgets, not live browser custody.</p>
             </div>
             <div class="nano-proof-rules">
               <strong>What counts as paid</strong>

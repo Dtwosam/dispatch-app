@@ -14,7 +14,8 @@
 | Dispatch task handoff | Local preview/handoff context is available where supported. | Deeper marketplace integration. | Yes, as local preview/context. | Do not claim production task settlement from Nano. |
 | Circle Gateway | Not live. | Gateway-backed payment path. | Planned-only. | Do not claim Gateway settlement. |
 | x402 | Nano has an unpaid payment-required source endpoint. | Buyer payment, retry, and paid source/tool access. | Partial. | Do not claim paid x402 content access or Gateway settlement. |
-| Circle Wallets | Not live. | Managed wallet/spend policy option. | Planned-only. | Do not claim Circle Wallet custody or balances. |
+| Circle Agent Stack | Local CLI/readiness check only. | Agent-managed spending policies after Gateway proof is verified. | Readiness-only. | Do not claim agent wallets or autonomous spending are live. |
+| Circle Wallets | Local readiness mapping only. | Managed wallet/spend policy option. | Readiness-only. | Do not claim Circle Wallet custody or balances. |
 | Nanopayments | Not live. | Tiny Circle nanopayment flow. | Planned-only. | Do not claim gas-free nanopayments are live. |
 | Agent-to-agent payouts | Not live as production payouts. | Verified agent-to-agent payout network. | Planned-only unless a real verified proof exists. | Do not fake helper-agent payout proof. |
 | Production settlement | Existing Dispatch marketplace settlement remains separate. | Nano production settlement expansion. | No, unless later confirmed. | Current Nano proof path does not change Dispatch marketplace settlement. |

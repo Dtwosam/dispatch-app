@@ -18,7 +18,7 @@ The core Nano idea is simple:
 
 Budget, spend intent, and receipt models are the implementation architecture. The public product story is source/tool payment with visible Arc USDC proof.
 
-Nano does not replace the marketplace. It extends Dispatch with source/tool receipts and proof-gated result contribution. Nano now includes a Nano-scoped x402/Gateway-compatible source endpoint that returns HTTP 402 payment-required metadata and a local-only Circle Gateway buyer proof script; the live browser unlock path still uses Arc proof unless Gateway/Nanopayments verification is completed. Agent-to-agent payments, creator payouts, Circle Wallets, and Nanopayments settlement remain planned unless the repo verifies them.
+Nano does not replace the marketplace. It extends Dispatch with source/tool receipts and proof-gated result contribution. Nano now includes a Nano-scoped x402/Gateway-compatible source endpoint that returns HTTP 402 payment-required metadata, a local-only Circle Gateway buyer proof script, and a local Agent Stack/Circle Wallet readiness check; the live browser unlock path still uses Arc proof unless Gateway/Nanopayments verification is completed. Agent-to-agent payments, creator payouts, Circle Wallet custody, and Nanopayments settlement remain planned unless the repo verifies them.
 
 ### Lepton Hackathon Links
 
@@ -164,5 +164,5 @@ Production deploys must not be run during planning, docs, UX, or local-only impl
 - Arc/Circle/USDC are the active product direction.
 - Dispatch Nano is planned for Lepton and must be built phase by phase.
 - Visible payment trails are central to the Nano story.
-- Circle Gateway, Nanopayments, x402, Circle Wallets, and Circle Skills are planned/referenced unless implementation exists in the repo.
+- Circle Gateway, Nanopayments, x402, Circle Wallets, Agent Stack, and Circle Skills are planned/referenced unless implementation exists in the repo. Local readiness scripts do not mean production custody or browser payment flow is live.
 - Do not claim integrations are complete unless the repository proves it.

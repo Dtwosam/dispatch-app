@@ -11,12 +11,13 @@ Purpose:
 
 Status:
 
-- planned/referenced only
+- local readiness check only; runtime integration planned
 
 Dispatch Nano usage:
 
 - guide the architecture for agent budgets and spend plans
 - align demo language with agent wallets, x402 services, and USDC spend receipts
+- local readiness script checks Circle CLI availability without creating wallets
 
 Must not claim yet:
 
@@ -32,11 +33,12 @@ Purpose:
 
 Status:
 
-- planned
+- local readiness mapping only; custody planned
 
 Current repo:
 
 - current task funding uses browser-wallet flow through existing Arc wallet logic
+- readiness script does not create wallets or read Circle Wallet balances
 
 Must not claim yet:
 
