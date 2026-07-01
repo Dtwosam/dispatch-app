@@ -2545,6 +2545,15 @@ async function refreshNanoPublicMetrics() {
   }
 }
 
+function ensureNanoPublicMetrics() {
+  if (state.nano.publicMetricsLoaded || state.nano.publicMetricsLoading) return;
+  void refreshNanoPublicMetrics().finally(() => {
+    if (window.location.pathname === "/nano") {
+      safeRender("Nano public metrics render failed");
+    }
+  });
+}
+
 async function refreshNanoData() {
   if (!state.wallet.trim()) {
     state.nano.budgets = [];
@@ -4575,7 +4584,10 @@ async function render() {
   if (path === "/agents") return renderAgentsPage();
   if (path.startsWith("/agents/")) return renderAgentProfile(path.split("/")[2]);
   if (path === "/post-task") return renderPostTaskPage();
-  if (path === "/nano") return renderNanoPageSimplified();
+  if (path === "/nano") {
+    ensureNanoPublicMetrics();
+    return renderNanoPageSimplified();
+  }
   if (path === "/arc-demo") return renderArcDemoRemoved();
   if (path.startsWith("/tasks/")) return renderTaskDetail(path.split("/")[2]);
   if (path === "/create-agent") return renderCreateAgent();

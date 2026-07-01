@@ -2128,6 +2128,22 @@ test("Nano public stats render before wallet-gated console in the Nano page temp
   assert.match(appSource, /getJson\("\/api\/nano\/metrics", validateNanoMetricsResponse\)/);
   assert.match(appSource, /buildNanoEconomyStatsModel\(state\.nano\.publicMetrics\)/);
   assert.doesNotMatch(statsSection, /metrics\?wallet/);
+
+  const nanoRouteIndex = appSource.indexOf('if (path === "/nano") {');
+  const nanoRouteEnd = appSource.indexOf('if (path === "/arc-demo")', nanoRouteIndex);
+  const nanoRouteBlock = appSource.slice(nanoRouteIndex, nanoRouteEnd);
+  assert.match(nanoRouteBlock, /ensureNanoPublicMetrics\(\)/);
+  assert.match(nanoRouteBlock, /renderNanoPageSimplified\(\)/);
+  assert.ok(
+    nanoRouteBlock.indexOf("ensureNanoPublicMetrics()") < nanoRouteBlock.indexOf("renderNanoPageSimplified()"),
+    "public Nano metrics should be scheduled before the Nano page renders",
+  );
+
+  const publicMetricsFunctionIndex = appSource.indexOf("async function refreshNanoPublicMetrics()");
+  const publicMetricsFunctionEnd = appSource.indexOf("function ensureNanoPublicMetrics()", publicMetricsFunctionIndex);
+  const publicMetricsFunction = appSource.slice(publicMetricsFunctionIndex, publicMetricsFunctionEnd);
+  assert.match(publicMetricsFunction, /\/api\/nano\/metrics/);
+  assert.doesNotMatch(publicMetricsFunction, /nanoWalletParam|state\.wallet|metrics\?wallet|budgets\?wallet/);
 });
 
 test("Nano metrics count only verified Arc proof as paid usage", () => {
