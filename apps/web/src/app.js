@@ -3773,6 +3773,10 @@ function renderNanoPageSimplified() {
                 </article>
               `).join("")}
             </div>
+            <div class="nano-proof-box">
+              <h3>x402/Gateway source path</h3>
+              <p><strong>Payment-required endpoint available.</strong> Nano can now detect a payment-required source path. The browser flow still uses Arc proof for paid/unlocked state. Gateway Nanopayments are verified only when a real buyer proof is completed.</p>
+            </div>
             <div class="nano-proof-rules">
               <strong>What counts as paid</strong>
               ${judgeCommandCenter.proofRules.map((rule) => `<span>${escapeHtml(rule)}</span>`).join("")}

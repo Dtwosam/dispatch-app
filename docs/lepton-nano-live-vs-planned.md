@@ -13,7 +13,7 @@
 | Receipt trail | Receipt trail and shareable receipt route are supported for real wallet-scoped runs. | Public explorer and richer receipt views. | Yes, when using real run data. | Do not invent receipt URLs or tx hashes. |
 | Dispatch task handoff | Local preview/handoff context is available where supported. | Deeper marketplace integration. | Yes, as local preview/context. | Do not claim production task settlement from Nano. |
 | Circle Gateway | Not live. | Gateway-backed payment path. | Planned-only. | Do not claim Gateway settlement. |
-| x402 | Not live. | x402 paid source/tool endpoints. | Planned-only. | Do not claim x402 requests or paid content access. |
+| x402 | Nano has an unpaid payment-required source endpoint. | Buyer payment, retry, and paid source/tool access. | Partial. | Do not claim paid x402 content access or Gateway settlement. |
 | Circle Wallets | Not live. | Managed wallet/spend policy option. | Planned-only. | Do not claim Circle Wallet custody or balances. |
 | Nanopayments | Not live. | Tiny Circle nanopayment flow. | Planned-only. | Do not claim gas-free nanopayments are live. |
 | Agent-to-agent payouts | Not live as production payouts. | Verified agent-to-agent payout network. | Planned-only unless a real verified proof exists. | Do not fake helper-agent payout proof. |

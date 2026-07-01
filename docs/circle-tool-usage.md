@@ -53,12 +53,13 @@ Purpose:
 
 Status:
 
-- planned
+- planned for payment/settlement; referenced by Nano's unpaid payment-required endpoint
 
 Dispatch Nano usage:
 
 - future payment proof for source/tool/agent payouts
 - possible bridge from budget deposits to spend receipts
+- current Nano x402 source endpoint returns payment-required metadata only
 
 Must not claim yet:
 
@@ -75,12 +76,13 @@ Purpose:
 
 Status:
 
-- planned
+- planned for buyer payment/settlement
 
 Dispatch Nano usage:
 
 - tiny per-use payments in the Nano spend plan
 - visible receipt trail showing amount, recipient type, and proof state
+- Nano now has a payment-required source endpoint, but not completed Nanopayments settlement
 
 Must not claim yet:
 
@@ -96,18 +98,20 @@ Purpose:
 
 Status:
 
-- planned
+- partially implemented for an unpaid Nano payment-required endpoint; buyer proof remains planned
 
 Dispatch Nano usage:
 
-- source/tool APIs can become x402-protected resources later
+- source/tool APIs can become x402-protected resources
 - agent spend intent can map to payment-required resource access
+- current endpoint: `GET /api/nano/x402/source-brief` returns HTTP 402 payment-required metadata
 
 Must not claim yet:
 
-- x402 middleware
+- x402 buyer payment completion
 - x402 service discovery
 - x402 paid content access
+- Gateway settlement
 
 ## Circle Skills / MCP
 
@@ -166,6 +170,7 @@ Must not claim yet:
 - source/tool/creator/agent payout recipients
 - visible Nano receipt trail
 - Circle Gateway/Nanopayments/x402 proof where feasible
+- Nano-scoped x402-compatible payment-required source endpoint
 - judge demo that clearly separates planned proof from implemented proof
 
 ## Claims To Avoid
@@ -174,7 +179,7 @@ Do not claim:
 
 - Circle Wallets are active
 - Gateway is settling Nano payouts
-- x402 is wired
+- x402 buyer payment or paid content access is wired
 - Nanopayments are live
 - agent-to-agent payments are complete
 - creators/sources/tools have been paid

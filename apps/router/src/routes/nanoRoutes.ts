@@ -9,6 +9,10 @@ import {
 } from "@marketplace/shared";
 import type { NanoBudgetService } from "../services/nanoBudgetService";
 import type { NanoArcProofService } from "../services/nanoArcProofService";
+import {
+  buildNanoX402PaymentRequiredResponse,
+  encodeNanoX402PaymentRequiredHeader,
+} from "../services/nanoX402CompatibilityService";
 
 function walletQuery(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -29,6 +33,13 @@ export function createNanoRoutes(service: NanoBudgetService, arcProofService?: N
 
   router.get("/health", (_req, res) => {
     res.json(service.health());
+  });
+
+  router.get("/x402/source-brief", (req, res) => {
+    const response = buildNanoX402PaymentRequiredResponse(req.originalUrl || req.path);
+    res.setHeader("PAYMENT-REQUIRED", encodeNanoX402PaymentRequiredHeader(response));
+    res.setHeader("Cache-Control", "no-store");
+    res.status(402).json(response);
   });
 
   router.get("/budgets", (req, res) => {

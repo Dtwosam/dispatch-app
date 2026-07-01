@@ -18,7 +18,7 @@ The core Nano idea is simple:
 
 Budget, spend intent, and receipt models are the implementation architecture. The public product story is source/tool payment with visible Arc USDC proof.
 
-Nano does not replace the marketplace. It extends Dispatch with source/tool receipts and proof-gated result contribution. Agent-to-agent payments, creator payouts, Gateway, x402, Circle Wallets, and Nanopayments remain planned unless the repo verifies them.
+Nano does not replace the marketplace. It extends Dispatch with source/tool receipts and proof-gated result contribution. Nano now includes a Nano-scoped x402/Gateway-compatible source endpoint that returns HTTP 402 payment-required metadata; the live browser unlock path still uses Arc proof unless Gateway/Nanopayments buyer proof is completed. Agent-to-agent payments, creator payouts, Circle Wallets, and Nanopayments settlement remain planned unless the repo verifies them.
 
 ### Lepton Hackathon Links
 

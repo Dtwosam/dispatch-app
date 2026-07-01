@@ -2178,6 +2178,23 @@ test("Nano public stats render before wallet-gated console in the Nano page temp
   assert.doesNotMatch(publicMetricsFunction, /state\.nano\.publicMetrics = null/);
 });
 
+test("Nano x402/Gateway status copy stays supporting and unpaid in the Nano template", () => {
+  const appSource = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+  const statusIndex = appSource.indexOf("x402/Gateway source path");
+  const heroIndex = appSource.indexOf("AI agents that pay for sources before using them.");
+  const supportIndex = appSource.indexOf('<section class="nano-support-details');
+  const proofRulesIndex = appSource.indexOf("What counts as paid", supportIndex);
+  const statusBlock = appSource.slice(statusIndex, statusIndex + 700);
+
+  assert.ok(statusIndex > supportIndex, "x402/Gateway copy should live in supporting details");
+  assert.ok(statusIndex > heroIndex, "x402/Gateway copy should not appear in the hero");
+  assert.ok(statusIndex < proofRulesIndex, "x402/Gateway copy should sit near live/planned proof rules");
+  assert.match(statusBlock, /Payment-required endpoint available/);
+  assert.match(statusBlock, /browser flow still uses Arc proof for paid\/unlocked state/);
+  assert.match(statusBlock, /real buyer proof is completed/);
+  assert.doesNotMatch(statusBlock, /Gateway payment verified|Nanopayments live|paid with Gateway proof|Gateway receipt verified/i);
+});
+
 test("Nano metrics count only verified Arc proof as paid usage", () => {
   const verifiedTx = `0x${"a".repeat(64)}`;
   const gatewayTx = `0x${"b".repeat(64)}`;
