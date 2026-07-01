@@ -20,6 +20,17 @@ Budget, spend intent, and receipt models are the implementation architecture. Th
 
 Nano does not replace the marketplace. It extends Dispatch with source/tool receipts and proof-gated result contribution. Agent-to-agent payments, creator payouts, Gateway, x402, Circle Wallets, and Nanopayments remain planned unless the repo verifies them.
 
+### Lepton Hackathon Links
+
+- Current Nano preview: https://dispatch-68rsav7s4-dtwoflicks-2878s-projects.vercel.app/nano
+- Router metrics endpoint: https://dispatch-router.onrender.com/api/nano/metrics
+- Final submission package: [docs/lepton-nano-final-submission-package.md](docs/lepton-nano-final-submission-package.md)
+- Judge walkthrough: [docs/lepton-nano-judge-walkthrough.md](docs/lepton-nano-judge-walkthrough.md)
+- Live vs planned claims: [docs/lepton-nano-live-vs-planned.md](docs/lepton-nano-live-vs-planned.md)
+- Demo script: [docs/lepton-nano-demo-script.md](docs/lepton-nano-demo-script.md)
+
+Use the preview link for the latest Nano judging flow. Production at https://dispatch-arc.vercel.app may not include the latest preview changes unless a production deploy is explicitly requested and completed.
+
 ## Current Direction
 
 The current Dispatch direction is:
