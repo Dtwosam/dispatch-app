@@ -2035,9 +2035,11 @@ test("Nano economy stats count only verified Arc proof for paid values", () => {
   const verifiedAgentTx = `0x${"b".repeat(64)}`;
   const rejectedTx = `0x${"c".repeat(64)}`;
   const model = buildNanoEconomyStatsModel({
+    verifiedUsdc: "0.05",
     receiptCount: 5,
     sourceRequestCount: 3,
-    verifiedSourceUnlockCount: 1,
+    verifiedUnlockCount: 1,
+    dispatchAgentCount: 5,
     totalRecordedPaymentValue: 0.05,
   }, {
     publicReceipts: [

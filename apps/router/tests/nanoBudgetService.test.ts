@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { nanoSpendPaymentRecordRequestSchema, type NanoPaymentProof } from "@marketplace/shared";
+import { nanoMetricsSchema, nanoSpendPaymentRecordRequestSchema, type NanoPaymentProof } from "@marketplace/shared";
 import { InMemoryRegistryStore } from "../src/db/store";
 import { NanoBudgetService } from "../src/services/nanoBudgetService";
 
@@ -275,9 +275,19 @@ test("public Nano metrics aggregate stored records without using wallet-private 
   assert.equal(publicMetrics.sourceRequestCount, 2);
   assert.equal(publicMetrics.receiptCount, 2);
   assert.equal(publicMetrics.verifiedSourceUnlockCount, 1);
+  assert.equal(publicMetrics.verifiedUnlockCount, 1);
   assert.equal(publicMetrics.verifiedArcReceiptCount, 1);
+  assert.equal(publicMetrics.verifiedUsdc, "0.05");
+  assert.equal(publicMetrics.dispatchAgentCount, 5);
+  assert.equal(publicMetrics.source, "router-read-model");
   assert.equal(publicMetrics.totalRecordedPaymentValue, 0.05);
   assert.equal(publicMetrics.walletsWithBudgets, 2);
+  assert.equal(typeof publicMetrics.sourceRequestCount, "number");
+  assert.equal(typeof publicMetrics.receiptCount, "number");
+  assert.equal(typeof publicMetrics.verifiedUnlockCount, "number");
+  assert.equal(typeof publicMetrics.dispatchAgentCount, "number");
+  assert.equal(Object.prototype.hasOwnProperty.call(publicMetrics, "sourceRequests"), false);
+  assert.doesNotThrow(() => nanoMetricsSchema.parse(publicMetrics));
   assert.equal(walletMetrics.budgetCount, 1);
   assert.equal(walletMetrics.sourceRequestCount, 1);
   assert.equal(walletMetrics.receiptCount, 1);

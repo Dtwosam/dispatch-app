@@ -337,6 +337,7 @@ export function validateNanoArcProofVerifyResponse(payload) {
 export function validateNanoMetricsResponse(payload) {
   const root = assertObject(payload, "nano metrics response");
   assertString(root.generatedAt, "nano metrics response.generatedAt");
+  assertString(root.verifiedUsdc, "nano metrics response.verifiedUsdc");
   [
     "budgetCount",
     "spendIntentCount",
@@ -344,12 +345,15 @@ export function validateNanoMetricsResponse(payload) {
     "sourceRequestCount",
     "receiptCount",
     "verifiedSourceUnlockCount",
+    "verifiedUnlockCount",
     "verifiedArcReceiptCount",
+    "dispatchAgentCount",
     "totalAuthorizedBudget",
     "totalApprovedIntentValue",
     "totalRecordedPaymentValue",
     "availableBudget",
     "walletsWithBudgets",
   ].forEach((key) => assertNumber(root[key], `nano metrics response.${key}`));
+  assertString(root.source, "nano metrics response.source");
   return root;
 }

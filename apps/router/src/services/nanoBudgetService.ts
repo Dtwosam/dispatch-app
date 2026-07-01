@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 import type { RegistryDatabase } from "../db/models";
 
 const NANO_PAYEE_TYPES: NanoPayeeType[] = ["source", "tool", "creator", "agent", "platform"];
+const DISPATCH_NANO_BUILT_IN_AGENT_COUNT = 5;
 
 function nowIso() {
   return new Date().toISOString();
@@ -37,6 +38,18 @@ function sameWallet(a: string, b: string) {
 
 function sumAmounts(values: number[]) {
   return Number(values.reduce((total, value) => total + value, 0).toFixed(6));
+}
+
+function metricCount(value: number) {
+  return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+}
+
+function metricAmount(value: number) {
+  return Number.isFinite(value) ? Number(Math.max(0, value).toFixed(6)) : 0;
+}
+
+function formatMetricUsdc(value: number) {
+  return metricAmount(value).toFixed(2);
 }
 
 function isValidArcTxHash(value: string | null | undefined) {
@@ -286,22 +299,29 @@ export class NanoBudgetService {
     const intents = [...this.store.nanoSpendIntents.values()].filter((intent) => budgetIds.has(intent.budgetId));
     const receipts = [...this.store.nanoSpendReceipts.values()].filter((receipt) => budgetIds.has(receipt.budgetId));
     const verifiedArcReceipts = receipts.filter(isVerifiedArcReceipt);
+    const sourceRequestCount = metricCount(intents.filter(isSourceUnlockPayee).length);
+    const verifiedSourceUnlockCount = metricCount(verifiedArcReceipts.filter(isSourceUnlockPayee).length);
+    const totalRecordedPaymentValue = metricAmount(sumAmounts(verifiedArcReceipts.map((receipt) => receipt.amount)));
     return {
       generatedAt: nowIso(),
-      budgetCount: budgets.length,
-      spendIntentCount: intents.length,
-      approvedSpendIntentCount: intents.filter((intent) => ["approved", "payment_recorded"].includes(intent.status)).length,
-      sourceRequestCount: intents.filter(isSourceUnlockPayee).length,
-      receiptCount: receipts.length,
-      verifiedSourceUnlockCount: verifiedArcReceipts.filter(isSourceUnlockPayee).length,
-      verifiedArcReceiptCount: verifiedArcReceipts.length,
-      totalAuthorizedBudget: sumAmounts(budgets.map((budget) => budget.amount)),
-      totalApprovedIntentValue: sumAmounts(
+      verifiedUsdc: formatMetricUsdc(totalRecordedPaymentValue),
+      budgetCount: metricCount(budgets.length),
+      spendIntentCount: metricCount(intents.length),
+      approvedSpendIntentCount: metricCount(intents.filter((intent) => ["approved", "payment_recorded"].includes(intent.status)).length),
+      sourceRequestCount,
+      receiptCount: metricCount(receipts.length),
+      verifiedSourceUnlockCount,
+      verifiedUnlockCount: verifiedSourceUnlockCount,
+      verifiedArcReceiptCount: metricCount(verifiedArcReceipts.length),
+      dispatchAgentCount: DISPATCH_NANO_BUILT_IN_AGENT_COUNT,
+      totalAuthorizedBudget: metricAmount(sumAmounts(budgets.map((budget) => budget.amount))),
+      totalApprovedIntentValue: metricAmount(sumAmounts(
         intents.filter((intent) => ["approved", "payment_recorded"].includes(intent.status)).map((intent) => intent.amount),
-      ),
-      totalRecordedPaymentValue: sumAmounts(verifiedArcReceipts.map((receipt) => receipt.amount)),
-      availableBudget: sumAmounts(budgets.map((budget) => this.calculateAvailableBudget(budget.budgetId))),
-      walletsWithBudgets: new Set(budgets.map((budget) => normalizeWallet(budget.ownerWallet))).size,
+      )),
+      totalRecordedPaymentValue,
+      availableBudget: metricAmount(sumAmounts(budgets.map((budget) => this.calculateAvailableBudget(budget.budgetId)))),
+      walletsWithBudgets: metricCount(new Set(budgets.map((budget) => normalizeWallet(budget.ownerWallet))).size),
+      source: "router-read-model",
     };
   }
 

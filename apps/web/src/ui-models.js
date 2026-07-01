@@ -1565,7 +1565,7 @@ export function buildNanoEconomyStatsModel(metrics, options = {}) {
   const publicReceipts = Array.isArray(options.publicReceipts) ? options.publicReceipts : [];
   const verifiedArcReceipts = publicReceipts.filter(isVerifiedNanoArcProofReceipt);
   const verifiedUsdcFromReceipts = verifiedArcReceipts.reduce((total, receipt) => total + Number(receipt?.amount || 0), 0);
-  const verifiedUsdc = Number(metrics?.totalRecordedPaymentValue || 0) || verifiedUsdcFromReceipts;
+  const verifiedUsdc = Number(metrics?.verifiedUsdc ?? metrics?.totalRecordedPaymentValue ?? 0) || verifiedUsdcFromReceipts;
   const hasRouterMetrics = Boolean(metrics);
   const verifiedSourceUnlocks = verifiedArcReceipts.filter((receipt) => {
     const payeeId = String(receipt?.payee?.payeeId || receipt?.payeeId || "").toLowerCase();
@@ -1573,8 +1573,9 @@ export function buildNanoEconomyStatsModel(metrics, options = {}) {
     return payeeId === "source_unlock" || payeeType === "source";
   }).length;
   const sourceRequestCount = Number(metrics?.sourceRequestCount ?? 0);
-  const verifiedUnlockCount = Number(metrics?.verifiedSourceUnlockCount ?? verifiedSourceUnlocks);
+  const verifiedUnlockCount = Number(metrics?.verifiedUnlockCount ?? metrics?.verifiedSourceUnlockCount ?? verifiedSourceUnlocks);
   const realReceiptCount = Number(metrics?.receiptCount ?? publicReceipts.length);
+  const dispatchAgentCount = Number(metrics?.dispatchAgentCount ?? nanoDispatchAgentOptions.length);
 
   return {
     title: "Platform Nano stats",
@@ -1604,7 +1605,7 @@ export function buildNanoEconomyStatsModel(metrics, options = {}) {
       },
       {
         label: "Dispatch agents",
-        value: `${nanoDispatchAgentOptions.length} built-in`,
+        value: `${dispatchAgentCount} built-in`,
         helper: "Available source agents for Nano runs.",
       },
     ],

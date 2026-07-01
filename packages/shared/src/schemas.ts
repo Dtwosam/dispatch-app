@@ -594,18 +594,22 @@ export const nanoRunContextSchema = z.object({
 
 export const nanoMetricsSchema = z.object({
   generatedAt: isoDateTimeSchema,
+  verifiedUsdc: z.string().regex(/^\d+(?:\.\d{1,6})?$/),
   budgetCount: z.number().int().nonnegative(),
   spendIntentCount: z.number().int().nonnegative(),
   approvedSpendIntentCount: z.number().int().nonnegative(),
   sourceRequestCount: z.number().int().nonnegative(),
   receiptCount: z.number().int().nonnegative(),
   verifiedSourceUnlockCount: z.number().int().nonnegative(),
+  verifiedUnlockCount: z.number().int().nonnegative(),
   verifiedArcReceiptCount: z.number().int().nonnegative(),
+  dispatchAgentCount: z.number().int().nonnegative(),
   totalAuthorizedBudget: usdcAmountSchema,
   totalApprovedIntentValue: usdcAmountSchema,
   totalRecordedPaymentValue: usdcAmountSchema,
   availableBudget: usdcAmountSchema,
   walletsWithBudgets: z.number().int().nonnegative(),
+  source: z.string().min(1),
 });
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
